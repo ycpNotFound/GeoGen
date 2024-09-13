@@ -1,0 +1,368 @@
+import json
+import re
+from collections import Counter
+from sympy import Symbol
+import random
+import numpy as np
+import sympy
+from matplotlib import pyplot as plt
+
+PREDICATES_PRE = [
+    # Preset
+    "Collinear",
+    "Cocircular",
+]
+PREDICATES_ENT = [
+    # Entity
+    "Parallelogram",
+    "Rectangle",
+    "Rhombus",
+    "RightTriangle",
+    "Square",
+    "EquilateralTriangle",
+    "IsoscelesTriangle",
+    "Trapezoid",
+    "Kite",
+    "RightTrapezoid",
+    "IsoscelesTrapezoid",
+    "IsoscelesRightTriangle",
+]
+PREDICATES_REL = [
+    # Relation
+    # "IsCentreOfCircle", 
+    "PerpendicularBetweenLine",
+    "ParallelBetweenLine",
+    "IsTangentOfCircle",
+    "IsDiameterOfCircle",
+    "IsMidpointOfLine",
+    "IsBisectorOfAngle",
+    "IsPerpendicularBisectorOfLine",
+    "SimilarBetweenTriangle",
+    "SimilarBetweenQuadrilateral",
+    "IsAltitudeOfTriangle",
+    "MirrorCongruentBetweenTriangle",
+    "CongruentBetweenTriangle",
+    "IsMedianOfTriangle",
+    "IsIncenterOfTriangle",
+    "IsMidsegmentOfTriangle",
+    "MirrorSimilarBetweenTriangle",
+    "IsMidpointOfArc",
+    "CongruentBetweenArc",
+    "IsMidsegmentOfQuadrilateral",
+    "IsCentroidOfTriangle",
+    "MirrorCongruentBetweenQuadrilateral",
+    "IsAltitudeOfQuadrilateral",
+    "CongruentBetweenQuadrilateral",
+    "IsCircumcenterOfTriangle",
+    "IsIncenterOfQuadrilateral",
+    "IsCircumcenterOfQuadrilateral",
+]
+PREDICATES_REL_2 = [
+    "SimilarBetweenTriangle",
+    "SimilarBetweenQuadrilateral",
+    "MirrorCongruentBetweenTriangle",
+    "CongruentBetweenTriangle",
+    "MirrorSimilarBetweenTriangle",
+    "CongruentBetweenArc",
+    "MirrorCongruentBetweenQuadrilateral",
+    "CongruentBetweenQuadrilateral",
+]
+PREDICATES_ATTR = [
+    # Attribution
+    "LengthOfLine",
+    "MeasureOfAngle",
+    "MeasureOfArc",
+    "RadiusOfCircle",
+    "AreaOfTriangle",
+    "DiameterOfCircle",
+    "AreaOfQuadrilateral",
+    "PerimeterOfTriangle",
+    "LengthOfArc",
+    "PerimeterOfQuadrilateral",
+    "RatioOfSimilarTriangle",
+    "HeightOfQuadrilateral",
+    "AreaOfSector",
+    "AreaOfCircle",
+    "RatioOfSimilarArc",
+    "RatioOfMirrorSimilarTriangle",
+    "RatioOfSimilarQuadrilateral",
+]
+
+def get_predicate_name(clause):
+    if 'Equal' in clause:
+        return 'Equal'
+    else:
+        return clause.split('(')[0]
+    
+def move_subtractions_to_rhs(eq):
+    # 确保所有项都在等号左边
+    lhs, rhs = sympy.simplify(eq.lhs - eq.rhs), 0
+    
+    # 提取左边的项
+    terms = lhs.as_ordered_terms()
+    
+    # 存储加项和减项
+    positive_terms = []
+    negative_terms = []
+    
+    for term in terms:
+        if term.is_negative:
+            # 将减项存储
+            negative_terms.append(-term)
+        else:
+            # 将加项存储
+            positive_terms.append(term)
+    
+    # 组合成新方程
+    new_lhs = sympy.Add(*positive_terms)
+    new_rhs = sympy.Add(*negative_terms)
+    
+    # 生成字符串输出
+    result = f"{new_lhs} = {new_rhs}"
+    return result
+
+
+def read_json(json_path):
+    data = json.load(open(json_path, 'r', encoding='utf-8'))
+    return data
+
+def load_theorems_and_predicates():
+    path_1 = "doc/predicates.txt"
+    path_2 = "doc/theorems.txt"
+    
+    with open(path_1, 'r') as f1:
+        preds = f1.readlines()
+        preds = [s.strip() for s in preds]
+        
+    with open(path_2, 'r') as f2:
+        theos = f2.readlines()
+        theos = [s.strip() for s in theos]
+        
+    return preds, theos
+
+def stats_for_formalgeo():
+    split = "train"
+    data_path = f"datasets/processed_data/fgo_{split}.json"
+    data = read_json(data_path)
+    preds, theos = load_theorems_and_predicates()
+    
+    cdl_list, theo_list = [], []
+    for key, value in data.items():
+        cdl_list_i = value['construction_cdl'] + value['text_cdl']
+        
+            
+        cdl_list_1 = [s.split('(')[0] for s in cdl_list_i]
+        cdl_list_2 = []
+        for s in cdl_list_i:
+            if 'Equal' in s:
+                s = s.split('Equal(')[-1][:-1]
+                s = s.split('(')[0]
+                if s[0].isupper():
+                    cdl_list_2.append(s)
+        
+        cdl_list_i = cdl_list_1 + cdl_list_2
+        theo_list_i = value['theorem_seqs']
+        theo_list_i = [s.split('(')[0] for s in theo_list_i]
+        
+        cdl_list += cdl_list_i
+        theo_list += theo_list_i
+    
+    cdl_count = Counter(cdl_list)
+    theo_count = Counter(theo_list)
+    
+    preds_not_used = set(preds) - set(list(cdl_count.keys()))
+    print(f"{'-'*10} Predicats not used : {'-'*10}")
+    for p in preds_not_used:
+        print(p)
+        
+    theo_not_used = set(theos) - set(list(theo_count.keys()))
+    print("{'-'*10} Theorems not used: {'-'*10}")
+    for t in theo_not_used:
+        print(t)
+        
+    pred_sorted = sorted(list(cdl_count.keys()), key=lambda x: cdl_count[x], reverse=True)
+    print(f"{'-'*10} Predicats Stats: {'-'*10}")
+    for p in pred_sorted:
+        print(f"{cdl_count[p]} - {p}")
+        
+    theo_sorted = sorted(list(theo_count.keys()), key=lambda x: theo_count[x], reverse=True)
+    print(f"{'-'*10} Theorem Stats: {'-'*10}")
+    for t in theo_sorted:
+        print(f"{theo_count[t]} - {t}")
+        
+    return cdl_count, theo_count
+
+
+# Tools for generator
+
+def get_points_mapping(clause, template):
+    clause_content = re.findall(r'\((.*?)\)', clause)
+    template_content = re.findall(r'\((.*?)\)', template)
+
+    # 检查是否找到了匹配项并且确保两者都只有一个括号对
+    if len(clause_content) != 1 or len(template_content) != 1:
+        raise ValueError("Invalid input strings, expected exactly one pair of parentheses.")
+
+    # 分割出括号内的各个元素
+    clause_elements = clause_content[0].replace(',', '')
+    template_elements = template_content[0].replace(',', '')
+
+    # 确保两个字符串的括号内元素数量一致
+    if len(clause_elements) != len(template_elements):
+        raise ValueError("The number of elements within parentheses must match.")
+
+    # 创建映射
+    mapping = {}
+    for t, c in zip(template_elements, clause_elements):
+        mapping[t.strip()] = c.strip()
+
+    return mapping
+
+def get_symbol(char):
+    return [Symbol(f"x_{char}"), Symbol(f"y_{char}")]
+
+def get_content(clause):
+    if ',' in clause:
+        match = re.search(r'\((.*?)\)', clause)
+        items = match.group(1)
+        items = items.split(',')
+        points = list(set(sum([list(s.strip()) for s in items], [])))
+    else:
+        items = re.findall(r'\((\w+)\)', clause)
+        points = sum((list(set(item)) for item in items), [])
+    return sorted(points)
+        
+    
+def get_points_num(clause):
+    if ',' in clause:
+        match = re.search(r'\((.*?)\)', clause)
+        items = match.group(1)
+        items = items.split(',')
+        points = list(set(sum([list(s.strip()) for s in items], [])))
+
+    else:
+        items = re.findall(r'\((\w+)\)', clause)
+        points = sum((list(set(item)) for item in items), [])
+    return len(points)
+
+def replace_points(predicate, pred_info, new_points, mapping=None):
+    # Predicate(* Points) -> Predicate(* New Points) 
+    # Given point mapping: do not use new_points
+    if mapping == None:
+        mapping = {}
+        points = get_content(predicate)
+        assert len(points) == len(new_points)
+        for p, new_p in zip(points, new_points):
+            mapping[p] = new_p
+        
+    def replace_for_predicate(predicate, p_map):
+        if 'Equal' in predicate:
+            items = predicate.split('Equal(')[-1][:-1]
+            left, right = items.split(',')
+            left = replace_for_predicate(left, p_map)
+            right = replace_for_predicate(right, p_map)
+            return f'Equal({left},{right})'
+        elif '(' not in predicate and ')' not in predicate:
+            return predicate
+        else:
+            name, letter_part = predicate.split('(')
+            letter_part = letter_part.rstrip(')')
+            letter_part = ''.join(p_map.get(c, c) for c in letter_part)
+            return f"{name}({letter_part})"
+
+    predicate = replace_for_predicate(predicate, mapping)
+    for i, pred_i in enumerate(pred_info['ee_check']):
+        pred_info['ee_check'][i] = replace_for_predicate(pred_i, mapping)
+    for i, pred_i in enumerate(pred_info['extend']):
+        pred_info['extend'][i] = replace_for_predicate(pred_i, mapping)
+
+    return predicate, pred_info
+
+def append_lst(lst, items: list):
+    for item in items:
+        if item not in lst:
+            lst.append(item)
+            
+    return lst
+
+def parse_clause(clause):
+    if 'Equal' in clause:
+        pattern =  r'Equal\((.*)\)'
+        match = re.search(pattern, clause)
+        items = match.group(1)
+        item_l, item_r = items.split(',')
+        predicate_l, predicate_r = None, None
+        content_l, content_r = item_l, item_r
+        if not item_l.isdigit():
+            predicate_l, content_l = parse_clause(item_l)
+            if len(content_l) == 1:
+                content_l = content_l[0]
+        if not item_r.isdigit():
+            predicate_r, content_r = parse_clause(item_r)
+            if len(content_r) == 1:
+                content_r = content_r[0]
+        content_l = content_l.strip()
+        content_r = content_r.strip()
+        predicate_l = predicate_l.strip()
+        if predicate_r is None or predicate_r == predicate_l:
+            return predicate_l, (content_l, content_r)
+        else:
+            print(predicate_r)
+            print('Error')
+    else:
+        items = re.findall(r'\((.*?)\)', clause)[0]
+        items = [i.strip() for i in items.split(',')]
+        predicate = clause.split('(')[0].strip()
+        
+        return predicate, items
+    
+def get_points(clause):
+    _, items = parse_clause(clause)
+    points = set()
+    for item in items:
+        if item.isdigit():
+            continue
+        if len(item) > 1:
+            points.update(list(item))
+        else:
+            points.add(item)
+            
+    return sorted(list(points))
+    
+def max_letter_index(s):
+    # 提取括号内的内容
+    if 'Equal' in s:
+        pattern =  r'Equal\((.*)\)'
+        match = re.search(pattern, s)
+        if match:
+            # 提取匹配到的内容
+            items = match.group(1)
+            max_index_l, max_index_r = 0, 0
+            item_l, item_r = items.split(',')
+            if not item_l.isdigit(): 
+                max_index_l = max_letter_index(item_l)
+            if not item_r.isdigit():
+                max_index_r = max_letter_index(item_r)
+            return max(max_index_l, max_index_r)
+        else:
+            return 0
+    else:
+        content = re.findall(r'\((.*?)\)', s)[0]
+        # 计算括号内每个字母的索引，并找出最大索引
+        max_index = max(ord(c) - ord('a') for c in content if c.isalpha())
+        return max_index
+
+def intersects(line1, line2):
+    """检查两条线段是否相交"""
+    return bool(set(line1) & set(line2))
+
+def setup_seed(seed=1234):
+    random.seed(seed)
+    np.random.seed(seed)
+    
+    
+if __name__ == '__main__':
+    # stats_for_formalgeo()
+    s = "Cocircular(O,ABC)"
+    a = get_content(s)
+    print(a)
