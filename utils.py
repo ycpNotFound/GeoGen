@@ -14,6 +14,7 @@ PREDICATES_PRE = [
 ]
 PREDICATES_ENT = [
     # Entity
+    "Triangle",
     "Parallelogram",
     "Rectangle",
     "Rhombus",
@@ -38,7 +39,7 @@ PREDICATES_REL = [
     "IsBisectorOfAngle",
     "IsPerpendicularBisectorOfLine",
     "SimilarBetweenTriangle",
-    "SimilarBetweenQuadrilateral",
+    # "SimilarBetweenQuadrilateral",
     "IsAltitudeOfTriangle",
     "MirrorCongruentBetweenTriangle",
     "CongruentBetweenTriangle",
@@ -58,14 +59,14 @@ PREDICATES_REL = [
     "IsCircumcenterOfQuadrilateral",
 ]
 PREDICATES_REL_2 = [
-    "SimilarBetweenTriangle",
+    # "SimilarBetweenTriangle",
     "SimilarBetweenQuadrilateral",
-    "MirrorCongruentBetweenTriangle",
-    "CongruentBetweenTriangle",
-    "MirrorSimilarBetweenTriangle",
-    "CongruentBetweenArc",
-    "MirrorCongruentBetweenQuadrilateral",
-    "CongruentBetweenQuadrilateral",
+    # "MirrorCongruentBetweenTriangle",
+    # "CongruentBetweenTriangle",
+    # "MirrorSimilarBetweenTriangle",
+    # "CongruentBetweenArc",
+    # "MirrorCongruentBetweenQuadrilateral",
+    # "CongruentBetweenQuadrilateral",
 ]
 PREDICATES_ATTR = [
     # Attribution
@@ -340,17 +341,60 @@ def max_letter_index(s):
             max_index_l, max_index_r = 0, 0
             item_l, item_r = items.split(',')
             if not item_l.isdigit(): 
-                max_index_l = max_letter_index(item_l)
+                max_index_l, _ = max_letter_index(item_l)
             if not item_r.isdigit():
-                max_index_r = max_letter_index(item_r)
-            return max(max_index_l, max_index_r)
+                max_index_r, _ = max_letter_index(item_r)
+            max_index = max(max_index_l, max_index_r)
+            return (max_index, 0)
         else:
-            return 0
+            return (0, 0)
     else:
         content = re.findall(r'\((.*?)\)', s)[0]
         # 计算括号内每个字母的索引，并找出最大索引
         max_index = max(ord(c) - ord('a') for c in content if c.isalpha())
-        return max_index
+        index_2 = 0
+        if 'Cocircular' in s: # move cocircular to the last
+            index_2 = 1
+        return (max_index, index_2)
+    
+def find_target_for_construct(clause):
+    # 返回需要构造的target points
+    # 以其他点为条件，可确定target points的坐标
+    predicate, items = parse_clause(clause)
+    if predicate in ['Shape', 'Polygon'] :
+        return []
+    if predicate == 'LengthOfLine':
+        return [max(items[0] + items[1])]
+    if predicate == 'LengthOfArc':
+        points_1 = items[0][1:]
+        points_2 = items[1][1:]
+        return [max(points_1 + points_2)]
+    elif predicate == 'MeasureOfAngle':
+        a1, a2 = items
+        if a2.isdigit():
+            return [max(a1)]
+        else:
+            return [max(a1 + a2)]
+    elif predicate == 'Collinear':
+        points = sorted(items[0])
+        return points[2:]
+    elif predicate == 'Cocircular':
+        circle, points = items
+        sorted_points = sorted(points)
+        if circle > max(sorted_points[:3]):
+            return [circle] + list(points[3:])
+        else:
+            return list(sorted_points[1:])
+    elif predicate == 'ParallelBetweenLine':
+        return [max(items[0] + items[1])]
+    elif predicate == 'SimilarBetweenTriangle':
+        return [max(items[0] + items[1])]
+    elif predicate == 'IsCircumcenterOfQuadrilateral':
+        return items[0]
+    elif predicate == 'IsCentroidOfTriangle':
+        return items[0]
+    else:
+        raise KeyError(predicate)
 
 def intersects(line1, line2):
     """检查两条线段是否相交"""

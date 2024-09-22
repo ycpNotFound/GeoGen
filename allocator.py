@@ -7,7 +7,7 @@ from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from utils import (get_content, get_points, get_predicate_name, get_symbol,
-                   max_letter_index, parse_clause, replace_points, setup_seed)
+                   max_letter_index, parse_clause, replace_points, setup_seed, find_target_for_construct)
 
 # ClauseGenerator 
 # Allocator
@@ -33,44 +33,6 @@ IGNORE_NAMES = [
     
 def get_max_letter(s):
     return sorted(s)[-1]
-
-def find_target_for_construct(clause):
-    # 返回需要构造的target points
-    # 以其他点为条件，可确定target points的坐标
-    predicate, items = parse_clause(clause)
-    if predicate == 'Shape':
-        return []
-    if predicate == 'LengthOfLine':
-        return [max(items[0] + items[1])]
-    if predicate == 'LengthOfArc':
-        points_1 = items[0][1:]
-        points_2 = items[1][1:]
-        return [max(points_1 + points_2)]
-    elif predicate == 'MeasureOfAngle':
-        a1, a2 = items
-        if a2.isdigit():
-            return [max(a1)]
-        else:
-            return [max(a1 + a2)]
-    elif predicate == 'Collinear':
-        points = sorted(items[0])
-        return points[2:]
-    elif predicate == 'Cocircular':
-        circle, points = items
-        sorted_points = sorted(points)
-        if circle > max(sorted_points[:3]):
-            return [circle] + list(points[3:])
-        
-        else:
-            return list(sorted_points[1:])
-    elif predicate == 'ParallelBetweenLine':
-        return [max(items[0] + items[1])]
-    
-    elif predicate == 'SimilarBetweenTriangle':
-        return [max(items[0] + items[1])]
-    
-    else:
-        raise KeyError(predicate)
     
 
 class Allocator():
@@ -193,7 +155,7 @@ class Allocator():
         elif predicate == 'LengthOfLine':
             self.allocate_equal_line(items[0], items[1])
         elif predicate == 'LengthOfArc':
-            self.allocate_equal_arc()
+            self.allocate_equal_arc(items[0], items[1])
         else:
             print('Error: ', predicate, items)
             raise KeyError(predicate)
@@ -247,6 +209,8 @@ class Allocator():
         if circle > max(points[:3]):
             # define new circle center
             char, target, expand_eq = self.find_target([circle])
+            if target is None:
+                return
             circle_eqs = self.get_circum_circle_eqs(target, points[:3])
             solution = solve(circle_eqs + expand_eq, target)
             self.update_symbol(solution, circle)
@@ -274,12 +238,12 @@ class Allocator():
         
         return
     
-    def allocate_congruent(self, points_1, points_2):
+    def allocate_congruent(self, pclause):
         predicate, items = parse_clause(clause)
         points_1, points_2 = items
         self.define_points(list(points_1 + points_2))
     
-    def allocate_similar(self, points_1, points_2):
+    def allocate_similar(self, clause):
         predicate, items = parse_clause(clause)
         points_1, points_2 = items
         self.define_points(list(points_1 + points_2))
@@ -342,12 +306,33 @@ class Allocator():
             
         circle, p1, p2 = arc_1
         circle, p3, p4 = arc_2
-        cos_1 = self.get_cos([p1, circle, p2])
-        cos_2 = self.get_cos([p3, circle, p4])
+        dot_1 = self.get_dot_product([circle, p1], [circle, p2])
+        dot_2 = self.get_dot_product([circle, p3], [circle, p4])
+        
+        if isinstance(dot_1, float) and isinstance(dot_2, float):
+            if abs(dot_1 - dot_2) < 1e-8:
+                return
+            else:
+                raise ValueError(dot_1 - dot_2)
+        eq = Eq(dot_1, dot_2)
+        # find the max index point as target
+        if arc_2.isdigit():
+            char, target, expand_eq = self.find_target(arc_1)
+        else:
+            char, target, expand_eq = self.find_target(arc_1 + arc_2)
+        # solve the equation
+        if target is None:
+            return False
+        
+        solution = solve((eq, ) + expand_eq, target)
+        # update position of target point
+        self.update_symbol(solution, char) 
+        return 
         
             
     
     def get_cos(self, angle):
+        # angle ABC
         if angle.isdigit():
             return cos(float(angle) * pi / 180)
         p1, p2, p3 = angle
@@ -360,6 +345,18 @@ class Allocator():
         len_BA = (BA[0]**2 + BA[1]**2)**0.5
         len_BC = (BC[0]**2 + BC[1]**2)**0.5
         return dot_product / (len_BA * len_BC)
+    
+    def get_dot_product(self, line_1, line_2):
+        # AB * CD 
+        p1, p2 = line_1
+        p3, p4 = line_2
+        xa, ya = self.p_pos[p1]
+        xb, yb = self.p_pos[p2]
+        xc, yc = self.p_pos[p3]
+        xd, yd = self.p_pos[p4]
+        AB = (xb - xa, yb - ya)
+        CD = (xd - xc, yd - yc)
+        return AB[0]*CD[0] + AB[1]*CD[1]
     
     def get_line_length(self, line):
         p1, p2 = line
@@ -445,7 +442,7 @@ class Allocator():
                 return c, tuple([x_sym, y_sym]), ()
         return None, None, ()
     
-    def update_symbol(self, solution, char):
+    def update_symbol(self, solution, char, ignore_value=None):
         # update p_pos with new solved symbols
         if len(solution) == 0:
             return False
@@ -530,7 +527,7 @@ if __name__ == '__main__':
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     for i in range(5):
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
-        constr_cdls, text_cdls = cg.generate_clauses_from_predicates(1, 2, 2)
+        constr_cdls, text_cdls = cg.generate_clauses_from_predicates(1, 2, 1, 2)
         allocator = Allocator(cg.states, constr_cdls, text_cdls, dl.predicate_GDL)
         
         print(f"{'-'*10} Clause {'-'*10}")

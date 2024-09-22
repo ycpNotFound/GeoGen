@@ -6,7 +6,7 @@ from copy import deepcopy
 from formalgeo.data import DatasetLoader
 from utils import (PREDICATES_ATTR, PREDICATES_ENT, PREDICATES_PRE,
                    PREDICATES_REL, append_lst, get_content, get_points_num, get_symbol, get_predicate_name, get_points_mapping,
-                   replace_points, setup_seed)
+                   replace_points, setup_seed, parse_clause, find_target_for_construct, get_points)
 
 
 
@@ -26,6 +26,7 @@ class ClauseGenerator():
         self.constraints = []
         
         self.points_on_circle = {}
+        self.points_with_constraints = {}
 
     
     @property
@@ -92,12 +93,58 @@ class ClauseGenerator():
     def get_all_extend(self, clauses):
         constraints = []
         for clause in clauses:
-            constraints += self.get_extend(clause)
-            
+            try:
+                constraints += self.get_extend(clause)
+            except RecursionError as e:
+                print(clauses)
+                raise e
         return constraints
+    
+    def update_constraints_for_points(self, clauses, targets_in_clauses=None):
+        '''record / add constraints (clauses) for each point'''
+        for p in self.points:
+            if p not in self.points_with_constraints:
+                self.points_with_constraints[p] = []
+                
+        if targets_in_clauses is None:
+            targets_in_clauses = [find_target_for_construct(c) for c in clauses] 
+        for targets, clause in zip(targets_in_clauses, clauses):
+            for p in targets:
+                self.points_with_constraints[p] = append_lst(
+                    self.points_with_constraints[p], [clause])
+                    
+        return
             
+    def find_unconstrained_points(self, n=None, ignore_ps=None):
+        unconstr_ps = []
+        for p, constrs in self.points_with_constraints.items():
+            # do not return point a, b, c, as it's used for initialization
+            if p in ['a', 'b', 'c']:
+                continue
+            if ignore_ps is not None and p in ignore_ps:
+                continue
+            # if p is circle center defined by 'Cocircular', it's constrained
+            centre = [p == parse_clause(constr)[1][0] if 'Cocircular' in constr 
+                      else False for constr in constrs]
+            if any(centre):
+                continue
+            if len(constrs) < 2:
+                unconstr_ps.append(p)
+                
+        if len(unconstr_ps) == 0 and n is not None:
+            unconstr_ps = self.add_new_points(1)
+                
+        if n is not None: # create new if not enough
+            if n > len(unconstr_ps):
+                new_ps = self.add_new_points(n - len(unconstr_ps))
+                unconstr_ps += new_ps
+            else:
+                unconstr_ps = random.sample(unconstr_ps, n)
             
-    def generate_clauses_from_predicates(self, n_entity, n_construct, n_relation):
+        return unconstr_ps
+        
+            
+    def generate_clauses_from_predicates(self, n_entity, n_relation, n_construct, n_new_lines):
         # define base entity (Square, Rectangle) 
         clauses_entity = random.choices(PREDICATES_ENT, k=n_entity)
         constr_cdls = [] # Shape, Collinear, Cocircular
@@ -106,13 +153,7 @@ class ClauseGenerator():
             constr_cdl, text_cdl = self.define_entity(entity_name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
-        
-        # define construct predicates (Collinear, Cocircular)
-        clauses_constr = random.choices(PREDICATES_PRE, k=n_construct)
-        for constr_name in clauses_constr:
-            constr_cdl, text_cdl = self.define_construction(constr_name)
-            constr_cdls += constr_cdl
-            text_cdls += text_cdl
+            
             
         # define relation predicates (Midpoint, Parallel ..)
         clauses_rel = random.choices(PREDICATES_REL, k=n_relation)
@@ -120,6 +161,38 @@ class ClauseGenerator():
             constr_cdl, text_cdl = self.define_relation(rel_name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
+            
+        # define construct predicates (Collinear, Cocircular)
+        for i in range(n_construct):
+            if len(self.circles) == 0:
+                constr_name = 'Collinear'
+            else:
+                constr_name = random.choice(PREDICATES_PRE)
+            constr_cdl, text_cdl = self.define_construction(constr_name)
+            constr_cdls += constr_cdl
+            text_cdls += text_cdl
+        
+            if len(self.find_unconstrained_points()) != 0:
+                constr_cdl, text_cdl = self.define_construction('Collinear')
+                constr_cdls += constr_cdl
+                text_cdls += text_cdl
+                
+        # add new lines
+        possible_lines = list(itertools.combinations(self.points, 2))
+        possible_new_lines = []
+        for line_1 in possible_lines:
+            exist_flag = False
+            for line_2 in self.lines:
+                if all([p in line_2 for p in line_1]):
+                    # line_1 \in line_2
+                    exist_flag = True
+                    break
+            if not exist_flag:
+                possible_new_lines.append(line_1)
+        if len(possible_new_lines) >= n_new_lines:
+            possible_new_lines_n = random.sample(possible_new_lines, k=n_new_lines)
+            for l in possible_new_lines_n:
+                self.add_new_line(l)
             
         return constr_cdls, text_cdls
             
@@ -133,7 +206,7 @@ class ClauseGenerator():
         # need p_num points
         p_num = get_points_num(predicate)
         # get points of Entity, include old and new defined points
-        new_points = self.distribute_new_points(p_num)
+        new_points = self.distribute_entity_points(p_num)
         # replace ABC.. -> distributed points
         predicate, pred_info = replace_points(predicate, pred_info, new_points)
         # get construct and text clauses
@@ -143,64 +216,39 @@ class ClauseGenerator():
         self.polygons = append_lst(self.polygons, [tuple(new_points)])
         all_extend = self.get_all_extend(pred_info['extend'])
         self.constraints += all_extend
+        self.update_constraints_for_points(all_extend)
         return constr_cdl, text_cdl
-    
-    def define_construction(self, pred_name):
-        '''define collinear, cocircular'''
-        construct_cdls = []
-        text_clds = []
-        if pred_name == 'Collinear':
-            # extend 2 lines and make them intersect
-            lines = self.distribute_new_lines()
-            if len(lines[0]) > 2:
-                cdl = f"Collinear({''.join(lines[0])})"
-                construct_cdls.append(cdl)
-            if len(lines[1]) > 2:
-                cdl = f"Collinear({''.join(lines[1])})"
-                construct_cdls.append(cdl)
-
-        elif pred_name == 'Cocircular':
-            # random choose 2 ~ 3 points, make circumcircle
-            # create 1 new points on circle
-            circle, points_oncircle, is_diameter = self.distribute_new_circle()
-            c_cdl = f"Cocircular({circle},{''.join(points_oncircle)})"
-            
-            construct_cdls.append(c_cdl)
-            
-            if is_diameter:
-                r_cdl = f"IsDiameterOfCircle({''.join(points_oncircle[:2])},{circle})"
-                construct_cdls.append(f"Collinear({points_oncircle[0]}{circle}{points_oncircle[1]})")
-                text_clds.append(r_cdl)
-                constraint = f"IsMidpointOfLine({circle},{''.join(points_oncircle[:2])})"
-                self.constraints += self.get_all_extend([constraint])
-                
-                
-        return construct_cdls, text_clds
     
     def define_relation(self, pred_name):
         '''try to distribute points for (Find), and construct new points in (Construct)'''
         constr_cdls = []
         text_cdls = []
-        pred_type = "Relation"
         predicate = self.predicate_rel_names[pred_name]
         # IsMidpointOfLine(M,AB)
-        pred_info = deepcopy(self.predicate_GDL[pred_type][predicate])
+        pred_info = deepcopy(self.predicate_GDL["Relation"][predicate])
         # points mapping, from template to existed
         mapping = {}
         # try to distribute points for 'find'
         for clause in pred_info['find']:
             # distribute points according to clause
-            mapping_i, c_cdls, t_cdls = self.find_construct_clause(clause)
+            ignore_ps = [v for k, v in mapping.items()]
+            mapping_i, c_cdls, t_cdls = self.find_construct_clause(clause, ignore_ps)
             # merge mapping
             # some points may be repeated
             for p, new_p in mapping_i.items():
                 mapping[p] = new_p
                 
-            constr_cdls += c_cdls
-            text_cdls += t_cdls
+            constr_cdls = append_lst(constr_cdls, c_cdls) 
+            text_cdls = append_lst(text_cdls, t_cdls)
         # construct new points in 'construct'
-        for point in pred_info['construct']:
-            new_p = self.add_new_points(1)[0]
+        for point, fixed in zip(pred_info['construct'], pred_info['fixed']):
+            if fixed:
+                new_p = self.add_new_points(1)[0]
+            else:
+                new_p = self.find_unconstrained_points(
+                    n=1, # ignore points that have existed in mapping.
+                    ignore_ps=[v for k, v in mapping.items()]
+                )[0]
             mapping[point] = new_p
         # replace template points -> distributed points
         predicate, pred_info = replace_points(
@@ -213,19 +261,46 @@ class ClauseGenerator():
         text_cdls += [predicate]
         # add constraints
         all_extend = self.get_all_extend(pred_info['extend'])
+        # add collinear or cocircular relation (have algebra relation)
+        for cdl in constr_cdls:
+            if 'Collinear' in cdl or 'Cocircular' in cdl:
+                all_extend.append(cdl)
         if len(all_extend) == 0:
             all_extend = [predicate]
         self.constraints += all_extend
+        self.update_constraints_for_points(all_extend)
         return constr_cdls, text_cdls
     
-    def find_construct_clause(self, clause):
-        # 找到clause对应点，尽可能返回已有的点，不构造新点
+    def define_construction(self, pred_name):
+        '''define collinear, cocircular'''
+        construct_cdls = []
+        text_clds = []
+        if pred_name == 'Collinear':
+            new_lines = self.distribute_collinear_points()
+            for new_line in new_lines:
+                cdl = f"Collinear({''.join(new_line)})"
+                target = new_line[0]
+                construct_cdls.append(cdl)
+                self.update_constraints_for_points([cdl], [[target]])
+
+        elif pred_name == 'Cocircular':
+            circle, points_oncircle = self.distribute_cocircular_points()
+            if len(points_oncircle) != 0:
+                cdl = f"Cocircular({circle},{''.join(points_oncircle)})"
+                construct_cdls.append(cdl)
+                self.update_constraints_for_points([cdl])
+                
+        return construct_cdls, text_clds
+    
+    def find_construct_clause(self, clause, ignore_ps=[]):
+        '''find points for clause (template), try to return existed points'''
         constr_cdls = []
         text_cdls = []
         if 'Line' in clause:
             if len(self.lines) == 0:
                 self.add_new_line()
             lines = [l for l in self.lines if len(l)==2]
+            lines = [l for l in lines if not any([p in l for p in ignore_ps])]
             points = list(random.choice(self.lines))
             
         if 'Circle' in clause:
@@ -249,19 +324,32 @@ class ClauseGenerator():
             num = len(items.split(',')[-1])
             if len(self.circles) == 0:
                 self.add_new_circle()
-            # if there's no enough points on circle
-            if len(self.points_on_circle[self.circles[0]]) < num:
-                if num <= 3: # find 3 points to be on circle
-                    ps_to_sample = [p for p in self.points if p != self.circles[0]]
-                    ps_on_circle = random.sample(ps_to_sample, 3)
-                    
-                else: # if num > 3, create the rest points
-                    ps_to_sample = [p for p in self.points if p != self.circles[0]]
-                    ps_on_circle = random.sample(ps_to_sample, 3) + self.add_new_points(num - 3)
+            ori_ps_on_circle = self.points_on_circle[self.circles[0]]
+            # x<3, create points up to 3
+            if len(ori_ps_on_circle) < 3:
+                ps_to_sample = [p for p in self.points 
+                                if p != self.circles[0] and
+                                p not in ori_ps_on_circle]
+                if len(ps_to_sample) < 3 - len(ori_ps_on_circle):
+                    ps_to_sample = ps_to_sample + self.add_new_points(
+                        3-len(ori_ps_on_circle)-len(ps_to_sample)
+                    )
+                new_ps_on_circle = random.sample(ps_to_sample, k=3-len(ori_ps_on_circle))
+                # remove collinear points
+                if self.check_collinear(new_ps_on_circle + ori_ps_on_circle):
+                    new_ps_on_circle = self.add_new_points(
+                        3-len(ori_ps_on_circle)
+                    )
+                self.points_on_circle[self.circles[0]] += new_ps_on_circle
                 
-                self.points_on_circle[self.circles[0]] = append_lst(self.points_on_circle[self.circles[0]], ps_on_circle)
+            # y>x, create y-x new points
+            if num > len(self.points_on_circle[self.circles[0]]):
+                new_ps_on_circle = self.add_new_points(
+                    num-len(self.points_on_circle[self.circles[0]])
+                )
+                self.points_on_circle[self.circles[0]] += new_ps_on_circle
                 
-                constr_cdls += [f"Cocircular({self.circles[0]},{''.join(ps_on_circle)})"]
+            constr_cdls = append_lst(constr_cdls, [f"Cocircular({self.circles[0]},{''.join(self.points_on_circle[self.circles[0]])})"])
             points = random.sample(self.points_on_circle[self.circles[0]], num)
             points = [self.circles[0]] + points
         
@@ -273,14 +361,38 @@ class ClauseGenerator():
             num = len(items[1:])
             if len(self.circles) == 0:
                 self.add_new_circle()
-            if len(self.points_on_circle[self.circles[0]]) < num:
-                if num <= 3: # find 3 points to be on circle
-                    ps_to_sample = [p for p in self.points if p != self.circles[0]]
-                    ps_on_circle = random.sample(ps_to_sample, 3)
-                else: # if num > 3, create the rest points
-                    ps_to_sample = [p for p in self.points if p != self.circles[0]]
-                    ps_on_circle = random.sample(ps_to_sample, 3) + self.add_new_points(num - 3)
-                self.points_on_circle[self.circles[0]] = append_lst(self.points_on_circle[self.circles[0]], ps_on_circle)
+            # if not enough points on circle, create points
+            # 1. x points on circle, x<3, find 3-x existed point and add
+            # 2. x points on circle, x >=3, pass
+            # 3. sample y points, y<=x, direct sample
+            # 4. sample y points, y>x, create y-x new points then sample
+
+            ori_ps_on_circle = self.points_on_circle[self.circles[0]]
+            # x<3, create points up to 3
+            if len(ori_ps_on_circle) < 3:
+                ps_to_sample = [p for p in self.points 
+                                if p != self.circles[0] and
+                                p not in ori_ps_on_circle]
+                if len(ps_to_sample) < 3 - len(ori_ps_on_circle):
+                    ps_to_sample = ps_to_sample + self.add_new_points(
+                        3-len(ori_ps_on_circle)-len(ps_to_sample)
+                    )
+                new_ps_on_circle = random.sample(ps_to_sample, k=3-len(ori_ps_on_circle))
+                # remove collinear points
+                if self.check_collinear(new_ps_on_circle + ori_ps_on_circle):
+                    new_ps_on_circle = self.add_new_points(
+                        3-len(ori_ps_on_circle)
+                    )
+                self.points_on_circle[self.circles[0]] += new_ps_on_circle
+                
+            # y>x, create y-x new points
+            if num > len(self.points_on_circle[self.circles[0]]):
+                new_ps_on_circle = self.add_new_points(
+                    num-len(self.points_on_circle[self.circles[0]])
+                )
+                self.points_on_circle[self.circles[0]] += new_ps_on_circle
+                
+            constr_cdls += [f"Cocircular({self.circles[0]},{''.join(self.points_on_circle[self.circles[0]])})"]
             points = random.sample(self.points_on_circle[self.circles[0]], num)
             points = [self.circles[0]] + points
          
@@ -292,6 +404,8 @@ class ClauseGenerator():
             if len(polygons) == 0:
                 ps = sorted(random.sample(self.points, len(items)))
                 self.define_construct_clauses([f"Polygon({''.join(ps)})"])
+                constr_cdls += [f"Polygon({''.join(ps)})"]
+                
             polygons = [p for p in self.polygons if len(p)==len(items)]
             points = list(random.choice(polygons))
         
@@ -299,7 +413,7 @@ class ClauseGenerator():
             angles = []
             for p in self.points:
                 lines = [l for l in self.lines if p in l]
-                if len(lines) > 2:
+                if len(lines) >= 2:
                     lines = random.sample(lines, 2)
                     angles.append(lines)
 
@@ -311,7 +425,10 @@ class ClauseGenerator():
             points = [p1, p_mid, p2]
         
         if 'Point' in clause:
-            points = [random.choice(self.points)]
+            points = [p for p in self.points if p not in ignore_ps]
+            if len(points) == 0:
+                points = self.add_new_points(1)
+            points = [random.choice(points)]
         
         if 'Trapezoid' in clause:
             items = clause.lstrip('Trapezoid(').rstrip(')')
@@ -321,6 +438,11 @@ class ClauseGenerator():
                 new_items.append(mapping_i[items[i]])
             points = ''.join(new_items)
             text_cdls += [f"Trapezoid({''.join(points)})"]
+            l_1 = f"{mapping_i['A']}{mapping_i['D']}"
+            l_2 = f"{mapping_i['B']}{mapping_i['C']}"
+            cdl = f"ParallelBetweenLine({l_1},{l_2})"
+            self.constraints += [cdl]
+            self.update_constraints_for_points([cdl])
         
         # create mapping
         items = clause.split('(')[-1].rstrip(')')
@@ -332,17 +454,17 @@ class ClauseGenerator():
             mapping[template_p] = new_p
             
         return mapping, constr_cdls, text_cdls
-        
-    
+          
     def define_construct_clauses(self, clauses):
-        # 直接定义新的实体
+        '''define clauses directly'''
         constr_cdls = []
         for clause in clauses:
             if 'Polygon' in clause:
                 points = get_content(clause)
                 lines = [f"{points[i]}{points[(i+1)%len(points)]}" for i in range(len(points))]
                 constr_cdls.append(f"Shape({','.join(lines)})")
-                self.lines = append_lst(self.lines, [tuple(line) for line in lines])
+                for l in lines:
+                    self.add_new_line(tuple(l))
                 self.polygons = append_lst(self.polygons, [tuple(points)])
                 
             elif 'Point' in clause:
@@ -353,7 +475,14 @@ class ClauseGenerator():
                 points = get_content(clause)
                 assert len(points) == 2
                 constr_cdls.append(f"Shape({''.join(points)})")
-                self.lines = append_lst(self.lines, [tuple(points)])
+                self.add_new_line(tuple(points))
+                
+            elif 'Angle' in clause:
+                points = get_content(clause)
+                line_1 = tuple([points[0], points[1]])
+                line_2 = tuple([points[1], points[2]])
+                self.add_new_line(line_1)
+                self.add_new_line(line_2)
                 
             elif 'Arc' in clause:
                 points = get_content(clause)
@@ -368,9 +497,7 @@ class ClauseGenerator():
             elif 'Collinear' in clause:
                 points = get_content(clause)
                 constr_cdls.append(clause)
-                if tuple([points[0], points[-1]]) in self.lines:
-                    self.lines.remove(tuple([points[0], points[-1]]))
-                self.lines = append_lst(self.lines, [tuple(points)])
+                self.add_new_line(tuple(points))
                 
             elif 'Cocircular' in clause:
                 constr_cdls.append(clause)
@@ -386,10 +513,11 @@ class ClauseGenerator():
                 self.circles = append_lst(self.circles, circles)
             else:
                 print('ERROR: ', clause)
+                raise KeyError(clause)
                 
         return constr_cdls
     
-    def distribute_new_points(self, n):
+    def distribute_entity_points(self, n):
         '''找n个点'''
         if n > self.p_num + 1:
             new_points = self.add_new_points(n - self.p_num)
@@ -403,87 +531,69 @@ class ClauseGenerator():
         return new_points
         
     
-    def distribute_new_lines(self):
-        '''找2条未相交不平行的line，其中包含已有的、新创建的，使其相交'''
+    def distribute_collinear_points(self):
+        '''find unconstrained / new point, define it on existed line'''
         if self.l_num == 0:
             if self.p_num < 2:
                 self.add_new_points(2)
             points = random.sample(self.points, 2)
             self.add_new_line(tuple(points))
         
-        # random choose one origin line
-        line_chosen = random.choice(self.lines)
-        lines_remain = self.find_lines_not_intersect_and_parallel(line_chosen, self.lines)
-        points_remain = [p for p in self.points if p not in line_chosen]
-        create_flag = random.choice([0,1])
-        if len(lines_remain) == 0:
-            create_flag = 1
-        
-        # create new line, point A, line BC -> line AD, line BDC
-        if create_flag:
-            ori_p = random.choice(points_remain)
-            new_line = self.add_new_line(ori_p)
-            new_p = new_line[-1]
-            ori_line = tuple(list(line_chosen) + [new_p])
-            new_lines = [ori_line, new_line]
-        
-        # extend exist lines, line AB, line CD -> line ABE, line CDE
-        else:
-            new_line = random.choice(lines_remain)
-            new_p = self.add_new_points(1)[0]
-            line1 = tuple(list(new_line) + [new_p])
-            line2 = tuple(list(line_chosen) + [new_p])
-            new_lines = [line1, line2]
-
-        self.add_new_line(new_lines[0])
-        self.add_new_line(new_lines[1])
-        return new_lines
+        # create: unconstrained point A, line BC -> line ABC
+        new_lines = []
+        unconstrained_ps = self.find_unconstrained_points()
+        if len(unconstrained_ps) == 0:
+            unconstrained_ps = self.find_unconstrained_points(n=1)
+        for A in unconstrained_ps:
+            # if there's one angle constraints, pass because too complex
+            if len(self.points_with_constraints[A]) == 1:
+                if 'MeasureOfAngle' in self.points_with_constraints[A][0]:
+                    continue
+            avai_lines = [sorted(l) for l in self.lines]
+      
+            # remove parallel lines
+            ori_line = [l for l in self.lines if A in l]
+            if len(ori_line) >= 1:
+                ori_line = ori_line[0]
+                parallel_lines = self.find_parallel(ori_line)
+                avai_lines = [l for l in avai_lines if l not in parallel_lines]
             
-    def distribute_new_circle(self):
-        '''以旧2点为直径创建三点共圆，或以旧3点作外接圆创建四点共圆'''
-        # if there's already a circle, create up to 3 points or 1 new points
-        if len(self.circles) != 0:
-            if len(self.points_on_circle[self.circles[0]]) < 3:
-                add_num = 3 - self.p_num
-            else:
-                add_num = 1
-            new_points = self.add_new_points(add_num)
-            circle = self.circles[0]
-            self.points_on_circle[circle] = append_lst(self.points_on_circle[circle], new_points)
-            return self.circles[0], new_points, False
-        else: # create circle and points on circle
+            if len(avai_lines) > 0:
+                BC = random.choice(avai_lines)
+                new_line = tuple([A, BC[0], BC[1]])
+                new_lines.append(new_line)
+                self.add_new_line(new_line)
+        
+        return new_lines 
+            
+    def distribute_cocircular_points(self):
+        '''find unconstrained / new point, define it on circle'''
+        if len(self.circles) == 0:
             circle = self.add_new_circle()
-            if self.p_num < 3:
-                new_points = self.add_new_points(3 - self.p_num)
-                
-            ori_points_num = random.choice([2, 3])
-            if ori_points_num == 2: # sample 2 points as diameter
-                chosen_points = random.sample(self.points, 2)
-                new_points = chosen_points + self.add_new_points(1)
-                is_diameter = True
-            else: # sample 3 points
-                while(1): # check if collinear
-                    chosen_points = random.sample(self.points, 3)
-                    collinear = False
-                    for l in self.lines:
-                        if all([p in l for p in chosen_points]):
-                            collinear = True
-                    if not collinear:
-                        break
-                new_points = chosen_points + self.add_new_points(1)
-                is_diameter = False
+            new_ps = random.sample(self.points, k=3)
+            self.points_on_circle[circle] = new_ps 
             
-            
-            self.points_on_circle[circle] = append_lst(self.points_on_circle[circle], new_points) 
-            return circle, new_points, is_diameter
+        else:
+            circle = self.circles[0]
+            ps_on_c = self.points_on_circle[circle]
+            new_ps = self.find_unconstrained_points(ignore_ps=ps_on_c)
              
-    
+            self.points_on_circle[circle] = append_lst(
+                self.points_on_circle[circle], new_ps
+            )
+
+        return self.circles[0], new_ps
+
     def add_new_points(self, n):
         new_ps = []
         for i in range(self.p_num, n+self.p_num):
             new_ps.append(self.all_letters[i])
         
         self.points += new_ps
+        
+        for p in new_ps:
+            self.points_with_constraints[p] = []
+                
         return new_ps
     
     def add_new_line(self, item=None):
@@ -504,13 +614,12 @@ class ClauseGenerator():
                     self.lines.remove(tuple([i, j]))
                 
         if item not in self.lines:
-            self.lines.append(item)
+            if tuple([item[1], item[0]]) not in self.lines:
+                self.lines.append(item)
         return item
     
     def add_new_circle(self, item=None):
         # no item input
-        if len(self.circles) == 1:
-            return self.circles[0]
         if item == None:
             item = self.add_new_points(1)[0]
         # single point
@@ -521,21 +630,50 @@ class ClauseGenerator():
             self.points_on_circle[item] = []
         return item
     
-    def find_lines_not_intersect_and_parallel(self, target_line, lines):
-        res_lines = []
+    def check_collinear(self, points):
+        if len(points) == 2:
+            return False
+        lines = itertools.permutations(points)
         for l in lines:
-            # do not have same letter
-            if not bool(set(target_line) & set(l)): 
-                # do not parallel
-                para_flag = False
-                for item in self.constraints:
-                    if 'Parallel' in item and ''.join(l) in item and ''.join(target_line) in item:
-                        para_flag = True
-                if not para_flag:
-                    res_lines.append(l)
-                    
-        return res_lines      
+            if l in self.lines:
+                return True
+        return False
     
+    def find_parallel(self, line):
+        para_clauses = [c for c in self.constraints if 'ParallelBetweenLine' in c]
+        parallels = []
+        for clause in para_clauses:
+            _, items = parse_clause(clause)
+            line_1, line_2 = items
+            if all([p in line_1 for p in line]):
+                parallels.append(sorted(line_2))
+            if all([p in line_2 for p in line]):
+                parallels.append(sorted(line_1))
+        
+        perps = self.find_perpendicular(line)
+        for perp_line in perps:
+            perps_of_perp = self.find_perpendicular(perp_line)
+            if sorted(line) in perps_of_perp:
+                perps_of_perp.remove(sorted(line))
+            if len(perps_of_perp) != 0:
+                parallels += perps_of_perp
+                
+        return parallels
+            
+    def find_perpendicular(self, line):
+        perp_clauses = [c for c in self.constraints if 'MeasureOfAngle' in c and '90' in c]
+
+        perps = []
+        for clause in perp_clauses:
+            _, items = parse_clause(clause)
+            angle = items[0]
+            line_1, line_2 = [angle[0], angle[1]], [angle[1], angle[2]]
+            if all([p in line_1 for p in line]):
+                perps.append(sorted(line_2))
+            if all([p in line_2 for p in line]):
+                perps.append(sorted(line_1))
+        
+        return perps
     
 
 def test():
@@ -543,7 +681,7 @@ def test():
     constraints = []
     for i in range(100):
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
-        c_cdls, t_cdls = cg.generate_clauses_from_predicates(1, 2, 2)
+        c_cdls, t_cdls = cg.generate_clauses_from_predicates(1, 2, 1, 2)
         
         print('---------- Construct CDLs ----------')
         for c_cdl in c_cdls:
