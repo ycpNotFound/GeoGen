@@ -38,35 +38,36 @@ PREDICATES_REL = [
     "IsMidpointOfLine",
     "IsBisectorOfAngle",
     "IsPerpendicularBisectorOfLine",
-    "SimilarBetweenTriangle",
+    # "SimilarBetweenTriangle",
     # "SimilarBetweenQuadrilateral",
     "IsAltitudeOfTriangle",
-    "MirrorCongruentBetweenTriangle",
-    "CongruentBetweenTriangle",
+    # "MirrorCongruentBetweenTriangle",
+    # "CongruentBetweenTriangle",
     "IsMedianOfTriangle",
     "IsIncenterOfTriangle",
     "IsMidsegmentOfTriangle",
-    "MirrorSimilarBetweenTriangle",
+    # "MirrorSimilarBetweenTriangle",
     "IsMidpointOfArc",
     "CongruentBetweenArc",
     "IsMidsegmentOfQuadrilateral",
     "IsCentroidOfTriangle",
-    "MirrorCongruentBetweenQuadrilateral",
+    # "MirrorCongruentBetweenQuadrilateral",
     "IsAltitudeOfQuadrilateral",
-    "CongruentBetweenQuadrilateral",
+    # "CongruentBetweenQuadrilateral",
     "IsCircumcenterOfTriangle",
     "IsIncenterOfQuadrilateral",
     "IsCircumcenterOfQuadrilateral",
 ]
 PREDICATES_REL_2 = [
-    # "SimilarBetweenTriangle",
+    "SimilarBetweenTriangle",
+    "MirrorSimilarBetweenTriangle",
     "SimilarBetweenQuadrilateral",
-    # "MirrorCongruentBetweenTriangle",
-    # "CongruentBetweenTriangle",
-    # "MirrorSimilarBetweenTriangle",
+    "CongruentBetweenTriangle",
+    "MirrorCongruentBetweenTriangle",
     # "CongruentBetweenArc",
-    # "MirrorCongruentBetweenQuadrilateral",
-    # "CongruentBetweenQuadrilateral",
+    "CongruentBetweenQuadrilateral",
+    "MirrorCongruentBetweenQuadrilateral",
+    
 ]
 PREDICATES_ATTR = [
     # Attribution
@@ -387,8 +388,11 @@ def find_target_for_construct(clause):
             return list(sorted_points[1:])
     elif predicate == 'ParallelBetweenLine':
         return [max(items[0] + items[1])]
-    elif predicate == 'SimilarBetweenTriangle':
-        return [max(items[0] + items[1])]
+    elif predicate in ['SimilarBetweenTriangle', 
+                       'SimilarBetweenQuadrilateral'
+                       'CongruentBetweenTriangle', 
+                       'CongruentBetweenQuadrilateral']:
+        return list(items[1])
     elif predicate == 'IsCircumcenterOfQuadrilateral':
         return items[0]
     elif predicate == 'IsCentroidOfTriangle':

@@ -4,8 +4,8 @@ import string
 import itertools
 from copy import deepcopy
 from formalgeo.data import DatasetLoader
-from utils import (PREDICATES_ATTR, PREDICATES_ENT, PREDICATES_PRE,
-                   PREDICATES_REL, append_lst, get_content, get_points_num, get_symbol, get_predicate_name, get_points_mapping,
+from utils import (PREDICATES_ATTR, PREDICATES_ENT, PREDICATES_PRE, 
+                   PREDICATES_REL, PREDICATES_REL_2, append_lst, get_content, get_points_num, get_symbol, get_predicate_name, get_points_mapping,
                    replace_points, setup_seed, parse_clause, find_target_for_construct, get_points)
 
 
@@ -24,6 +24,7 @@ class ClauseGenerator():
         self.circles = []
         self.polygons = []
         self.constraints = []
+        self.constraints_base = []
         
         self.points_on_circle = {}
         self.points_with_constraints = {}
@@ -43,15 +44,10 @@ class ClauseGenerator():
             "points": self.points,
             "lines": self.lines,
             "circles": self.circles,
-            "constraints": self.constraints
+            "constraints": self.constraints,
+            "constraints_base": self.constraints_base
         }
     
-    def empty_states(self):
-        self.points = []
-        self.lines = []
-        self.circles = []
-        self.constraints = []
-        self.points_on_circle = {}
     
     def print_states(self):
         p_str = ', '.join(self.points)
@@ -63,7 +59,8 @@ class ClauseGenerator():
         print(f"Circles: {c_str}")
         print('Constraints: ')
         for c in self.constraints:
-            print(c)
+            if c not in self.constraints_base:
+                print(c)
             
     def get_extend(self, clause):
         name = get_predicate_name(clause)
@@ -144,38 +141,36 @@ class ClauseGenerator():
         return unconstr_ps
         
             
-    def generate_clauses_from_predicates(self, n_entity, n_relation, n_construct, n_new_lines):
-        # define base entity (Square, Rectangle) 
-        clauses_entity = random.choices(PREDICATES_ENT, k=n_entity)
-        constr_cdls = [] # Shape, Collinear, Cocircular
-        text_cdls = [] # Equal, Rectangle, IsMedianOf
-        for entity_name in clauses_entity:
-            constr_cdl, text_cdl = self.define_entity(entity_name)
+    def generate_clauses_from_predicates(
+        self, 
+        clauses_base, 
+        clauses_rel, 
+        n_new_lines
+    ):
+        # define base entity (Square, Rectangle / Similar, Congruent) 
+        constr_cdls = [] 
+        text_cdls = [] 
+        for name in clauses_base:
+            pred_type = "Entity" if name in PREDICATES_ENT else "Relation"
+            constr_cdl, text_cdl = self.define_base(name, pred_type=pred_type)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
-            
             
         # define relation predicates (Midpoint, Parallel ..)
-        clauses_rel = random.choices(PREDICATES_REL, k=n_relation)
-        for rel_name in clauses_rel:
-            constr_cdl, text_cdl = self.define_relation(rel_name)
+        for name in clauses_rel:
+            constr_cdl, text_cdl = self.define_relation(name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
             
-        # define construct predicates (Collinear, Cocircular)
-        for i in range(n_construct):
-            if len(self.circles) == 0:
-                constr_name = 'Collinear'
-            else:
-                constr_name = random.choice(PREDICATES_PRE)
+        # define construct predicates (Collinear, Cocircular) if there's unconstrained points 
+        if len(self.circles) == 0:
+            constr_name = 'Collinear'
+        else:
+            constr_name = random.choice(PREDICATES_PRE)
+        if len(self.find_unconstrained_points()) != 0:
             constr_cdl, text_cdl = self.define_construction(constr_name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
-        
-            if len(self.find_unconstrained_points()) != 0:
-                constr_cdl, text_cdl = self.define_construction('Collinear')
-                constr_cdls += constr_cdl
-                text_cdls += text_cdl
                 
         # add new lines
         possible_lines = list(itertools.combinations(self.points, 2))
@@ -197,10 +192,13 @@ class ClauseGenerator():
         return constr_cdls, text_cdls
             
     
-    def define_entity(self, pred_name):
+    def define_base(self, pred_name, pred_type):
         '''define base entity (Square, Rectangle)'''
-        pred_type = "Entity"
-        predicate = self.predicate_ent_names[pred_name]
+        assert pred_type in ["Entity", "Relation"]
+        if pred_type == "Entity":
+            predicate = self.predicate_ent_names[pred_name]
+        else:
+            predicate = self.predicate_rel_names[pred_name]
         # Predicate(ABC..)
         pred_info = deepcopy(self.predicate_GDL[pred_type][predicate])
         # need p_num points
@@ -216,8 +214,10 @@ class ClauseGenerator():
         self.polygons = append_lst(self.polygons, [tuple(new_points)])
         all_extend = self.get_all_extend(pred_info['extend'])
         self.constraints += all_extend
+        self.constraints_base += all_extend
         self.update_constraints_for_points(all_extend)
         return constr_cdl, text_cdl
+
     
     def define_relation(self, pred_name):
         '''try to distribute points for (Find), and construct new points in (Construct)'''
@@ -334,13 +334,18 @@ class ClauseGenerator():
                     ps_to_sample = ps_to_sample + self.add_new_points(
                         3-len(ori_ps_on_circle)-len(ps_to_sample)
                     )
-                new_ps_on_circle = random.sample(ps_to_sample, k=3-len(ori_ps_on_circle))
-                # remove collinear points
-                if self.check_collinear(new_ps_on_circle + ori_ps_on_circle):
+                comb_list = list(itertools.combinations(ps_to_sample, 3-len(ori_ps_on_circle)))
+                if len(comb_list) == 0:
                     new_ps_on_circle = self.add_new_points(
-                        3-len(ori_ps_on_circle)
-                    )
-                self.points_on_circle[self.circles[0]] += new_ps_on_circle
+                            3-len(ori_ps_on_circle)
+                        )
+                else:
+                    random.shuffle(comb_list)
+                    for new_ps_on_circle in comb_list:
+                        # remove collinear points
+                        if not self.check_collinear(list(new_ps_on_circle) + ori_ps_on_circle):
+                            break
+                self.points_on_circle[self.circles[0]] += list(new_ps_on_circle)
                 
             # y>x, create y-x new points
             if num > len(self.points_on_circle[self.circles[0]]):
@@ -377,13 +382,18 @@ class ClauseGenerator():
                     ps_to_sample = ps_to_sample + self.add_new_points(
                         3-len(ori_ps_on_circle)-len(ps_to_sample)
                     )
-                new_ps_on_circle = random.sample(ps_to_sample, k=3-len(ori_ps_on_circle))
-                # remove collinear points
-                if self.check_collinear(new_ps_on_circle + ori_ps_on_circle):
+                comb_list = list(itertools.combinations(ps_to_sample, 3-len(ori_ps_on_circle)))
+                if len(comb_list) == 0:
                     new_ps_on_circle = self.add_new_points(
-                        3-len(ori_ps_on_circle)
-                    )
-                self.points_on_circle[self.circles[0]] += new_ps_on_circle
+                            3-len(ori_ps_on_circle)
+                        )
+                else:
+                    random.shuffle(comb_list)
+                    for new_ps_on_circle in comb_list:
+                        # remove collinear points
+                        if not self.check_collinear(list(new_ps_on_circle) + ori_ps_on_circle):
+                            break
+                self.points_on_circle[self.circles[0]] += list(new_ps_on_circle)
                 
             # y>x, create y-x new points
             if num > len(self.points_on_circle[self.circles[0]]):
@@ -523,10 +533,7 @@ class ClauseGenerator():
             new_points = self.add_new_points(n - self.p_num)
             new_points = sorted(list(set(self.points + new_points)))
         else:
-            added_num = random.choice([1, 2])
-            select_num = n - added_num
-            selected_points = sorted(random.sample(self.points, select_num))
-            new_points = selected_points + self.add_new_points(added_num)
+            new_points = sorted(random.sample(self.points, n))
 
         return new_points
         
@@ -547,8 +554,7 @@ class ClauseGenerator():
         for A in unconstrained_ps:
             # if there's one angle constraints, pass because too complex
             if len(self.points_with_constraints[A]) == 1:
-                if 'MeasureOfAngle' in self.points_with_constraints[A][0]:
-                    continue
+                continue
             avai_lines = [sorted(l) for l in self.lines]
       
             # remove parallel lines
@@ -607,6 +613,8 @@ class ClauseGenerator():
             item = tuple([item[0], new_p])
         if type(item) != tuple:
             item = tuple(item)
+            
+        item = tuple(sorted(item))
         # line A B C, remove line A B
         if len(item) > 2:
             for (i, j) in list(itertools.combinations(item, 2)):
@@ -678,10 +686,24 @@ class ClauseGenerator():
 
 def test():
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    constraints = []
+
     for i in range(100):
+        # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
+        # clauses_rel = random.choices(PREDICATES_REL, k=2)
+        
+        clauses_base = ['MirrorSimilarBetweenTriangle']
+        clauses_rel = ['IsMedianOfTriangle']
+        
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
-        c_cdls, t_cdls = cg.generate_clauses_from_predicates(1, 2, 1, 2)
+        c_cdls, t_cdls = cg.generate_clauses_from_predicates(
+            clauses_base, 
+            clauses_rel, 
+            n_new_lines=2
+        )
+        print('---------- Chosen Predicates ----------')
+        print('clauses_base: ', clauses_base)
+        print('clauses_rel: ', clauses_rel)
+        
         
         print('---------- Construct CDLs ----------')
         for c_cdl in c_cdls:
@@ -695,10 +717,6 @@ def test():
         cg.print_states()
         print('=====================================')
         
-        constraints += [get_predicate_name(s) for s in cg.constraints]
-        constraints = list(set(constraints))
-        
-    print(constraints)
         
 if __name__ == '__main__':
     setup_seed(1234)
