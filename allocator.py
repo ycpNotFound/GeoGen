@@ -42,7 +42,7 @@ class Allocator():
         self.circles = geo_states['circles']
         self.constraints = [c for c in geo_states['constraints'] 
                             if c not in geo_states['constraints_base']]
-
+        self.constraints_base = geo_states['constraints_base']
         self.construct_cdls = construct_cdls
         self.text_cdls = text_cdls
         self.predicate_GDL = predicate_GDL
@@ -128,19 +128,23 @@ class Allocator():
         
             
     def allocate(self):
-        self.allocate_base(self.text_cdls[0])
+        self.allocate_for_base(self.text_cdls[0])
         
         for clause in self.clauses:
-            self.allocate_for_one_clause(clause)
+            self.allocate_for_relation(clause)
             
         # if there're still points not solved:
         for p in self.points:
-            x, y = self.p_pos[p]
-            if isinstance(x, Expr) or isinstance(y, Expr):
-                position = self.random_allocate_position(p)
+            if self.p_pos[p] is None:
+                position = self.random_allocate_position()
                 self.update_values(p, position)
+            else:
+                x, y = self.p_pos[p]
+                if isinstance(x, Expr) or isinstance(y, Expr):
+                    position = self.random_allocate_position()
+                    self.update_values(p, position)
                 
-    def allocate_base(self, clause):
+    def allocate_for_base(self, clause):
         name = get_predicate_name(clause)
         if name == 'Circle':
             self.allocate_circle(clause)
@@ -170,18 +174,16 @@ class Allocator():
             self.allocate_isosceles_trapezoid(clause)
         elif name == 'RightTrapezoid':
             self.allocate_right_trapezoid(clause)
-        elif name in ['SimilarBetweenTriangle', 
-                      'SimilarBetweenQuadrilateral']:
-            self.allocate_similar(clause)
-        elif name in ['MirrorSimilarBetweenTriangle', 
-                      'MirrorSimilarBetweenQuadrilatera']:
-            self.allocate_mirror_similar(clause)
-        elif name in ['CongruentBetweenTriangle', 
+        elif name in ['SimilarBetweenTriangle',
+                      'CongruentBetweenTriangle',
+                      'SimilarBetweenQuadrilateral',
                       'CongruentBetweenQuadrilateral']:
-            self.allocate_congruent(clause)
-        elif name in ['MirrorCongruentBetweenTriangle', 
+            self.allocate_congruent_similar(clause)
+        elif name in ['MirrorSimilarBetweenTriangle', 
+                      'MirrorCongruentBetweenTriangle',
+                      'MirrorSimilarBetweenQuadrilatera',
                       'MirrorCongruentBetweenQuadrilateral']:
-            self.allocate_mirror_congruent(clause)
+            self.allocate_congruent_similar(self.constraints_base[0])
     
     def allocate_circle(self, clause):
         predicate, items = parse_clause(clause)
@@ -202,23 +204,63 @@ class Allocator():
                 
 
     def allocate_right_triangle(self, clause):
+        # 确定垂直单位向量，随机长度
         predicate, items = parse_clause(clause)
+        A, B, C = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        BA = [xb - xa, yb - ya]
+        BA_length = self.distance([xa, yb], [xb, yb])
+        BC_length = random.uniform(0.75, 1.5) * BA_length
+        unit_dx = (xb - xa) / BA_length
+        unit_dy = (yb - ya) / BA_length
+
+        perp_dx, perp_dy = -unit_dy, unit_dx
+        xc, yc = xb + BC_length * perp_dx, yb + BC_length * perp_dy
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
         
     def allocate_isosceles_triangle(self, clause):
+        # 将一点旋转随机角度
         predicate, items = parse_clause(clause)
+        A, B, C = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        
+        top_angle =  math.radians(random.uniform(30, 150)) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+        xc = (xb - xa) * cos_val - (yb - yb) * sin_val
+        yc = (xb - xa) * sin_val + (yb - yb) * cos_val
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        
         
     def allocate_isosceles_right_triangle(self, clause):
+        # 确定垂直单位向量，固定长度
         predicate, items = parse_clause(clause)
-        
+        A, B, C = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        BA_length = self.distance([xa, yb], [xb, yb])
+        BC_length = BA_length
+        unit_dx = (xb - xa) / BA_length
+        unit_dy = (yb - ya) / BA_length
+
+        perp_dx, perp_dy = -unit_dy, unit_dx
+        xc, yc = xb + BC_length * perp_dx, yb + BC_length * perp_dy
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+    
     def allocate_equilateral_triangle(self, clause):
-        # random allocate A, B, calcuate C
+        # 确定中垂线，延长sqrt(3) / 2 * length
         # OC = OM + MC, OM = (OA + OB) / 2
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
-        if A != 'a':
-            xa, ya = self.random_allocate_position()
-        else:
-            xa, ya = self.p_pos[A]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
         xm, ym =  (xa + xb) / 2, (ya + yb) / 2
         
@@ -234,33 +276,172 @@ class Allocator():
         # 第三个顶点C1（顺时针60度）
         xc, yc = xm + MC_length * perp_dx, ym + MC_length * perp_dy
         
-        self.p_pos[A] = xa, ya
-        self.p_pos[B] = xb, yb
-        self.p_pos[C] = xc, yc
-    
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
         
     def allocate_kite(self, clause):
+        # 先确定A,B,D, 用向量关系确定C
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle =  math.radians(random.uniform(60, 120)) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        # OC = OA + AC = OA + k(AB + AD)
+        ratio = random.uniform(0.75, 1.5)
+        xc = xa + (xb - xa) + (xd - xa)
+        yc = ya + (yb - ya) + (yd - ya)
+        xc, yc = xc * ratio, yc * ratio
+        
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
         
     def allocate_parallelogram(self, clause):
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle =  math.radians(random.uniform(45, 135)) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+        
+        ratio = random.uniform(1.2, 1.5)
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        xd, yd = xd * ratio, yd * ratio
+        # OC = OA + AC = OA + AB + AD
+        xc = xa + (xb - xa) + (xd - xa)
+        yc = ya + (yb - ya) + (yd - ya)
+        
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
         
     def allocate_rectangle(self, clause):
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle =  math.radians(90) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+        ratio = random.uniform(1.2, 1.5)
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        xd, yd = xd * ratio, yd * ratio
+        # OC = OA + AC = OA + AB + AD
+        xc = xa + (xb - xa) + (xd - xa)
+        yc = ya + (yb - ya) + (yd - ya)
+        
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
         
     def allocate_square(self, clause):
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle =  math.radians(90) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+        ratio = random.uniform(1.2, 1.5)
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        xd, yd = xd * ratio, yd * ratio
+        # OC = OA + AC = OA + AB + AD
+        xc = xa + (xb - xa) + (xd - xa)
+        yc = ya + (yb - ya) + (yd - ya)
+        
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
         
     def allocate_trapezoid(self, clause):
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle =  math.radians(random.uniform(60, 120)) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+        
+        ratio = random.uniform(1.2, 1.5)
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        xd, yd = xd * ratio, yd * ratio
+        # OC = OA + AC = OA + AB + k * AD
+        # 钝角对应增加长度，锐角对应减小长度
+        ratio_2 = random.uniform(1.8, 2.4) if top_angle > math.pi / 2 else\
+            random.uniform(0.6, 0.8)
+        xc = xa + (xb - xa) + (xd - xa) * ratio_2
+        yc = ya + (yb - ya) + (yd - ya) * ratio_2
+        
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
         
     def allocate_isosceles_trapezoid(self, clause):
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle = math.radians(random.uniform(100, 130)) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle) 
+        ratio = random.uniform(1.2, 1.5)
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        # OE = OA + AE = OA + AB + AD
+        xe = xa + (xb - xa) + (xd - xa) 
+        ye = ya + (yb - ya) + (yd - ya)
+        # 将E绕D逆时针旋转180-2\theta得到C
+        rotate_angle = 2*top_angle - math.pi
+        cos_val_2 = math.cos(top_angle)
+        sin_val_2 = math.sin(top_angle) 
+        xc = xe + (xe - xd) * cos_val_2 - (ye - yd) * sin_val_2
+        yc = ye + (xe - xd) * sin_val_2 + (ye - yd) * cos_val_2
         
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
+          
     def allocate_right_trapezoid(self, clause):
         predicate, items = parse_clause(clause)
+        A, B, C, D = items[0]
+        xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
+        xb, yb = self.random_allocate_position()
+        top_angle =  math.radians(90) 
+        cos_val = math.cos(top_angle)
+        sin_val = math.sin(top_angle)
+        
+        ratio = random.uniform(1.2, 1.5)
+        xd = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
+        yd = ya + (xb - xa) * sin_val + (yb - ya) * cos_val
+        xd, yd = xd * ratio, yd * ratio
+        # OC = OA + AC = OA + AB + k * AD
+        ratio_2 = random.uniform(1.6, 2.0) 
+        xc = xa + (xb - xa) + (xd - xa) * ratio_2
+        yc = ya + (yb - ya) + (yd - ya) * ratio_2
+        
+        self.p_pos[A] = [xa, ya]
+        self.p_pos[B] = [xb, yb]
+        self.p_pos[C] = [xc, yc]
+        self.p_pos[D] = [xd, yd]
             
-    def allocate_for_one_clause(self, clause):
+    def allocate_for_relation(self, clause):
         name = get_predicate_name(clause)
 
         if name == 'Collinear':
@@ -271,12 +452,12 @@ class Allocator():
             self.allocate_equal(clause)
         elif name == 'ParallelBetweenLine':
             self.allocate_parallel(clause)
-        elif name in ['CongruentBetweenQuadrilateral', 
-                      'CongruentBetweenTriangle']:
-            self.allocate_congruent(clause)
-        elif name in ['SimilarBetweenQuadrilateral', 
-                      'SimilarBetweenTriangle']:
-            self.allocate_similar(clause)
+        elif name == 'IsCentroidOfTriangle':
+            self.allocate_centroid(clause)
+        elif name == 'IsOrthocenterOfTriangle':
+            self.allocate_orthocenter(clause)
+        elif name in ['IsCircumcenterOfTriangle', 'IsCircumcenterOfQuadrilateral']:
+            self.allocate_circumcenter(clause)
 
         self.update_position(clause)
         
@@ -370,16 +551,58 @@ class Allocator():
         
         return
     
-    def allocate_congruent(self, clause):
+    def allocate_congruent_similar(self, clause):
         predicate, items = parse_clause(clause)
         points_1, points_2 = items
         self.define_points(list(points_1 + points_2))
-    
-    def allocate_similar(self, clause):
-        predicate, items = parse_clause(clause)
-        points_1, points_2 = items
-        self.define_points(list(points_1 + points_2))
+        for p in points_1:
+            if p == 'a': continue
+            self.p_pos[p] = self.random_allocate_position()
+
+        max_length = max([
+            self.get_line_length([points_1[0], points_1[1]]),
+            self.get_line_length([points_1[1], points_1[2]]),
+            self.get_line_length([points_1[0], points_1[2]])
+        ])
+        ratio = random.uniform(0.75, 1.25) # scale ratio
+        if 'Congruent' in predicate:
+            ratio = 1.0
+        offset_x = random.uniform(max(1, ratio)*max_length, 1.25*max_length)
+        offset_y = random.uniform(-3, 3)
         
+        positions_1 = [self.p_pos[p] for p in points_1]
+        positions_2 = []
+        xa, ya = positions_1[0]
+        # 以第一个点为缩放中心，缩放ratio倍，再加offset
+        for i, p in enumerate(points_2):
+            if i == 0:
+                positions_2.append([xa, ya])
+            else:
+                xi_1, yi_1 = positions_1[i]
+                xi_2, yi_2 = xa + ratio * (xi_1 - xa), ya + ratio * (yi_1 - ya)
+                positions_2.append([xi_2, yi_2])
+        # add offset
+        positions_2 = [[xi + offset_x, yi + offset_y] for [xi, yi] in positions_2]
+        for p, pos in zip(points_2, positions_2):
+            self.p_pos[p] = pos
+        return
+    
+            
+    def allocate_centroid(self, clause):
+        predicate, items = parse_clause(clause)
+        O = items[0]
+        A, B, C = items[1]
+        xa, ya = self.p_pos[A]
+        xb, yb = self.p_pos[B]
+        xc, yc = self.p_pos[C]
+        xo, yo = (xa + xb + xc) / 3, (ya + yb + yc) / 3
+        self.p_pos[O] = [xo, yo]
+    
+    def allocate_orthocenter(self, clause):
+        pass
+    
+    def allocate_circumcenter(self, clause):
+        pass   
 
     def allocate_equal_angle(self, angle_1, angle_2):
         if not angle_1.isdigit(): 
@@ -477,8 +700,7 @@ class Allocator():
         # update position of target point
         self.update_symbol(solution, char) 
         return 
-        
-            
+
     
     def get_cos(self, angle):
         # angle ABC
@@ -654,7 +876,7 @@ class Allocator():
                 if self.p_pos[p] is not None:
                     x, y = self.p_pos[p]
                     if isinstance(x, Expr) or isinstance(y, Expr):
-                        position = self.random_allocate_position(p)
+                        position = self.random_allocate_position()
                         self.update_values(p, position)
         
     def random_allocate_position(self, n=5):
@@ -669,7 +891,7 @@ class Allocator():
             min_distance = float('inf')
 
             for p, pos in self.p_pos.items():
-                if pos is None:
+                if pos is None or type(pos) not in [float, Float]:
                     continue
                 dist = self.distance_2([x, y], pos)
                 if dist < min_distance:
@@ -714,10 +936,10 @@ if __name__ == '__main__':
     setup_seed(1234)
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     for i in range(5):
-        # clauses_entity = random.choices(PREDICATES_ENT, k=1)
+        # clauses_base = random.choices(PREDICATES_ENT, k=1)
         # clauses_rel = random.choices(PREDICATES_REL, k=2)
-        clauses_base = ['MirrorSimilarBetweenTriangle']
-        clauses_rel = ['IsMedianOfTriangle']
+        clauses_base = ['EquilateralTriangle']
+        clauses_rel = ['IsCentroidOfTriangle', 'IsMedianOfTriangle']
         
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
