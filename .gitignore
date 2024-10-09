@@ -1,11 +1,9 @@
-# Byte-compiled
+
 __pycache__
 
-# PyCharm
 .vscode
-
-# packaging
 
 datasets
 
-# tests
+imgs_test
+

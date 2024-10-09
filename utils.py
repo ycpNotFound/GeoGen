@@ -5,6 +5,7 @@ from sympy import Symbol
 import random
 import numpy as np
 import sympy
+from sympy import Float
 from matplotlib import pyplot as plt
 
 PREDICATES_PRE = [
@@ -14,6 +15,7 @@ PREDICATES_PRE = [
 ]
 PREDICATES_ENT = [
     # Entity
+    # "Circle",
     "Triangle",
     "Parallelogram",
     "Rectangle",
@@ -48,25 +50,25 @@ PREDICATES_REL = [
     "IsMidsegmentOfTriangle",
     # "MirrorSimilarBetweenTriangle",
     "IsMidpointOfArc",
-    "CongruentBetweenArc",
+    # "CongruentBetweenArc",
     "IsMidsegmentOfQuadrilateral",
     "IsCentroidOfTriangle",
     # "MirrorCongruentBetweenQuadrilateral",
     "IsAltitudeOfQuadrilateral",
     # "CongruentBetweenQuadrilateral",
     "IsCircumcenterOfTriangle",
-    "IsIncenterOfQuadrilateral",
+    # "IsIncenterOfQuadrilateral",
     "IsCircumcenterOfQuadrilateral",
 ]
 PREDICATES_REL_2 = [
     "SimilarBetweenTriangle",
-    "MirrorSimilarBetweenTriangle",
+    # "MirrorSimilarBetweenTriangle",
     "SimilarBetweenQuadrilateral",
     "CongruentBetweenTriangle",
-    "MirrorCongruentBetweenTriangle",
+    # "MirrorCongruentBetweenTriangle",
     # "CongruentBetweenArc",
     "CongruentBetweenQuadrilateral",
-    "MirrorCongruentBetweenQuadrilateral",
+    # "MirrorCongruentBetweenQuadrilateral",
     
 ]
 PREDICATES_ATTR = [
@@ -362,8 +364,14 @@ def find_target_for_construct(clause):
     # 返回需要构造的target points
     # 以其他点为条件，可确定target points的坐标
     predicate, items = parse_clause(clause)
-    if predicate in ['Shape', 'Polygon'] :
+    if predicate in ['Shape', 'Triangle'] :
         return []
+    if predicate == 'Polygon':
+        if len(items[0]) <= 3:
+            return []
+        if len(items[0]) == 4:
+            return [max(items[0])]
+            
     if predicate == 'LengthOfLine':
         return [max(items[0] + items[1])]
     if predicate == 'LengthOfArc':
@@ -389,10 +397,11 @@ def find_target_for_construct(clause):
     elif predicate == 'ParallelBetweenLine':
         return [max(items[0] + items[1])]
     elif predicate in ['SimilarBetweenTriangle', 
-                       'SimilarBetweenQuadrilateral'
+                       'SimilarBetweenQuadrilateral',
                        'CongruentBetweenTriangle', 
                        'CongruentBetweenQuadrilateral']:
-        return list(items[1])
+        # 对于全等和相似，需要构造所有的点
+        return list(items[0]) + list(items[1])
     elif predicate == 'IsCircumcenterOfQuadrilateral':
         return items[0]
     elif predicate == 'IsCentroidOfTriangle':
@@ -407,7 +416,22 @@ def intersects(line1, line2):
 def setup_seed(seed=1234):
     random.seed(seed)
     np.random.seed(seed)
+
+def simplify_and_trim(poly, threshold=1e-10):
+     # 将多项式中的浮点数转换为 SymPy 的 Float 类型
+    poly = poly.xreplace({n: Float(n) for n in poly.atoms(float)})
     
+    # 获取多项式的系数
+    coeffs = poly.as_coefficients_dict()
+    
+    # 创建一个新的系数字典，将接近零的系数替换为零
+    new_coeffs = {key: 0 if abs(value.evalf()) < threshold else value for key, value in coeffs.items()}
+    
+    # 构建新的多项式
+    new_poly = sum(value * key for key, value in new_coeffs.items())
+    
+    # 返回简化后的多项式
+    return new_poly
     
 if __name__ == '__main__':
     # stats_for_formalgeo()

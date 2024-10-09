@@ -45,8 +45,20 @@ class ClauseGenerator():
             "lines": self.lines,
             "circles": self.circles,
             "constraints": self.constraints,
-            "constraints_base": self.constraints_base
+            "constraints_base": self.constraints_base,
+            "points_on_circle": self.points_on_circle
         }
+        
+    def empty_states(self):
+        self.points = []
+        self.lines = []
+        self.circles = []
+        self.polygons = []
+        self.constraints = []
+        self.constraints_base = []
+        
+        self.points_on_circle = {}
+        self.points_with_constraints = {}
     
     
     def print_states(self):
@@ -109,7 +121,15 @@ class ClauseGenerator():
             for p in targets:
                 self.points_with_constraints[p] = append_lst(
                     self.points_with_constraints[p], [clause])
+                # Similar和Congruent虽然只有1条约束，按2条约束处理
+                if 'Similar' in clause or 'Congruent' in clause:
+                    self.points_with_constraints[p].append('')
                     
+                # 出现Polygon(ABCD)也按2条约束处理，直接固定住
+                if 'Polygon' in clause:
+                    _, items = parse_clause(clause)
+                    if len(items[0]) == 4:
+                        self.points_with_constraints[p].append('')
         return
             
     def find_unconstrained_points(self, n=None, ignore_ps=None):
@@ -120,13 +140,15 @@ class ClauseGenerator():
                 continue
             if ignore_ps is not None and p in ignore_ps:
                 continue
-            # if p is circle center defined by 'Cocircular', it's constrained
-            centre = [p == parse_clause(constr)[1][0] if 'Cocircular' in constr 
-                      else False for constr in constrs]
-            if any(centre):
-                continue
-            if len(constrs) < 2:
-                unconstr_ps.append(p)
+            # if p is circle center defined by 'Cocircular' with >3 points, 
+            # it's constrained
+            if p in self.circles:
+                if len(self.points_on_circle[p]) <= 2:
+                    unconstr_ps.append(p)
+
+            else:
+                if len(constrs) < 2:
+                    unconstr_ps.append(p)
                 
         if len(unconstr_ps) == 0 and n is not None:
             unconstr_ps = self.add_new_points(1)
@@ -163,14 +185,11 @@ class ClauseGenerator():
             text_cdls += text_cdl
             
         # define construct predicates (Collinear, Cocircular) if there's unconstrained points 
-        if len(self.circles) == 0:
-            constr_name = 'Collinear'
-        else:
-            constr_name = random.choice(PREDICATES_PRE)
-        if len(self.find_unconstrained_points()) != 0:
-            constr_cdl, text_cdl = self.define_construction(constr_name)
-            constr_cdls += constr_cdl
-            text_cdls += text_cdl
+        # p_rest = len(self.find_unconstrained_points())
+        # if  p_rest != 0:
+        #     constr_cdl, text_cdl = self.define_construction_for_rest()
+        #     constr_cdls += constr_cdl
+        #     text_cdls += text_cdl
                 
         # add new lines
         possible_lines = list(itertools.combinations(self.points, 2))
@@ -213,6 +232,8 @@ class ClauseGenerator():
         # add constraints: ab \\parallel cd ..
         self.polygons = append_lst(self.polygons, [tuple(new_points)])
         all_extend = self.get_all_extend(pred_info['extend'])
+        if len(all_extend) == 0:
+            all_extend = [predicate]
         self.constraints += all_extend
         self.constraints_base += all_extend
         self.update_constraints_for_points(all_extend)
@@ -263,13 +284,17 @@ class ClauseGenerator():
         all_extend = self.get_all_extend(pred_info['extend'])
         # add collinear or cocircular relation (have algebra relation)
         for cdl in constr_cdls:
-            if 'Collinear' in cdl or 'Cocircular' in cdl:
+            if 'Collinear' in cdl or 'Cocircular' in cdl or 'Polygon' in cdl:
                 all_extend.append(cdl)
         if len(all_extend) == 0:
             all_extend = [predicate]
         self.constraints += all_extend
         self.update_constraints_for_points(all_extend)
         return constr_cdls, text_cdls
+    
+    
+    def define_construction_for_rest(self, p):
+        pass
     
     def define_construction(self, pred_name):
         '''define collinear, cocircular'''
@@ -291,6 +316,9 @@ class ClauseGenerator():
                 self.update_constraints_for_points([cdl])
                 
         return construct_cdls, text_clds
+    
+
+        
     
     def find_construct_clause(self, clause, ignore_ps=[]):
         '''find points for clause (template), try to return existed points'''
@@ -529,7 +557,7 @@ class ClauseGenerator():
     
     def distribute_entity_points(self, n):
         '''找n个点'''
-        if n > self.p_num + 1:
+        if n > self.p_num:
             new_points = self.add_new_points(n - self.p_num)
             new_points = sorted(list(set(self.points + new_points)))
         else:
