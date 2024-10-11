@@ -45,17 +45,15 @@ class Plotter():
         assert allocate_char_mode in ['random', 'order']
         self.allocate_char_mode = allocate_char_mode
         
-    @property
-    def radius(self):
-        c = self.circles[0]
-        p0 = self.points_on_circle[self.circles[0]][0]
-        xc, yc = self.p_pos[c]
-        x1, y1 = self.p_pos[p0]
-        return int(self.distance([xc, yc], [x1, y1]))
-        
     @staticmethod
     def distance(point1, point2):
         return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+    
+    def get_radius(self, c):
+        p0 = self.points_on_circle[c][0]
+        xc, yc = self.p_pos[c]
+        x1, y1 = self.p_pos[p0]
+        return int(self.distance([xc, yc], [x1, y1]))
             
     def normalize_positions(self, pad_size=50):
         # normalize positions for points, add padding and return fig size
@@ -68,12 +66,13 @@ class Plotter():
         
         # check if circle out of figure
         if len(self.circles) > 0:
-            circle_x, circle_y = self.p_pos[self.circles[0]]
-            radius = self.radius
-            min_x = min(min_x, circle_x - radius)
-            max_x = max(max_x, circle_x + radius)
-            min_y = min(min_y, circle_y - radius)
-            max_y = max(max_y, circle_y + radius)
+            for circle in self.circles:
+                circle_x, circle_y = self.p_pos[circle]
+                radius = self.get_radius(circle)
+                min_x = min(min_x, circle_x - radius)
+                max_x = max(max_x, circle_x + radius)
+                min_y = min(min_y, circle_y - radius)
+                max_y = max(max_y, circle_y + radius)
         
         bbox_width = max_x - min_x
         bbox_height = max_y - min_y
@@ -120,7 +119,7 @@ class Plotter():
                 img_reserve = 255 - self.fig[char_bbox[1]:char_bbox[3],
                                              char_bbox[0]:char_bbox[2], :]
                 pixel_val = sum(img_reserve.reshape(-1)) 
-                sum(255 - self.fig[char_bbox[0]:char_bbox[2], char_bbox[1]:char_bbox[3], :])
+
                 if abs(pixel_val) < 1e-5:
                     # cv2.circle(self.fig, (int(x), int(y)), 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
                     # cv2.rectangle(self.fig, [char_bbox[0], char_bbox[1]], [char_bbox[2], char_bbox[3]],(255, 0, 0), 1)
@@ -140,7 +139,6 @@ class Plotter():
         # plot points
         for p, pos in self.p_pos.items():
             cv2.circle(self.fig, pos, 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
-            # self.fig.ellipse()
             
         # plot lines
         for line in self.lines:
@@ -151,14 +149,15 @@ class Plotter():
         # plot circles
         for circle in self.circles:
             c_pos = self.p_pos[circle]
-            cv2.circle(self.fig, c_pos, self.radius, color=self.l_color, 
+            radius = self.get_radius(circle)
+            cv2.circle(self.fig, c_pos, radius, color=self.l_color, 
                        thickness=self.line_width, lineType=cv2.LINE_AA)
             
         # plot chars
         if self.allocate_char_mode == 'random':
             chars = random.sample(string.ascii_uppercase, len(self.p_pos))
         else:
-            chars = list(string.ascii_uppercase[:len(self.p_pos)])
+            chars = [c.upper() for c in self.p_pos]
         point_mapping = {}
         for point_i, char in zip(self.p_pos, chars):
             point_mapping[point_i] = char
@@ -177,71 +176,54 @@ class Plotter():
 if __name__ == '__main__':
     setup_seed(124)
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    for i in range(5):
-        # clauses_base = random.choices(PREDICATES_ENT, k=1)
-        # clauses_rel = random.choices(PREDICATES_REL, k=2)
+    for i in range(10):
+        clauses_base = random.choices(PREDICATES_ENT, k=1)
+        clauses_rel = random.choices(PREDICATES_REL, k=2)
         clauses_base = [
-            # 'EquilateralTriangle'
-            # 'RightTriangle',
-            # "Triangle",
-            # "Parallelogram",
-            # "Rectangle",
-            # "Rhombus",
-            # "RightTriangle",
-            "Square",
-            # "EquilateralTriangle",
-            # "IsoscelesTriangle",
-            # "Trapezoid",
-            # "Kite",
-            # "RightTrapezoid",
-            # "IsoscelesTrapezoid",
-            # "IsoscelesRightTriangle",
-            
-            # "SimilarBetweenTriangle",
-            # "SimilarBetweenQuadrilateral",
-            # "CongruentBetweenTriangle",
-            # "CongruentBetweenQuadrilateral",
+            "Kite",
         ]
         clauses_rel = [
-            'IsIncenterOfTriangle', 
-            'IsMidpointOfArc',
-            # 'CongruentBetweenArc'
+            # 'IsCentroidOfTriangle', 
+            # 'IsMidsegmentOfTriangle',
+            # 'IsAltitudeOfQuadrilateral',
+            'IsCircumcenterOfQuadrilateral',
+            "IsCircumcenterOfTriangle",
+            "IsMidpointOfArc",
             ]
+        print('---------- Chosen Predicates ----------')
+        print('clauses_base: ', clauses_base)
+        print('clauses_rel: ', clauses_rel)
         
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
             clauses_base, 
             clauses_rel, 
-            n_new_lines=0
+            n_more_lines=0
         )
-        print('---------- Chosen Predicates ----------')
-        print('clauses_base: ', clauses_base)
-        print('clauses_rel: ', clauses_rel)
-        
-        allocator = Allocator(cg.states, c_cdls, t_cdls, dl.predicate_GDL)
+        states = cg.states
+        states = {'points': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('b', 'd'), ('d', 'f'), ('a', 'f')], 'circles': ['e', 'g'], 'constraints': ['Equal(LengthOfLine(ab),LengthOfLine(ad))', 'Equal(LengthOfLine(cb),LengthOfLine(cd))', 'Cocircular(e,abdf)', 'Cocircular(g,bcd)', 'Equal(LengthOfArc(eah),LengthOfArc(ehb))', 'Cocircular(g,bcd)', 'Cocircular(e,abdf)', 'Cocircular(e,ahb)'], 'constraints_base': ['Equal(LengthOfLine(ab),LengthOfLine(ad))', 'Equal(LengthOfLine(cb),LengthOfLine(cd))'], 'points_on_circle': {'e': ['a', 'b', 'd', 'f', 'h'], 'g': ['b', 'c', 'd']}}
+        c_cdls = ['Shape(ab,bc,cd,da)', 'Polygon(abd)', 'Shape(ab,bd,df,fa)', 'Cocircular(e,abdf)', 'Shape(bc,cd,db)', 'Cocircular(g,bcd)', 'Cocircular(g,bcd)', 'Cocircular(e,abdf)', 'Cocircular(e,ahb)']
+        t_cdls = ['Kite(abcd)', 'IsCircumcenterOfQuadrilateral(e,abdf)', 'IsCircumcenterOfTriangle(g,bcd)', 'IsMidpointOfArc(h,eab)']
+        print('---------- Allocator Inputs ----------')
+        print(states)
+        print('c_cdls: ', c_cdls)
+        print('t_cdls: ', t_cdls)
+
+        allocator = Allocator(states, c_cdls, t_cdls, dl.predicate_GDL)
         print('---------- Formulated CDLs ----------')
-        formulated_cdls = allocator.formulated_cdls
-        print('Text CDLs: ')
-        for t_cdl in formulated_cdls['text_cdls']:
-            print('\t', t_cdl)
-        print('Construct CDLs: ')
-        for c_cdl in formulated_cdls['construct_cdls']:
-            print('\t', c_cdl)
+        
             
         allocator.allocate()
-        
-        
-        
-        print("---------- Location ----------")
-        for p, pos in allocator.p_pos.items():
-            print(f"{p}: [{pos[0]:.3f}, {pos[1]:.3f}]")
+        print('Text CDLs: ')
+        for t_cdl in allocator.formulated_cdls['text_cdls']:
+            print('\t', t_cdl)
+        print('Construct CDLs: ')
+        for c_cdl in allocator.formulated_cdls['construct_cdls']:
+            print('\t', c_cdl)
             
         plotter = Plotter(allocator.states)
         plotter.plot()
-        print("---------- Location Norm ----------")
-        for p, pos in plotter.p_pos.items():
-            print(f"{p}: [{pos[0]:.3f}, {pos[1]:.3f}]")
         plotter.save_fig('test', 'imgs_test')
         
         print('==============================================')

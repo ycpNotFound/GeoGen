@@ -23,6 +23,7 @@ class ClauseGenerator():
         self.lines = []
         self.circles = []
         self.polygons = []
+        self.polygons_used = []
         self.constraints = []
         self.constraints_base = []
         
@@ -167,7 +168,7 @@ class ClauseGenerator():
         self, 
         clauses_base, 
         clauses_rel, 
-        n_new_lines
+        n_more_lines
     ):
         # define base entity (Square, Rectangle / Similar, Congruent) 
         constr_cdls = [] 
@@ -183,15 +184,40 @@ class ClauseGenerator():
             constr_cdl, text_cdl = self.define_relation(name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
+            self.find_triangles()
+        
+        constr_cdl = self.add_more_lines(text_cdls, n_more_lines)
+        constr_cdls += constr_cdl
+        return constr_cdls, text_cdls
+    
+    def add_more_lines(self, text_cdls, n_more_lines):
+        # 一些定制化的操作
+        constr_cdls = []
+        for text_cdl in text_cdls:
+            if 'IsIncenterOfTriangle' in text_cdl:
+                _, items = parse_clause(text_cdl)
+                center, points = items
+                for p in points:
+                    self.add_new_line([center, p])
+            if 'IsCentroidOfTriangle' in text_cdl or 'IsOrthocenterOfTriangle' in text_cdl:
+                _, items = parse_clause(text_cdl)
+                center, points = items
+                p1 = random.choice(points)
+                p2, p3 = sorted(list(set(points) - set([p1])))
+                mid_p = self.add_new_points(1)[0]
+                self.add_new_line([p1, center, mid_p])
+                self.add_new_line([p2, mid_p, p3])
+                constr_cdls += [
+                    f"Collinear({''.join([p1, center, mid_p])})",
+                    f"Collinear({''.join([p2, mid_p, p3])})",
+                ]
+            if'IsTangentOfCircle' in text_cdl:
+                _, items = parse_clause(text_cdl)
+                line, circle = items
+                self.add_new_line([circle, line[1]])
             
-        # define construct predicates (Collinear, Cocircular) if there's unconstrained points 
-        # p_rest = len(self.find_unconstrained_points())
-        # if  p_rest != 0:
-        #     constr_cdl, text_cdl = self.define_construction_for_rest()
-        #     constr_cdls += constr_cdl
-        #     text_cdls += text_cdl
-                
-        # add new lines
+        
+        # 额外增加一些线段
         possible_lines = list(itertools.combinations(self.points, 2))
         possible_new_lines = []
         for line_1 in possible_lines:
@@ -203,13 +229,43 @@ class ClauseGenerator():
                     break
             if not exist_flag:
                 possible_new_lines.append(line_1)
-        if len(possible_new_lines) >= n_new_lines:
-            possible_new_lines_n = random.sample(possible_new_lines, k=n_new_lines)
+        if len(possible_new_lines) >= n_more_lines:
+            possible_new_lines_n = random.sample(possible_new_lines, k=n_more_lines)
             for l in possible_new_lines_n:
                 self.add_new_line(l)
             
-        return constr_cdls, text_cdls
+        return constr_cdls
+        
+    
+    def find_triangles(self):
+        '''find possible triangles'''
+        possible_triangles = list(itertools.combinations(self.points, 3))
+        triangles = []
+        for points in possible_triangles:
+            if points in self.polygons:
+                continue
             
+            l1 = tuple([points[0], points[1]])
+            l2 = tuple([points[1], points[2]])
+            l3 = tuple([points[0], points[2]])
+            l1_exist, l2_exist, l3_exist = False, False, False
+            collinear = False
+            for l in self.lines:
+                if all([p in l for p in l1]):
+                    l1_exist = True
+                if all([p in l for p in l2]):
+                    l2_exist = True
+                if all([p in l for p in l3]):
+                    l3_exist = True
+                if all([p in l for p in points]):
+                    collinear = True
+            
+            if l1_exist and l2_exist and l3_exist and not collinear:
+                triangles.append(points)
+                
+        self.polygons = append_lst(self.polygons, triangles)
+        
+        
     
     def define_base(self, pred_name, pred_type):
         '''define base entity (Square, Rectangle)'''
@@ -282,21 +338,21 @@ class ClauseGenerator():
         text_cdls += [predicate]
         # add constraints
         all_extend = self.get_all_extend(pred_info['extend'])
-        # add collinear or cocircular relation (have algebra relation)
+        # add collinear / cocircular / polygon (> 4) to all_extend (have algebra relation)
         for cdl in constr_cdls:
-            if 'Collinear' in cdl or 'Cocircular' in cdl or 'Polygon' in cdl:
+            if 'Collinear' in cdl or 'Cocircular' in cdl:
                 all_extend.append(cdl)
+            if 'Polygon' in cdl:
+                _, items = parse_clause(cdl)
+                if len(items[0]) > 3:
+                    all_extend.append(cdl)
         if len(all_extend) == 0:
             all_extend = [predicate]
         self.constraints += all_extend
         self.update_constraints_for_points(all_extend)
         return constr_cdls, text_cdls
     
-    
-    def define_construction_for_rest(self, p):
-        pass
-    
-    def define_construction(self, pred_name):
+    def define_collinear_cocircular(self, pred_name):
         '''define collinear, cocircular'''
         construct_cdls = []
         text_clds = []
@@ -317,9 +373,6 @@ class ClauseGenerator():
                 
         return construct_cdls, text_clds
     
-
-        
-    
     def find_construct_clause(self, clause, ignore_ps=[]):
         '''find points for clause (template), try to return existed points'''
         constr_cdls = []
@@ -338,26 +391,26 @@ class ClauseGenerator():
         
         if 'Collinear' in clause:
             if all([len(l)<3 for l in self.lines]):
-                c_cdls, _ = self.define_construction('Collinear')
+                c_cdls, _ = self.define_collinear_cocircular('Collinear')
                 constr_cdls += c_cdls
             collinear_ls = [l for l in self.lines if len(l) ==3]
             points = list(random.choice(collinear_ls))
         
         if 'Cocircular' in clause:
             if len(self.circles) == 0:
-                _, t_cdls = self.define_construction('Cocircular')
+                _, t_cdls = self.define_collinear_cocircular('Cocircular')
                 text_cdls += t_cdls
                 
             items = clause.lstrip('Cocircular(').rstrip(')')
             num = len(items.split(',')[-1])
             if len(self.circles) == 0:
                 self.add_new_circle()
-            ori_ps_on_circle = self.points_on_circle[self.circles[0]]
+            circle = random.choice(self.circles)
+            ori_ps_on_circle = self.points_on_circle[circle]
             # x<3, create points up to 3
             if len(ori_ps_on_circle) < 3:
                 ps_to_sample = [p for p in self.points 
-                                if p != self.circles[0] and
-                                p not in ori_ps_on_circle]
+                                if p != circle and p not in ori_ps_on_circle]
                 if len(ps_to_sample) < 3 - len(ori_ps_on_circle):
                     ps_to_sample = ps_to_sample + self.add_new_points(
                         3-len(ori_ps_on_circle)-len(ps_to_sample)
@@ -373,22 +426,22 @@ class ClauseGenerator():
                         # remove collinear points
                         if not self.check_collinear(list(new_ps_on_circle) + ori_ps_on_circle):
                             break
-                self.points_on_circle[self.circles[0]] += list(new_ps_on_circle)
+                self.points_on_circle[circle] += list(new_ps_on_circle)
                 
             # y>x, create y-x new points
-            if num > len(self.points_on_circle[self.circles[0]]):
+            if num > len(self.points_on_circle[circle]):
                 new_ps_on_circle = self.add_new_points(
-                    num-len(self.points_on_circle[self.circles[0]])
+                    num-len(self.points_on_circle[circle])
                 )
-                self.points_on_circle[self.circles[0]] += new_ps_on_circle
+                self.points_on_circle[circle] += new_ps_on_circle
                 
-            constr_cdls = append_lst(constr_cdls, [f"Cocircular({self.circles[0]},{''.join(self.points_on_circle[self.circles[0]])})"])
-            points = random.sample(self.points_on_circle[self.circles[0]], num)
-            points = [self.circles[0]] + points
+            constr_cdls = append_lst(constr_cdls, [f"Cocircular({circle},{''.join(self.points_on_circle[circle])})"])
+            points = random.sample(self.points_on_circle[circle], num)
+            points = [circle] + points
         
         if 'Arc' in clause:
             if len(self.circles) == 0:
-                _, t_cdls = self.define_construction('Cocircular')
+                _, t_cdls = self.define_collinear_cocircular('Cocircular')
                 text_cdls += t_cdls
             items = clause.lstrip('Arc(').rstrip(')')
             num = len(items[1:])
@@ -399,13 +452,12 @@ class ClauseGenerator():
             # 2. x points on circle, x >=3, pass
             # 3. sample y points, y<=x, direct sample
             # 4. sample y points, y>x, create y-x new points then sample
-
-            ori_ps_on_circle = self.points_on_circle[self.circles[0]]
+            circle = random.choice(self.circles)
+            ori_ps_on_circle = self.points_on_circle[circle]
             # x<3, create points up to 3
             if len(ori_ps_on_circle) < 3:
                 ps_to_sample = [p for p in self.points 
-                                if p != self.circles[0] and
-                                p not in ori_ps_on_circle]
+                                if p != circle and p not in ori_ps_on_circle]
                 if len(ps_to_sample) < 3 - len(ori_ps_on_circle):
                     ps_to_sample = ps_to_sample + self.add_new_points(
                         3-len(ori_ps_on_circle)-len(ps_to_sample)
@@ -421,18 +473,18 @@ class ClauseGenerator():
                         # remove collinear points
                         if not self.check_collinear(list(new_ps_on_circle) + ori_ps_on_circle):
                             break
-                self.points_on_circle[self.circles[0]] += list(new_ps_on_circle)
+                self.points_on_circle[circle] += list(new_ps_on_circle)
                 
             # y>x, create y-x new points
-            if num > len(self.points_on_circle[self.circles[0]]):
+            if num > len(self.points_on_circle[circle]):
                 new_ps_on_circle = self.add_new_points(
-                    num-len(self.points_on_circle[self.circles[0]])
+                    num-len(self.points_on_circle[circle])
                 )
-                self.points_on_circle[self.circles[0]] += new_ps_on_circle
+                self.points_on_circle[circle] += new_ps_on_circle
                 
-            constr_cdls += [f"Cocircular({self.circles[0]},{''.join(self.points_on_circle[self.circles[0]])})"]
-            points = random.sample(self.points_on_circle[self.circles[0]], num)
-            points = [self.circles[0]] + points
+            constr_cdls += [f"Cocircular({circle},{''.join(self.points_on_circle[circle])})"]
+            points = random.sample(self.points_on_circle[circle], num)
+            points = [circle] + points
          
         if 'Polygon' in clause:
             items = clause.lstrip('Polygon(').rstrip(')')

@@ -54,7 +54,7 @@ PREDICATES_REL = [
     "IsMidsegmentOfQuadrilateral",
     "IsCentroidOfTriangle",
     # "MirrorCongruentBetweenQuadrilateral",
-    "IsAltitudeOfQuadrilateral",
+    # "IsAltitudeOfQuadrilateral",
     # "CongruentBetweenQuadrilateral",
     "IsCircumcenterOfTriangle",
     # "IsIncenterOfQuadrilateral",
@@ -417,7 +417,7 @@ def setup_seed(seed=1234):
     random.seed(seed)
     np.random.seed(seed)
 
-def simplify_and_trim(poly, threshold=1e-10):
+def simplify_and_trim(poly, threshold=1e-3):
      # 将多项式中的浮点数转换为 SymPy 的 Float 类型
     poly = poly.xreplace({n: Float(n) for n in poly.atoms(float)})
     
