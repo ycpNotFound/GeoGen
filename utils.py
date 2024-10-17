@@ -5,7 +5,7 @@ from sympy import Symbol
 import random
 import numpy as np
 import sympy
-from sympy import Float
+from sympy import Float, Add, Mul, simplify
 from matplotlib import pyplot as plt
 
 PREDICATES_PRE = [
@@ -91,6 +91,31 @@ PREDICATES_ATTR = [
     "RatioOfMirrorSimilarTriangle",
     "RatioOfSimilarQuadrilateral",
 ]
+
+def extract_sqrt_terms(expression):
+    # 使用 SymPy 的 args 属性，该属性对于加法表达式返回所有加项，
+    # 对于乘法表达式返回所有因子。
+    if expression.func is Add:  # Add 是加法类
+        res_list = []
+        for arg in expression.args:
+            res = extract_sqrt_terms(arg)
+            if len(res) != 0:
+                res_list += res
+        return res_list
+
+    elif expression.func is Mul:  # Mul 是乘法类
+        res_list = []
+        for arg in expression.args:
+            res = extract_sqrt_terms(arg)
+            if len(res) != 0:
+                res_list += res
+        return res_list
+
+    elif expression.is_Pow and expression.exp == 1/2:
+        return [expression]
+
+    else:
+        return []
 
 def get_predicate_name(clause):
     if 'Equal' in clause:
@@ -334,31 +359,34 @@ def get_points(clause):
     return sorted(list(points))
     
 def max_letter_index(s):
-    # 提取括号内的内容
+    # index 0: letter idx
+    # index 1: others > Equal > Cocircular
     if 'Equal' in s:
         pattern =  r'Equal\((.*)\)'
         match = re.search(pattern, s)
         if match:
             # 提取匹配到的内容
             items = match.group(1)
-            max_index_l, max_index_r = 0, 0
+            max_index_l, max_index_r = (0, 0), (0, 0)
             item_l, item_r = items.split(',')
             if not item_l.isdigit(): 
-                max_index_l, _ = max_letter_index(item_l)
+                max_index_l = max_letter_index(item_l)
             if not item_r.isdigit():
-                max_index_r, _ = max_letter_index(item_r)
+                max_index_r = max_letter_index(item_r)
             max_index = max(max_index_l, max_index_r)
-            return (max_index, 0)
+            return (max_index[0], 1)
         else:
-            return (0, 0)
+            return (0, 1)
     else:
         content = re.findall(r'\((.*?)\)', s)[0]
         # 计算括号内每个字母的索引，并找出最大索引
-        max_index = max(ord(c) - ord('a') for c in content if c.isalpha())
-        index_2 = 0
+        index = sorted([ord(c) - ord('a') for c in content if c.isalpha()], reverse=True)
+        
+        index_0 = index[0]
+        index_1 = 0 
         if 'Cocircular' in s: # move cocircular to the last
-            index_2 = 1
-        return (max_index, index_2)
+            index_1 = 2
+        return (index_0, index_1)
     
 def find_target_for_construct(clause):
     # 返回需要构造的target points
@@ -418,6 +446,7 @@ def setup_seed(seed=1234):
     np.random.seed(seed)
 
 def simplify_and_trim(poly, threshold=1e-3):
+    poly = simplify(poly)
      # 将多项式中的浮点数转换为 SymPy 的 Float 类型
     poly = poly.xreplace({n: Float(n) for n in poly.atoms(float)})
     

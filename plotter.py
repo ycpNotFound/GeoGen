@@ -12,7 +12,7 @@ from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
 
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, find_target_for_construct,
+from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, find_target_for_construct,
                    get_content, get_points, get_predicate_name, get_symbol,
                    max_letter_index, parse_clause, replace_points, setup_seed)
 import cv2
@@ -177,19 +177,20 @@ if __name__ == '__main__':
     setup_seed(124)
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     for i in range(10):
+        # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
-        clauses_base = [
-            "Kite",
-        ]
-        clauses_rel = [
-            # 'IsCentroidOfTriangle', 
-            # 'IsMidsegmentOfTriangle',
-            # 'IsAltitudeOfQuadrilateral',
-            'IsCircumcenterOfQuadrilateral',
-            "IsCircumcenterOfTriangle",
-            "IsMidpointOfArc",
-            ]
+        # clauses_base = [
+        #     "RightTriangle",
+        # ]
+        # clauses_rel = [
+        #     # 'IsCentroidOfTriangle', 
+        #     # 'IsMidsegmentOfTriangle',
+        #     # 'IsAltitudeOfQuadrilateral',
+        #     'IsMidpointOfArc',
+        #     "IsMidsegmentOfQuadrilateral",
+        #     # "IsMidpointOfArc",
+        #     ]
         print('---------- Chosen Predicates ----------')
         print('clauses_base: ', clauses_base)
         print('clauses_rel: ', clauses_rel)
@@ -202,9 +203,11 @@ if __name__ == '__main__':
             n_more_lines=0
         )
         states = cg.states
-        states = {'points': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('b', 'd'), ('d', 'f'), ('a', 'f')], 'circles': ['e', 'g'], 'constraints': ['Equal(LengthOfLine(ab),LengthOfLine(ad))', 'Equal(LengthOfLine(cb),LengthOfLine(cd))', 'Cocircular(e,abdf)', 'Cocircular(g,bcd)', 'Equal(LengthOfArc(eah),LengthOfArc(ehb))', 'Cocircular(g,bcd)', 'Cocircular(e,abdf)', 'Cocircular(e,ahb)'], 'constraints_base': ['Equal(LengthOfLine(ab),LengthOfLine(ad))', 'Equal(LengthOfLine(cb),LengthOfLine(cd))'], 'points_on_circle': {'e': ['a', 'b', 'd', 'f', 'h'], 'g': ['b', 'c', 'd']}}
-        c_cdls = ['Shape(ab,bc,cd,da)', 'Polygon(abd)', 'Shape(ab,bd,df,fa)', 'Cocircular(e,abdf)', 'Shape(bc,cd,db)', 'Cocircular(g,bcd)', 'Cocircular(g,bcd)', 'Cocircular(e,abdf)', 'Cocircular(e,ahb)']
-        t_cdls = ['Kite(abcd)', 'IsCircumcenterOfQuadrilateral(e,abdf)', 'IsCircumcenterOfTriangle(g,bcd)', 'IsMidpointOfArc(h,eab)']
+        
+        # states = {'points': ['a', 'b', 'c', 'd', 'e', 'f', 'g'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'f'), ('a', 'f'), ('b', 'd', 'g'), ('a', 'c', 'g')], 'circles': ['e'], 'polygons': [('a', 'b', 'c'), ('a', 'b', 'c', 'f'), ('a', 'c', 'f')], 'constraints': ['Equal(LengthOfLine(ab),LengthOfLine(bc))', 'Equal(LengthOfLine(bc),LengthOfLine(ac))', 'Equal(MeasureOfAngle(abc),60)', 'IsCentroidOfTriangle(d,abc)', 'Cocircular(e,abcf)'], 'constraints_base': ['Equal(LengthOfLine(ab),LengthOfLine(bc))', 'Equal(LengthOfLine(bc),LengthOfLine(ac))', 'Equal(MeasureOfAngle(abc),60)'], 'points_on_circle': {'e': ['a', 'b', 'c', 'f']}}
+        # c_cdls = ['Shape(ab,bc,ca)', 'Shape(ab,bc,ca)', 'Shape(ab,bc,cf,fa)', 'Cocircular(e,abcf)', 'Collinear(bdg)', 'Collinear(agc)']
+        # t_cdls = ['EquilateralTriangle(abc)', 'IsCentroidOfTriangle(d,abc)', 'IsCircumcenterOfQuadrilateral(e,abcf)']
+        
         print('---------- Allocator Inputs ----------')
         print(states)
         print('c_cdls: ', c_cdls)

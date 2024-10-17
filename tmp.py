@@ -1,8 +1,13 @@
 import random
 
 
-from sympy import symbols
+from sympy import symbols, Add, Mul, S
+import sympy as sp
 
-x, a = symbols('x a')
-expr = (x - 1.1)**2  # 直接使用这个形式
-print(expr)
+ye = sp.symbols('y_e')
+
+# 提取平方根部分
+
+
+
+

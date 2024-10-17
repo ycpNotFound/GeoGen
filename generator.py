@@ -7,7 +7,7 @@ from formalgeo.data import DatasetLoader
 from utils import (PREDICATES_ATTR, PREDICATES_ENT, PREDICATES_PRE, 
                    PREDICATES_REL, PREDICATES_REL_2, append_lst, get_content, get_points_num, get_symbol, get_predicate_name, get_points_mapping,
                    replace_points, setup_seed, parse_clause, find_target_for_construct, get_points)
-
+import networkx as nx
 
 
 class ClauseGenerator():
@@ -23,7 +23,7 @@ class ClauseGenerator():
         self.lines = []
         self.circles = []
         self.polygons = []
-        self.polygons_used = []
+
         self.constraints = []
         self.constraints_base = []
         
@@ -45,6 +45,7 @@ class ClauseGenerator():
             "points": self.points,
             "lines": self.lines,
             "circles": self.circles,
+            "polygons": self.polygons,
             "constraints": self.constraints,
             "constraints_base": self.constraints_base,
             "points_on_circle": self.points_on_circle
@@ -184,7 +185,9 @@ class ClauseGenerator():
             constr_cdl, text_cdl = self.define_relation(name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
+            self.find_collinear_from_para_perp()
             self.find_triangles()
+            
         
         constr_cdl = self.add_more_lines(text_cdls, n_more_lines)
         constr_cdls += constr_cdl
@@ -194,13 +197,13 @@ class ClauseGenerator():
         # 一些定制化的操作
         constr_cdls = []
         for text_cdl in text_cdls:
-            if 'IsIncenterOfTriangle' in text_cdl:
-                _, items = parse_clause(text_cdl)
+            predicate, items = parse_clause(text_cdl)
+            if 'IsIncenterOfTriangle' == predicate:
                 center, points = items
                 for p in points:
                     self.add_new_line([center, p])
-            if 'IsCentroidOfTriangle' in text_cdl or 'IsOrthocenterOfTriangle' in text_cdl:
-                _, items = parse_clause(text_cdl)
+            if 'IsCentroidOfTriangle' == predicate or \
+                'IsOrthocenterOfTriangle' == predicate: # "IsCentroidOfTriangle(O,ABC)"
                 center, points = items
                 p1 = random.choice(points)
                 p2, p3 = sorted(list(set(points) - set([p1])))
@@ -211,13 +214,25 @@ class ClauseGenerator():
                     f"Collinear({''.join([p1, center, mid_p])})",
                     f"Collinear({''.join([p2, mid_p, p3])})",
                 ]
-            if'IsTangentOfCircle' in text_cdl:
-                _, items = parse_clause(text_cdl)
+            if 'IsTangentOfCircle' == predicate: # "IsTangentOfCircle(PA,O)"
                 line, circle = items
                 self.add_new_line([circle, line[1]])
-            
+            if 'IsMidpointOfArc' == predicate: # "IsMidpointOfArc(M,OAB)"
+                # create line OM, OM and AB intersect -> OCM and ACB
+                mid_p, points = items
+                circle, p1, p2 = points
+                new_p = self.add_new_points(1)[0]
+                self.add_new_line([circle, new_p, mid_p])
+                self.add_new_line([p1, new_p, p2])
+                constr_cdls += [
+                    f"Collinear({''.join([circle, new_p, mid_p])})",
+                    f"Collinear({''.join([p1, new_p, p2])})",
+                ]
+                
         
         # 额外增加一些线段
+        if n_more_lines == 0:
+            return constr_cdls
         possible_lines = list(itertools.combinations(self.points, 2))
         possible_new_lines = []
         for line_1 in possible_lines:
@@ -265,7 +280,70 @@ class ClauseGenerator():
                 
         self.polygons = append_lst(self.polygons, triangles)
         
+    def find_collinear_from_para_perp(self):
+        '''
+            AD \parallel BC, BE \parallel AD => E B C collinear
+            AB \perp BC, BE \perp BC => E B C collinear
+            得到的collinear关系是推论，不参与constraint的计算
+        '''
         
+        # Parallel lines
+        parallel_clauses = [c for c in self.constraints if 'ParallelBetweenLine' in c]
+        G_para = nx.Graph()
+        for clause in parallel_clauses:
+            _, items = parse_clause(clause)
+            line_1, line_2 = items
+            line_1, line_2 = tuple(sorted(line_1)), tuple(sorted(line_2))
+            G_para.add_edge(line_1, line_2)
+            
+        parallel_groups = [list(group) for group in nx.connected_components(G_para)]
+        for group in parallel_groups:
+            if len(group) >= 3:
+                line_comb = list(itertools.combinations(group, 3))
+                for comb in line_comb:
+                    l1, l2, l3 = comb
+                    if len(set(l1) & set(l2)) == 1:
+                        collinear_1, collinear_2 = l1, l2
+                    elif len(set(l2) & set(l3)) == 1:
+                        collinear_1, collinear_2 = l2, l3
+                    elif len(set(l1) & set(l3)) == 1:
+                        collinear_1, collinear_2 = l1, l3
+                    else:
+                        continue
+                    same_p = list(set(collinear_1) & set(collinear_2))[0]
+                    p1 = list(set(collinear_1) - set([same_p]))[0]
+                    p2 = list(set(collinear_2) - set([same_p]))[0]
+                    self.add_new_line([min(p1, p2), same_p, max(p1, p2)])
+        
+        
+        # Perp lines
+        perp_clauses = [c for c in self.constraints if 'PerpendicularBetweenLine' in c]    
+        perp_dict = {}
+        for clause in perp_clauses:
+            _, items = parse_clause(clause)
+            line_1, line_2 = items
+            line_1, line_2 = tuple(sorted(line_1)), tuple(sorted(line_2))
+            if line_1 not in perp_dict:
+                perp_dict[line_1] = [line_2]
+            else:
+                perp_dict[line_1].append(line_2)
+                
+            if line_2 not in perp_dict:
+                perp_dict[line_2] = [line_1]
+            else:
+                perp_dict[line_2].append(line_1)
+        
+        for line, perp_group in perp_dict.items():
+            if len(perp_group) >= 2:
+                line_comb = list(itertools.combinations(group, 2))
+                for comb in line_comb:
+                    l1, l2 = comb
+                    if len(set(l1) & set(l2)) == 1:   
+                        same_p = list(set(l1) & set(l2))[0]
+                        p1 = list(set(l1) - set([same_p]))[0]
+                        p2 = list(set(l2) - set([same_p]))[0]
+                        self.add_new_line([min(p1, p2), same_p, max(p1, p2)])
+                        
     
     def define_base(self, pred_name, pred_type):
         '''define base entity (Square, Rectangle)'''
@@ -281,15 +359,15 @@ class ClauseGenerator():
         # get points of Entity, include old and new defined points
         new_points = self.distribute_entity_points(p_num)
         # replace ABC.. -> distributed points
-        predicate, pred_info = replace_points(predicate, pred_info, new_points)
+        clause_base, pred_info = replace_points(predicate, pred_info, new_points)
         # get construct and text clauses
         constr_cdl = self.define_construct_clauses(pred_info['ee_check'])
-        text_cdl = [predicate]
+        text_cdl = [clause_base]
         # add constraints: ab \\parallel cd ..
         self.polygons = append_lst(self.polygons, [tuple(new_points)])
         all_extend = self.get_all_extend(pred_info['extend'])
         if len(all_extend) == 0:
-            all_extend = [predicate]
+            all_extend = [clause_base]
         self.constraints += all_extend
         self.constraints_base += all_extend
         self.update_constraints_for_points(all_extend)
@@ -309,7 +387,7 @@ class ClauseGenerator():
         for clause in pred_info['find']:
             # distribute points according to clause
             ignore_ps = [v for k, v in mapping.items()]
-            mapping_i, c_cdls, t_cdls = self.find_construct_clause(clause, ignore_ps)
+            mapping_i, c_cdls, t_cdls = self.find_construct_clause(clause, pred_name, ignore_ps)
             # merge mapping
             # some points may be repeated
             for p, new_p in mapping_i.items():
@@ -328,14 +406,14 @@ class ClauseGenerator():
                 )[0]
             mapping[point] = new_p
         # replace template points -> distributed points
-        predicate, pred_info = replace_points(
+        clause_relation, pred_info = replace_points(
             predicate, pred_info, 
             new_points=None, mapping=mapping
         )
         # get construct and text cdls
         constr_cdl = self.define_construct_clauses(pred_info['ee_check'])
         constr_cdls += constr_cdl
-        text_cdls += [predicate]
+        text_cdls += [clause_relation]
         # add constraints
         all_extend = self.get_all_extend(pred_info['extend'])
         # add collinear / cocircular / polygon (> 4) to all_extend (have algebra relation)
@@ -347,7 +425,7 @@ class ClauseGenerator():
                 if len(items[0]) > 3:
                     all_extend.append(cdl)
         if len(all_extend) == 0:
-            all_extend = [predicate]
+            all_extend = [clause_relation]
         self.constraints += all_extend
         self.update_constraints_for_points(all_extend)
         return constr_cdls, text_cdls
@@ -373,7 +451,7 @@ class ClauseGenerator():
                 
         return construct_cdls, text_clds
     
-    def find_construct_clause(self, clause, ignore_ps=[]):
+    def find_construct_clause(self, clause, pred_name, ignore_ps=[],):
         '''find points for clause (template), try to return existed points'''
         constr_cdls = []
         text_cdls = []
@@ -492,12 +570,42 @@ class ClauseGenerator():
                 self.add_new_points(len(items) - self.p_num)
             polygons = [p for p in self.polygons if len(p)==len(items)]
             if len(polygons) == 0:
-                ps = sorted(random.sample(self.points, len(items)))
+                if len(items) == 3:
+                    tris = list(itertools.combinations(self.points, 3))
+                    collinear_ps = [l for l in self.lines if len(l) >= 3]
+                    for collinear_p in collinear_ps:
+                        if collinear_p in tris:
+                            tris.remove(collinear_p)
+                    ps = random.choice(tris)
+                elif len(items) == 4:
+                    tris = [p for p in self.polygons if len(p)==3]
+                    if len(tris) == 0:
+                        tris = list(itertools.combinations(self.points, 3))
+                        collinear_ps = [l for l in self.lines if len(l) >= 3]
+                        for collinear_p in collinear_ps:
+                            if collinear_p in tris:
+                                tris.remove(collinear_p)
+                        ps = random.choice(tris)
+                    ps = random.choice(tris)
+                    new_p = self.add_new_points(1)[0]
+                    ps = tuple(list(ps) + [new_p])
                 self.define_construct_clauses([f"Polygon({''.join(ps)})"])
                 constr_cdls += [f"Polygon({''.join(ps)})"]
                 
             polygons = [p for p in self.polygons if len(p)==len(items)]
             points = list(random.choice(polygons))
+            if pred_name == 'IsAltitudeOfTriangle':
+                # IsAltitudeOfTriangle(AD, ABC), angle ABC / ACB can't be 90
+                # if == 90, move right angle point to the first 
+                cdl_1 = f"Equal(MeasureOfAngle({''.join(points)}),90)"
+                cdl_2 = f"Equal(MeasureOfAngle({''.join([points[2], points[0], points[1]])}),90)"
+                if cdl_1 in self.constraints or cdl_2 in self.constraints: 
+                    points = [points[1], points[2], points[0]]
+   
+                cdl_1 = f"Equal(MeasureOfAngle({''.join([points[0], points[2], points[1]])}),90)"
+                cdl_1 = f"Equal(MeasureOfAngle({''.join([points[1], points[2], points[0]])}),90)"
+                if cdl_1 in self.constraints or cdl_2 in self.constraints:
+                    points = [points[2], points[0], points[1]]
         
         if 'Angle' in clause:
             angles = []
@@ -520,20 +628,6 @@ class ClauseGenerator():
                 points = self.add_new_points(1)
             points = [random.choice(points)]
         
-        if 'Trapezoid' in clause:
-            items = clause.lstrip('Trapezoid(').rstrip(')')
-            mapping_i, _, _ = self.find_construct_clause(f"Polygon({items})")
-            new_items = []
-            for i in range(len(items)):
-                new_items.append(mapping_i[items[i]])
-            points = ''.join(new_items)
-            text_cdls += [f"Trapezoid({''.join(points)})"]
-            l_1 = f"{mapping_i['A']}{mapping_i['D']}"
-            l_2 = f"{mapping_i['B']}{mapping_i['C']}"
-            cdl = f"ParallelBetweenLine({l_1},{l_2})"
-            self.constraints += [cdl]
-            self.update_constraints_for_points([cdl])
-        
         # create mapping
         items = clause.split('(')[-1].rstrip(')')
         if ',' in items:
@@ -553,6 +647,7 @@ class ClauseGenerator():
                 points = get_content(clause)
                 lines = [f"{points[i]}{points[(i+1)%len(points)]}" for i in range(len(points))]
                 constr_cdls.append(f"Shape({','.join(lines)})")
+                # constr_cdls.append(clause)
                 for l in lines:
                     self.add_new_line(tuple(l))
                 self.polygons = append_lst(self.polygons, [tuple(points)])

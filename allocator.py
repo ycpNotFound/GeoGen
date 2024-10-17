@@ -1,15 +1,18 @@
+import itertools
+import math
 import random
 import re
-import math
+
 import sympy
-import itertools
-from sympy import Eq, Expr, Symbol, Float, cos, pi, simplify, solve, symbols, I, im, nsimplify
+from sympy import (Eq, Expr, Float, I, Symbol, cos, im, nsimplify, pi,
+                   simplify, solve, symbols)
 
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, find_target_for_construct,
-                   get_content, get_points, get_predicate_name, get_symbol,
-                   max_letter_index, parse_clause, replace_points, setup_seed, simplify_and_trim)
+from utils import (PREDICATES_ENT, PREDICATES_REL, extract_sqrt_terms,
+                   find_target_for_construct, get_content, get_points,
+                   get_predicate_name, get_symbol, max_letter_index,
+                   parse_clause, replace_points, setup_seed, simplify_and_trim)
 
 # ClauseGenerator 
 # Allocator
@@ -33,6 +36,8 @@ class Allocator():
         self.lines = geo_states['lines']
         self.circles = geo_states['circles']
         assert len(self.circles) in [0, 1, 2]
+        self.polygons = geo_states['polygons']
+        
         self.constraints = [c for c in geo_states['constraints'] 
                             if c not in geo_states['constraints_base']]
         self.constraints_base = geo_states['constraints_base']
@@ -49,19 +54,22 @@ class Allocator():
         # merge all cocircular clauses
         self.clauses = self.merge_cocircular_clauses()
         # sort by idx of points
-        self.clauses = sorted(self.clauses, key=max_letter_index)
+        # [max_letter_index(x) for x in self.clauses]
+        self.clauses = sorted(list(set(self.clauses)), key=max_letter_index)
         # filter by IGNORE_NAMES
         self.clauses = [c for c in self.clauses if c.split('(')[0] not in IGNORE_NAMES]
 
         # store the location of points
-        self.p_pos = {k: None for k in self.points}
+        self.p_pos = {p: None for p in self.points}
         self.p_pos['a'] = [0, 0]
+        self.p_pos_range = {}
 
         # find min clauses subset needed to construct each point 
         # key: point | value: subset of clauses
         # if all clauses are visited in one subset
         # then random allocate position for this point
         self.clause_subset = self.find_mini_clauses_subset()
+        self.clause_added = []
         
     @property
     def states(self):
@@ -84,13 +92,16 @@ class Allocator():
                 cocircular_cdls.append(const_cdl)
 
         if len(cocircular_cdls) > 0:
-            points = set()
+            points_on_circle = {}
             for cdl in cocircular_cdls:
                 _, items = parse_clause(cdl)
-                circle, ps_on_circle = items
-                points.update(ps_on_circle)
-            cocircular_cdl_total = f"Cocircular({circle},{''.join(sorted(list(points)))})"
-            construct_cdls.append(cocircular_cdl_total)
+                circle, ps = items
+                if circle not in points_on_circle:
+                    points_on_circle[circle] = set()
+                points_on_circle[circle].update(ps)
+            for circle, ps in points_on_circle.items():
+                cocircular_cdl = f"Cocircular({circle},{''.join(sorted(list(ps)))})"
+                construct_cdls.append(cocircular_cdl)
             
         return {
             "text_cdls": self.text_cdls,
@@ -168,14 +179,17 @@ class Allocator():
             
             for clause in self.clauses:
                 self.allocate_for_relation(clause)
+                # delete coincide points and modify clauses
+                # self.delete_coincide_points()
                 
             # check if there's complex solution: a + bI
             have_complex = False
             for p, pos in self.p_pos.items():
                 if type(pos[0]) in [Float, float, int]:
-                    x, y = pos
-                    if im(x).simplify() != 0 or im(y).simplify() != 0:
-                        have_complex = True
+                    continue
+                x, y = pos
+                if x.has(I) or y.has(I):
+                    have_complex = True
                     
             if have_complex:
                 print('Get complex solution. ')
@@ -201,6 +215,9 @@ class Allocator():
                             position = self.random_allocate_position(target_p=p)
                         self.update_values(p, position)
                         
+            # clauses new added
+            self.clauses = sorted(list(set(self.clauses + self.clause_added)), key=max_letter_index)
+            
             # delete coincide points and modify clauses
             self.delete_coincide_points()
             
@@ -212,35 +229,26 @@ class Allocator():
         
         
     def find_possible_collinear(self, target_p):
+        # get unsolved point with possible collinear constraint
         possible_lines = [l for l in self.lines if target_p not in l]
         random.shuffle(possible_lines)
         for line in possible_lines:
             x, y = self.p_pos[target_p]
             x1, y1 = self.p_pos[line[0]]
             x2, y2 = self.p_pos[line[1]]
-            # x, y = Symbol('x'), Symbol('y')
+            if not all([type(i) in [float, Float, int] for i in [x1, y1, x2, y2]]):
+                continue
             # (y2-y1)x - (x2-x1)y + (x2y1-x1y2) = 0
             expr = (y2 - y1) * x - (x2 - x1) * y + (x2 * y1 - x1 * y2)
-            expr = simplify(expr)
+            expr = simplify_and_trim(expr)
             line_eq = Eq(expr, 0)
+            if line_eq == True or line_eq == False:
+                continue
             _, target, expand_eq = self.find_target([target_p])
             solution = solve((line_eq, ) + expand_eq, target)
-            if len(solution) == 0:
-                continue
-            syms = get_symbol(target_p)
-            if type(solution) == list:
-                x, y = random.choice(solution)
-            else:
-                x, y = solution.get(syms[0], None), solution.get(syms[1], None)
-            if x == None or y == None: 
-                continue
-            if x > 100 or y > 100:
-                continue
-            
-            # 算出的x, y可能和已有点重合，去掉这种情况
-            coincide_ps = self.get_coincide_points(x, y)
-            if len(coincide_ps) == 0:
-                # sort by x
+            res = self.update_symbol(solution, target_p)
+            if res is not None:
+                x, y = res
                 zipped_pairs = zip([x1, x2, x], [line[0], line[1], target_p])
                 sorted_pairs = sorted(zipped_pairs)
                 _, sorted_ps = zip(*sorted_pairs)
@@ -257,35 +265,30 @@ class Allocator():
         return None
     
     def find_possible_cocircular(self, target_p):
+        for c in self.circles:
+            if target_p in self.points_on_circle[c]:
+                return None
         circle = random.choice(self.circles)
-        if target_p in self.points_on_circle[circle]:
-            return None
         xc, yc = self.p_pos[circle]
         x0, y0 = self.p_pos[self.points_on_circle[circle][0]] # first point on circle
         x, y = self.p_pos[target_p]
         dist_1 = (x0 - xc)**2 + (y0 - yc)**2
         dist_2 = (x - xc)**2 + (y - yc)**2
         
-        expr = simplify_and_trim(simplify(dist_1 - dist_2))
+        expr = simplify_and_trim(dist_1 - dist_2)
         line_eq = Eq(expr, 0)
         _, target, expand_eq = self.find_target([target_p])
         solution = solve((line_eq, ) + expand_eq, target)
-        if len(solution) == 0:
-            return None
-        if len(solution) == 2:
-            for sol in solution:
-                x, y = simplify_and_trim(sol[0]), simplify_and_trim(sol[1])
-                # x, y = sol
-                coincide_ps = self.get_coincide_points(x, y)
-                if len(coincide_ps) == 0:
-                    # add construct cdls
-                    cocircular_ps = sorted(self.points_on_circle[circle] + [target_p])
-                    self.construct_cdls.append(f"Cocircular({circle},{''.join(cocircular_ps)})")
-                    # add new ps on circle
-                    self.points_on_circle[circle] = cocircular_ps
-                    return [x, y]
-                    
         
+        res = self.update_symbol(solution, target_p)
+        if res is not None:
+            x, y = res
+            cocircular_ps = sorted(self.points_on_circle[circle] + [target_p])
+            self.construct_cdls.append(f"Cocircular({circle},{''.join(cocircular_ps)})")
+            # add new ps on circle
+            self.points_on_circle[circle] = cocircular_ps
+            return [x, y]
+                
         return None
     
     def get_coincide_points(self, x, y, ignore_p=None):
@@ -308,6 +311,8 @@ class Allocator():
         positions = list(self.p_pos.values())
         mapping = {}
         for p, pos in zip(points, positions):
+            if pos == None or type(pos[0]) not in [float, Float, int]:
+                continue
             coincide_ps = self.get_coincide_points(pos[0], pos[1], ignore_p=p)
             if len(coincide_ps) == 0:
                 mapping[p] = p
@@ -318,18 +323,19 @@ class Allocator():
                        mapping[coincide_p] = p
         
         # replace chars in clauses, may delete some clause
-        text_cdls = []
-        for cdl in self.text_cdls:
-            cdl_res = self.replace_points_for_clause(cdl, mapping)
-            text_cdls.append(cdl_res)
+        text_cdls = [self.replace_points_for_clause(cdl, mapping) 
+                     for cdl in self.text_cdls]
         
-        construct_cdls = []
-        for cdl in self.construct_cdls:
-            cdl_res = self.replace_points_for_clause(cdl, mapping)
-            construct_cdls.append(cdl_res)
-        
+        construct_cdls = [self.replace_points_for_clause(cdl, mapping) 
+                          for cdl in self.construct_cdls]
+
+        clauses = [self.replace_points_for_clause(cdl, mapping) 
+                   for cdl in self.clauses]
+        seen = set()
+        clauses = [c for c in clauses if c not in seen and not seen.add(c)]
         self.text_cdls = text_cdls
         self.construct_cdls = construct_cdls
+        self.clauses = clauses
         
         # replace chars in lines, circles, p_pos
         for p1, p2 in mapping.items():
@@ -349,6 +355,8 @@ class Allocator():
                 self.lines = sorted(set(new_lines))
                 if p1 in self.circles:
                     self.circles.remove(p1)
+                    self.circles.append(p2)
+                    self.points_on_circle[p2] = self.points_on_circle.pop(p1)
         
     def replace_points_for_clause(self, clause, mapping):
         predicate, items = parse_clause(clause)
@@ -435,18 +443,18 @@ class Allocator():
         _, items = parse_clause(clause)
         A, B, C, D = items[0]
         
-        if self.p_pos[A] is None or type(self.p_pos[A][0]) in [Expr, Symbol]:
+        if self.p_pos[A] is None or type(self.p_pos[A][0]) not in [float, Float, int]:
             xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
             self.p_pos[A] = [xa, ya]
             
-        if self.p_pos[B] is None or type(self.p_pos[B][0]) in [Expr, Symbol]:
+        if self.p_pos[B] is None or type(self.p_pos[B][0]) not in [float, Float, int]:
             xb, yb = self.random_allocate_position()
             self.p_pos[B] = [xb, yb]
             
         xa, ya = self.p_pos[A]
         xb, yb = self.p_pos[B]
         
-        if self.p_pos[C] is None or type(self.p_pos[C][0]) in [Expr, Symbol]:
+        if self.p_pos[C] is None or type(self.p_pos[C][0]) not in [float, Float, int]:
             angle_BAC = - math.radians(random.uniform(30, 60)) 
             ratio_AC = random.uniform(1.1, 1.4)
             cos_val = math.cos(angle_BAC)
@@ -454,16 +462,67 @@ class Allocator():
             xc = xa + ((xb - xa) * cos_val - (yb - ya) * sin_val) * ratio_AC
             yc = ya + ((xb - xa) * sin_val + (yb - ya) * cos_val) * ratio_AC
             self.p_pos[C] = [xc, yc]
-            
-        if self.p_pos[D] is None or type(self.p_pos[D][0]) in [Expr, Symbol]:
-            angle_BAD = - math.radians(random.uniform(100, 150)) 
-            cos_val = math.cos(angle_BAD)
-            sin_val = math.sin(angle_BAD)
-            ratio_AD = random.uniform(0.6, 1.3)
-            xd = xa + ((xb - xa) * cos_val - (yb - ya) * sin_val) * ratio_AD
-            yd = ya + ((xb - xa) * sin_val + (yb - ya) * cos_val) * ratio_AD
-            xd, yd = xd * ratio_AD, yd * ratio_AD
-            self.p_pos[D] = [xd, yd]
+        
+        xc, yc = self.p_pos[C]
+        
+        if self.p_pos[D] is None or type(self.p_pos[D][0]) not in [float, Float, int]:
+            # mode = random.choice(['random', 'cocircular', 'perp'])
+            # mode = 'cocircular'
+            mode = 'perp'
+            # self.define_points([D])
+    
+            if mode == 'cocircular':
+                x, y = Symbol('x'), Symbol('y')
+                xd, yd = self.p_pos[D]
+                # get circle center position
+                circle_eqs = self.get_circum_circle_eqs((x, y), [A, B, C])
+                solution = solve(circle_eqs, (x, y))
+                xo, yo = solution.get(x), solution.get(y)
+                # find whether there's circle center
+                coincide_ps = self.get_coincide_points(xo, yo)
+                if len(coincide_ps) > 0:
+                    c = coincide_ps[0]
+                    new_clause = f"Cocircular({c},{''.join([A, D])})"
+                    self.allocate_cocircular(new_clause)
+                    self.construct_cdls.append(new_clause)
+                    
+                    position = self.random_allocate_position(target_p=D)
+                    self.update_values(D, position)
+                else:
+                    mode = random.choice(['random', 'perp'])
+                    
+            if mode == 'random':
+                angle_BAD = - math.radians(random.uniform(100, 150)) 
+                cos_val = math.cos(angle_BAD)
+                sin_val = math.sin(angle_BAD)
+                ratio_AD = random.uniform(0.6, 1.3)
+                xd = xa + ((xb - xa) * cos_val - (yb - ya) * sin_val) * ratio_AD
+                yd = ya + ((xb - xa) * sin_val + (yb - ya) * cos_val) * ratio_AD
+                xd, yd = xd * ratio_AD, yd * ratio_AD
+                self.p_pos[D] = [xd, yd]
+                
+            # angle DAC = 90, or angle DCA = 90, or DAB = 90
+            if mode == 'perp':
+                angle = random.choice([
+                    [D, A, C], [D, C, A], [D, A, B]
+                ])
+                new_clause = f"Equal(MeasureOfAngle({''.join(angle)}),90)"
+                new_text_clause = f"PerpendicularBetweenLine({''.join([angle[0], angle[1]])},{''.join([angle[2], angle[1]])})"
+                self.text_cdls.append(new_text_clause)
+                
+                self.allocate_equal(new_clause)
+
+                # constraint: AC x AD must > 0 (for cv2, AC x AD < 0)
+                xd, yd = self.p_pos[D]
+                A = [xc - xa, yc - ya]
+                B = [xd - xa, yd - ya]
+                expr = A[0] * B[1] - A[1] * B[0]
+                inequality = expr < 0
+                solution_inequal = solve(inequality, inequality.free_symbols.pop())
+                self.p_pos_range[D] = solution_inequal
+                
+                position = self.random_allocate_position(target_p=D)
+                self.update_values(D, position)
 
     def allocate_right_triangle(self, clause):
         # 确定垂直单位向量，随机长度
@@ -782,9 +841,9 @@ class Allocator():
         x3, y3 = self.p_pos[line_2[0]]
         x4, y4 = self.p_pos[line_2[1]]
         
-        k1 = (y2 - y1) / (x2 - x1)
-        k2 = (y4 - y3) / (x4 - x3)
-        eq = Eq(k1, k2)
+        expr = (y2 - y1) * (x4 - x3) - (x2 - x1) * (y4 - y3)
+        expr = simplify_and_trim(expr)
+        eq = Eq(expr, 0)
         char, target, expand_eq = self.find_target(points)
         solution = solve((eq, ) + expand_eq, target)
         self.update_symbol(solution, char)
@@ -809,7 +868,7 @@ class Allocator():
                 return False
 
             solution = solve((eq, ) + expand_eq, target)
-            self.update_symbol(solution, other_p)
+            self.update_symbol(solution, other_p, check_coincide=False)
         
         return
     
@@ -818,14 +877,13 @@ class Allocator():
         circle, points = items[0], items[1]
         self.define_points([circle] + list(points))
         
-        if circle > max(points[:3]):
-            # define new circle center
+        if circle > max(points[:3]): # define new circle center
             char, target, expand_eq = self.find_target([circle])
             if target is None:
                 return
             circle_eqs = self.get_circum_circle_eqs(target, points[:3])
             solution = solve(circle_eqs + expand_eq, target)
-            self.update_symbol(solution, circle)
+            self.update_symbol(solution, circle, check_coincide=False)
             
             # define other points (if) on circle
             r_len_2 = self.get_line_length_2([circle, points[0]])
@@ -834,20 +892,39 @@ class Allocator():
                 eq = Eq(r_len_2, r_len_i_2)
                 char, target, expand_eq = self.find_target([p])
                 solution = solve((eq, ) + expand_eq, target)
-                self.update_symbol(solution, p)
+                self.update_symbol(solution, p, check_coincide=False)
         else: 
             # define other points (if) on circle
             sorted_points = sorted(points)
             r_len = self.get_line_length_2([circle, sorted_points[0]])
             for p in sorted_points[1:]:
                 r_len_i = self.get_line_length_2([circle, p])
-                eq = Eq(r_len_i, r_len)
+                expr = simplify_and_trim(r_len_i - r_len)
+                eq = Eq(expr, 0)
                 char, target, expand_eq = self.find_target([p])
                 if target is None:
                     continue
                 solution = solve((eq, ) + expand_eq, target)
-                self.update_symbol(solution, p)
-        
+                solution_inequal = []
+                if len(solution) == 2: 
+                    # Polygon ABCD, AC x AD must > 0
+                    # for cv2, Adopting clockwise direction, AC x AD < 0
+                    quads = [p for p in self.polygons if len(p) == 4 and char in p]
+                    if len(quads) != 0:
+                        for sol in solution:
+                            xa, ya = self.p_pos[quads[0][0]]
+                            xc, yc = self.p_pos[quads[0][2]]
+                            xd, yd = sol
+                            A = [xc - xa, yc - ya]
+                            B = [xd - xa, yd - ya]
+                            expr = A[0] * B[1] - A[1] * B[0]
+                            inequality = expr < 0
+                            solution_inequal.append(
+                                solve((inequality, ) + expand_eq, target))
+
+                    
+                self.update_symbol(solution, p, constraint=solution_inequal, check_coincide=False)
+         
         return
     
     def allocate_congruent_similar_base(self, clause):
@@ -922,7 +999,7 @@ class Allocator():
             return False
 
         solution = solve((eq_1, eq_2) + expand_eq, target)
-        self.update_symbol(solution, char) 
+        self.update_symbol(solution, char, check_coincide=False) 
         return
     
     def allocate_circumcenter(self, clause):
@@ -933,14 +1010,14 @@ class Allocator():
             return
         circle_eqs = self.get_circum_circle_eqs(target, points[:3])
         solution = solve(circle_eqs + expand_eq, target)
-        self.update_symbol(solution, circle)
+        self.update_symbol(solution, circle, check_coincide=False)
 
     def allocate_equal_angle(self, angle_1, angle_2):
         if not angle_1.isdigit(): 
             self.define_points(angle_1)
         if not angle_2.isdigit(): # angle abc = angle def
             self.define_points(angle_2)
-        
+  
         if len(set(angle_1) & set(angle_2)) == 2 and angle_1[1] == angle_2[1]:
             # BD is besector of angle ABC, angle ABD = CBD
             B = angle_1[1]
@@ -959,7 +1036,9 @@ class Allocator():
             angle_eq = Eq((yd - yb) / (xd - xb), BD_vec[1] / BD_vec[0])
             char, target, expand_eq = self.find_target([D])
             
-            
+            # BD_vec[1] and yd - yb must be same positive / negative
+            inequality = (yd - yb) * BD_vec[1] > 0
+            # ignore_value = None
         else:
             if angle_2 == '90':
                 # angle_1 ABC = 90, AB \\perp BC
@@ -968,8 +1047,15 @@ class Allocator():
                 xb, yb = self.p_pos[B]
                 xc, yc = self.p_pos[C]
                 dot_product = (xb - xa) * (xc - xb) + (yb - ya) * (yc - yb)
-                expr = simplify_and_trim(simplify(dot_product))
+                expr = simplify_and_trim(dot_product)
                 angle_eq = Eq(expr, 0)
+                
+                # A, B, C can't be coinside
+                # ignore_value = [(xa, ya)]
+                # if xb in [float, Float, int] and yb in [float, Float, int]:
+                #     ignore_value.append((xb, yb))
+                # if xc in [float, Float, int] and yc in [float, Float, int]:
+                #     ignore_value.append((xc, yc))
             
             else:
                 # get expression of cos
@@ -980,21 +1066,26 @@ class Allocator():
                         return
                     else:
                         raise ValueError(cos_1 - cos_2)
-                expr = simplify_and_trim(simplify(cos_1 - cos_2))
+                expr = simplify_and_trim(cos_1 - cos_2)
                 angle_eq = Eq(expr, 0)
+                # ignore_value = None
 
             # find the max index point as target
             if angle_2.isdigit():
                 char, target, expand_eq = self.find_target(angle_1)
             else:
                 char, target, expand_eq = self.find_target(angle_1 + angle_2)
-            # solve the equation
+            inequality = None
             if target is None:
-                return False
+                return 
         
         solution = solve((angle_eq, ) + expand_eq, target)
+        solution_inequal = [] if inequality is None else \
+            [solve(inequality, target)]
         # update position of target point
-        self.update_symbol(solution, char) 
+        self.update_symbol(solution, char, 
+                           constraint=solution_inequal, 
+                           check_coincide=False) 
         return 
         
     
@@ -1024,7 +1115,7 @@ class Allocator():
                 else:
                     raise ValueError(len_1 - len_2)
                 
-            expr = simplify_and_trim(simplify(len_1 - len_2))
+            expr = simplify_and_trim(len_1 - len_2)
             eq = Eq(expr, 0)
             
         char, target, expand_eq = self.find_target(line_1 + line_2)
@@ -1051,7 +1142,7 @@ class Allocator():
                 return
             else:
                 raise ValueError(length_1 - length_2)
-        expr = simplify_and_trim(simplify(length_1 - length_2))
+        expr = simplify_and_trim(length_1 - length_2)
         eq = Eq(expr, 0)
         
         # find the max index point as target
@@ -1065,20 +1156,34 @@ class Allocator():
         
         r_len_1 = self.get_line_length_2([O, min(p1, p2)])
         r_len_2 = self.get_line_length_2([O, char])
-        r_expr = simplify_and_trim(simplify(r_len_1 - r_len_2))
+        r_expr = simplify_and_trim(r_len_1 - r_len_2)
         r_eq = Eq(r_expr, 0)
-
-        # circle_eqs = self.get_circum_circle_eqs(target, points[:3])
-        solution = solve((eq, r_eq) + expand_eq, target)
-        # find solution with Inferior arc
+        
+        inequality = None
+        # find solution with Inferior arc, arc AC = BC, angle ACB > 90
+        # if len(set(arc_1[1:]) & set(arc_2[1:])) == 1:
+        #     C = list(set(arc_1[1:]) & set(arc_2[1:]))[0]
+        #     A = list(set(arc_1[1:]) - set([C]))[0]
+        #     B = list(set(arc_2[1:]) - set([C]))[0]
+        #     # CB dot CA < 0
+        #     expr = self.get_dot_product([C, A], [C, B])
+        #     inequality = expr <= 0 
         x0, y0 = self.p_pos[min(p1, p2)]
-        x1, y1 = solution[0]
-        x2, y2 = solution[1]
-        dist_1 = (x0 - x1) ** 2 + (y0 - y1) ** 2
-        dist_2 = (x0 - x2) ** 2 + (y0 - y2) ** 2
-        solution = solution[0] if dist_1 < dist_2 else solution[1]
+        
+
+        solution = solve((eq, r_eq) + expand_eq, target)
+        # solution = solve((eq, ) + expand_eq, target)
+        solution_inequal = [] if inequality is None else \
+            [solve((inequality, ) + expand_eq, target)]
+        
+        if len(solution) == 2:
+            x1, y1 = solution[0]
+            x2, y2 = solution[1]
+            dist_1 = (x0 - x1) ** 2 + (y0 - y1) ** 2
+            dist_2 = (x0 - x2) ** 2 + (y0 - y2) ** 2
+            solution = solution[0] if dist_1 < dist_2 else solution[1]
         # update position of target point
-        self.update_symbol(solution, char) 
+        self.update_symbol(solution, char, constraint=solution_inequal, check_coincide=False) 
         return 
     
     
@@ -1137,9 +1242,6 @@ class Allocator():
         len_BA_2 = (xa - xb)**2 + (ya - yb)**2
         return len_BA_2
     
-    def get_radius_length(self):
-        pass
-    
     def get_circum_circle_eqs(self, target, points):
         
         x, y = target
@@ -1181,6 +1283,8 @@ class Allocator():
     def define_points(self, points):
         # only define points when used in clause
         for p in points:
+            if p not in self.p_pos:
+                self.p_pos[p] = None
             if self.p_pos[p] == None:
                 self.p_pos[p] = get_symbol(p)
                 
@@ -1207,47 +1311,93 @@ class Allocator():
                 return c, tuple([x_sym, y_sym]), ()
         return None, None, ()
     
-    def update_symbol(self, solution, char, ignore_value=None):
+    def update_symbol(self, solution, char, constraint=[], check_coincide=True):
+        # select one solution and constraint, save to global and update p_pos
+        syms = get_symbol(char)
         # update p_pos with new solved symbols
         if len(solution) == 0:
-            return False
+            return None
         if type(solution) == dict:
-            syms = get_symbol(char)
             x = solution.get(syms[0], self.p_pos[char][0])
             y = solution.get(syms[1], self.p_pos[char][1])
-        elif type(solution) == list:
-            # have multiple solutions, choose reasonable (don't have big numbers)
-            solution_ = []
-            for s in solution:
-                if type(s[0]) in [Float, float] and type(s[1]) in [Float, float]:
-                    if abs(s[0]) > 1e5 or abs(s[1]) > 1e5:
-                        continue
-                    # delete coincide solution
-                    coincide_ps = self.get_coincide_points(s[0], s[1])
+            if x.has(I) or y.has(I):
+                x = simplify_and_trim(x)
+                y = simplify_and_trim(y)
+            if len(constraint) != 0:
+                self.p_pos_range[char] = constraint[0]
+            if type(x) in [Float, float] and type(y) in [Float, float]:
+                if check_coincide:
+                    coincide_ps = self.get_coincide_points(x, y)
                     if len(coincide_ps) > 0:
-                        continue
-                solution_.append(s)
+                        return None
+                
+        elif type(solution) == list:
+            # have multiple solutions, choose reasonable 
+            # 1. solution like [(x_expr, y_expr), (x_expr, y_expr)]
+            # 2 .solution like [(1, 2), (3, 4)]
+            solution_ = []
+            constraint_ = []
+            coincide_flags = []
+            for s in solution:
+                # select correspond constraint
+                # 1. len constrants = 2, len self.p_pos_range = 0
+                # 2. len constrants = 0, len self.p_pos_range = 1
+                # 3. len constrants = 0, len self.p_pos_range = 0
+                if len(constraint) != 0:
+                    constraint_i = constraint[solution.index(s)]
+                elif char in self.p_pos_range :
+                    constraint_i = self.p_pos_range.get(char)
+                else:
+                    constraint_i = None
                     
+                if s[0].has(I) or s[1].has(I):
+                    s = (simplify_and_trim(s[0]), simplify_and_trim(s[1]))
+                    
+                if type(s[0]) in [Float, float] and type(s[1]) in [Float, float]:
+                    # don't have big numbers
+                    if abs(s[0]) > 1e3 or abs(s[1]) > 1e3:
+                        continue
+                    # must satisfy constraint_i
+                    if constraint_i != None:
+                        if not constraint_i.subs({syms[0]: s[0], syms[1]: s[1]}):
+                            continue
+                    # record whether coincide
+                    if check_coincide:
+                        coincide = len(self.get_coincide_points(s[0], s[1])) > 0
+                        coincide_flags.append(coincide)
+                if constraint_i != None:
+                    constraint_.append(constraint_i)
+                solution_.append(s)
+            
+            # try to remove coincide solution
+            # choose solution not coincide, if both coincide: return None
+            if check_coincide and len(coincide_flags) > 0:
+                if any(coincide_flags):
+                    if False in coincide_flags:
+                        solution_ = [solution_[coincide_flags.index(False)]]
+                    else:
+                        solution_ = []
             if len(solution_) == 0:
-                raise ValueError(solution)
+                return None
+            
             x, y = random.choice(solution_)
+            # add constraints for symbols of p
+            if len(constraint_) != 0:
+                self.p_pos_range[char] = constraint_[solution_.index((x, y))]
+                
         elif type(solution) == tuple:
             x, y = solution
         else:
             print('Error: ', type(solution))
             raise TypeError(solution)
         
-        
-        # x = simplify_and_trim(x)
-        # y = simplify_and_trim(y)
-        
         if isinstance(x, Float):
             x = float(x)
         if isinstance(y, Float):
             y = float(y)
-        
-        
+
         self.p_pos[char] = [x, y]
+        return self.p_pos[char]
             
     def update_position(self, clause):
         # update point positions
@@ -1268,7 +1418,7 @@ class Allocator():
                     if isinstance(x, Expr) or isinstance(y, Expr):
                         depend_flag = self.check_dependency(p)
                         if depend_flag:
-                            position = self.random_allocate_position()
+                            position = self.random_allocate_position(target_p=p)
                             self.update_values(p, position)
     
     def check_dependency(self, target_p):
@@ -1283,9 +1433,54 @@ class Allocator():
                     return True
             
         return False
-            
     
-    def random_allocate_position(self, target_p=None, n=10):
+    def random_substitude_value(self, x_expr, y_expr, constraint=None):
+        syms = set(list(x_expr.free_symbols) + list(y_expr.free_symbols))
+        syms = list(syms)
+        if len(syms) == 1:
+            sym = syms[0]
+            # expr inside sqrt must >= 0
+            # sqrt_expr = extract_sqrt_terms(x_expr + y_expr)
+            # if len(sqrt_expr) > 0:
+            #     sqrt_expr = sqrt_expr[0]
+            #     inner_expr = sqrt_expr.args[0]
+            #     inequality = inner_expr >= 0
+            #     solution = solution & solve(inequality, sym)
+            # solution of inequal expr always be like: (x>=lower) & (x<=upper)
+            # merge with constraint
+            if constraint is not None:
+                solution = constraint
+            else:
+                solution = solve(
+                    (x_expr < 20, x_expr > -20, y_expr < 20, y_expr > -20), 
+                    sym
+                )
+            if solution.args[0].lhs.has(sym):
+                bound_1 = float(solution.args[0].rhs)
+            else:
+                bound_1 = float(solution.args[0].lhs)
+            if solution.args[1].lhs.has(sym):
+                bound_2 = float(solution.args[1].rhs)
+            else:
+                bound_2 = float(solution.args[1].lhs)
+            lower_bound = min([bound_1, bound_2])
+            lower_bound = max([-20, lower_bound])
+            upper_bound = max([bound_1, bound_2])
+            upper_bound = min([20, upper_bound])
+            
+            value = random.uniform(lower_bound, upper_bound)
+            x_val, y_val = x_expr.subs(sym, value), y_expr.subs(sym, value)
+            if max(abs(x_val), abs(y_val)) > 25:
+                x_val = x_expr.subs(sym, value / max(x_val, y_val) * 10)
+                y_val = y_expr.subs(sym, value / max(x_val, y_val) * 10)
+                
+        elif len(syms) == 2:
+            x_val = random.uniform(0, 10)
+            y_val = random.uniform(0, 10)
+            
+        return x_val, y_val
+    
+    def random_allocate_position(self, target_p=None, n=5):
         # random allocate for n times
         # choose the pos that \max \min dist(p, p_i), p_i in self.p_pos
         max_distance = 0
@@ -1295,13 +1490,13 @@ class Allocator():
             if target_p == None or self.p_pos[target_p] == None:
                 x = random.uniform(5, 10)
                 y = random.uniform(5, 10)
+            elif type(self.p_pos[target_p][0]) in [float, Float, int] and \
+                type(self.p_pos[target_p][1]) in [float, Float, int]:
+                    return self.p_pos[target_p]
             else:
                 x, y = self.p_pos[target_p]
-                syms = set(list(x.free_symbols) + list(y.free_symbols))
-                syms = list(syms)
-                for sym in syms:
-                    value = random.uniform(0, 10)
-                    x, y = x.subs(sym, value), y.subs(sym, value)
+                constraint = self.p_pos_range.get(target_p, None)
+                x, y = self.random_substitude_value(x, y, constraint=constraint)
             
             if im(x).simplify() != 0 or im(y).simplify() != 0:
                 continue
