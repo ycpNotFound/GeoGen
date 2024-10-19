@@ -16,14 +16,23 @@ from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, find_target
                    get_content, get_points, get_predicate_name, get_symbol,
                    max_letter_index, parse_clause, replace_points, setup_seed)
 import cv2
-
+import networkx as nx
 
 class Plotter():
-    def __init__(self, allocater_states, min_side=250, max_side=350, allocate_char_mode='order'):
+    def __init__(self, 
+                 allocater_states, 
+                 min_side=250, 
+                 max_side=300, 
+                 allocate_char_mode='order', 
+                 annotation=True):
         self.p_pos = allocater_states['p_pos']
         self.lines = allocater_states['lines']
         self.circles = allocater_states['circles']
         self.points_on_circle = allocater_states['points_on_circle']
+        # self.clauses = allocater_states['clauses_base'] + allocater_states['clauses']
+        self.clauses = allocater_states['clauses']
+        
+        # 
         self.min_side = min_side
         self.max_side = max_side
         
@@ -35,15 +44,28 @@ class Plotter():
         # self.fig = ImageDraw.Draw(image)
         
         # Color: BGR
-        self.l_color = (0, 0, 0)
-        self.p_color = (151, 85, 47)
-        self.c_color = (204, 72, 6)
+        self.l_color = (0, 0, 0)        # line
+        self.p_color = (151, 85, 47)    # point
+        self.c_color = (204, 72, 6)     # char
+        self.a_color = (21, 80, 240)    # annotation
         self.line_width = 2
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         
-        
+        # allocate characters: random / in order
         assert allocate_char_mode in ['random', 'order']
         self.allocate_char_mode = allocate_char_mode
+        
+        # draw annotations: perp symbols, equal symbols, ...
+        self.annotation = annotation
+        self.image_cdls = []
+        right_angles, eq_lines, eq_angles, eq_arcs = self.find_annotation_clauses()
+        self.annotation_targets = {
+            "right_angles": right_angles,
+            "eq_lines": eq_lines,
+            "eq_angles": eq_angles,
+            "eq_arcs": eq_arcs
+        }
+        
         
     @staticmethod
     def distance(point1, point2):
@@ -134,11 +156,207 @@ class Plotter():
         # 如果都有交叠，选择sum最小的位置
         idx = np.argmin(position_pixel_vals)
         return position_to_select[idx]
+    
+    def find_annotation_clauses(self):
+        right_angles, eq_lines, eq_angles, eq_arcs = [], [], [], []
+
+        for clause in self.clauses:
+            if 'Equal' in clause:
+                if 'LengthOfLine' in clause:
+                    if clause.count('LengthOfLine') == 2:
+                        _, items = parse_clause(clause)
+                        eq_lines.append([tuple(items[0]), tuple(items[1])])
+                        self.image_cdls.append(clause)
+                if 'MeasureOfAngle' in clause:
+                    if clause.count('MeasureOfAngle') == 1 and '90' in clause:
+                        _, items = parse_clause(clause)
+                        right_angles.append(tuple(items[0]))
+                        self.image_cdls.append(clause)
+                    elif clause.count('MeasureOfAngle') == 2:
+                        _, items = parse_clause(clause)
+                        eq_angles.append([tuple(items[0]), tuple(items[1])])
+                        self.image_cdls.append(clause)
+                if 'LengthOfArc' in clause:
+                    if clause.count('LengthOfArc') == 2:
+                        _, items = parse_clause(clause)
+                        eq_arcs.append([tuple(items[0]), tuple(items[1])])
+                        self.image_cdls.append(clause)
+        
+        # find AB = BC = CA 
+        G_eq_line = nx.Graph()
+        for eq_line in eq_lines:
+            line_1, line_2 = eq_line
+            line_1, line_2 = tuple(sorted(line_1)), tuple(sorted(line_2))
+            G_eq_line.add_edge(line_1, line_2)
+            
+        eq_lines = [list(group) for group in nx.connected_components(G_eq_line)]
+        
+        # when AB \perp CBD, there's angle ABC, ABD = 90, delete one
+        right_angles_ = []
+        for i in range(len(right_angles)):
+            angle_i = right_angles[i]
+            repeated = False
+            for j in range(i):
+                angle_j = right_angles[j]
+                if len(set(angle_i) & set(angle_j)) == 2:
+                    if angle_i[1] == angle_j[1]:
+                        repeated = True
+            if not repeated:
+                right_angles_.append(angle_i)
+        right_angles = right_angles_
+                
+        return right_angles, eq_lines, eq_angles, eq_arcs
+    
+    def plot_right_angle(self, right_angles):
+        # plot 'L' for right angle
+        for right_angle in right_angles:
+            # right angle ABC
+            l_len = 15
+            xa, ya = self.p_pos[right_angle[0]]
+            xb, yb = self.p_pos[right_angle[1]]
+            xc, yc = self.p_pos[right_angle[2]]
+            vec_ba_len = self.distance((xa, ya), (xb, yb))
+            vec_ba = ((xa - xb) / vec_ba_len, (ya - yb) / vec_ba_len)
+            vec_bc_len = self.distance((xc, yc), (xb, yb))
+            vec_bc = ((xc - xb) / vec_bc_len, (yc - yb) / vec_bc_len)
+            # p1 in AB, p2 in AC, p3: p1 + p2
+            x1, y1 = xb + vec_ba[0] * l_len, yb + vec_ba[1] * l_len
+            x2, y2 = xb + vec_bc[0] * l_len, yb + vec_bc[1] * l_len
+            x3 = xb + vec_ba[0] * l_len + vec_bc[0] * l_len
+            y3 = yb + vec_ba[1] * l_len + vec_bc[1] * l_len
+            x1, y1 = int(x1), int(y1)
+            x2, y2 = int(x2), int(y2)
+            x3, y3 = int(x3), int(y3)
+            # line: p1-p3, p2-p3
+            cv2.line(self.fig, (x1, y1), (x3, y3), self.a_color, self.line_width, lineType=cv2.LINE_AA)
+            cv2.line(self.fig, (x2, y2), (x3, y3), self.a_color, self.line_width, lineType=cv2.LINE_AA)
+            
+    def plot_equal_lines(self, eq_lines):
+        # plot 1/2/3 short perpendicular segment for equal lines
+        for idx, eq_line in enumerate(eq_lines):
+            l_len = 8
+            for l_i in eq_line: # line AB
+                xa, ya = self.p_pos[l_i[0]]
+                xb, yb = self.p_pos[l_i[1]]
+                xm, ym = (xa + xb) / 2, (ya + yb) / 2
+                ab_len = self.distance((xa, ya), (xb, yb))
+                ab_vec = ((xa - xb) / ab_len, (ya - yb) / ab_len)
+                ab_perp = (-ab_vec[1], ab_vec[0])
+                if idx == 0: # draw 1 perp line
+                    mid_ps = [[xm, ym]]
+                elif idx == 1: # draw 2 perp line
+                    xm_1, ym_1 = xm - 5 * ab_vec[0], ym - 5 * ab_vec[1]
+                    xm_2, ym_2 = xm + 5 * ab_vec[0], ym + 5 * ab_vec[1]
+                    mid_ps = [[xm_1, ym_1], [xm_2, ym_2]]
+                elif idx == 2: # draw 3 perp line
+                    xm_1, ym_1 = xm - 10 * ab_vec[0], ym - 10 * ab_vec[1]
+                    xm_2, ym_2 = xm + 10 * ab_vec[0], ym + 10 * ab_vec[1]
+                    mid_ps = [[xm_1, ym_1], [xm, ym], [xm_2, ym_2]]
+                else:
+                    continue
+                
+                for mid_p in mid_ps:
+                    xm_i, ym_i = mid_p
+                    x1, y1 = xm_i + ab_perp[0] * l_len, ym_i + ab_perp[1] * l_len
+                    x2, y2 = xm_i - ab_perp[0] * l_len, ym_i - ab_perp[1] * l_len
+                    cv2.line(self.fig, (int(x1), int(y1)), (int(x2), int(y2)), self.a_color, self.line_width, lineType=cv2.LINE_AA)
+        
+    def plot_equal_anlges(self, eq_angles):    
+        for idx, eq_angle in enumerate(eq_angles):
+            angle_1, angle_2 = eq_angle
+            # angle ABC
+            xa, ya = self.p_pos[angle_1[0]]
+            xb, yb = self.p_pos[angle_1[1]]
+            xc, yc = self.p_pos[angle_1[2]]
+            line_len = min(self.distance([xa, ya], [xb, yb]),
+                           self.distance([xc, yc], [xb, yb]))
+            radius = int(line_len / 4)
+            print(radius)
+            # get range of arc, ensure BA x BC < 0 (for cv2 > 0)
+            # BA -> BC
+            BA = [xa - xb, ya - yb]
+            BC = [xc - xb, yc - yb]
+            if BA[0] * BC[1] - BA[1] * BC[0] < 0:
+                xb, yb, xc, yc = xc, yc, xb, yb
+                BA = [xa - xb, ya - yb]
+                BC = [xc - xb, yc - yb]
+            angle_BC = np.degrees(np.arctan2(yc-yb, xc-xb))
+            angle_BA = np.degrees(np.arctan2(ya-yb, xa-xb))
+            angle_BC = angle_BC + 360 if angle_BC < 0 else angle_BC
+            angle_BA = angle_BA + 360 if angle_BA < 0 else angle_BA
+            if angle_BC < angle_BA:
+                angle_BA = angle_BA - 360
+            # B as circle center
+            cv2.ellipse(self.fig, (xb, yb), (radius, radius), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
+            
+            # angle ABC
+            xa, ya = self.p_pos[angle_2[0]]
+            xb, yb = self.p_pos[angle_2[1]]
+            xc, yc = self.p_pos[angle_2[2]]
+            # get range of arc, ensure BA x BC < 0 (for cv2 > 0)
+            # BA -> BC
+            BA = [xa - xb, ya - yb]
+            BC = [xc - xb, yc - yb]
+            if BA[0] * BC[1] - BA[1] * BC[0] < 0:
+                xb, yb, xc, yc = xc, yc, xb, yb
+                BA = [xa - xb, ya - yb]
+                BC = [xc - xb, yc - yb]
+            angle_BC = np.degrees(np.arctan2(yc-yb, xc-xb))
+            angle_BA = np.degrees(np.arctan2(ya-yb, xa-xb))
+            angle_BC = angle_BC + 360 if angle_BC < 0 else angle_BC
+            angle_BA = angle_BA + 360 if angle_BA < 0 else angle_BA
+            if angle_BC < angle_BA:
+                angle_BA = angle_BA - 360
+            # B as circle center, radius -= 5 to distinguish
+            cv2.ellipse(self.fig, (xb, yb), (radius-5, radius-5), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
+    
+    def plot_equal_arcs(self, eq_arcs):
+        for idx, eq_arc in enumerate(eq_arcs):
+            l_len = 8
+            for arc_i in eq_arc:
+                # acr OAB
+                xo, yo = self.p_pos[arc_i[0]]
+                xa, ya = self.p_pos[arc_i[1]]
+                xb, yb = self.p_pos[arc_i[2]]
+                r_len = self.distance((xo, yo), (xa, ya))
+                # OA + OB
+                mid_vec = (xa - xo + xb - xo, ya - yo + yb - yo)
+                mid_vec_len = math.sqrt(mid_vec[0]**2 + mid_vec[1]**2)
+                mid_vec_unit = (mid_vec[0] / mid_vec_len, mid_vec[1] / mid_vec_len)
+                xm, ym = xo + r_len * mid_vec_unit[0], yo + r_len * mid_vec_unit[1]
+                
+                if idx == 0: # draw 1 perp line
+                    mid_ps = [[xm, ym]]
+                elif idx == 1: # draw 2 perp line
+                    tangent_vec = - mid_vec_unit[1], mid_vec_unit[0]
+                    xm_1, ym_1 = xm - 3 * tangent_vec[0], ym - 3 * tangent_vec[1]
+                    xm_2, ym_2 = xm + 3 * tangent_vec[0], ym + 3 * tangent_vec[1]
+                    mid_ps = [[xm_1, ym_1], [xm_2, ym_2]]
+                else:
+                    continue
+                for mid_p in mid_ps:
+                    xm_i, ym_i = mid_p
+                    x1, y1 = xm_i + mid_vec_unit[0] * l_len, ym_i + mid_vec_unit[1] * l_len
+                    x2, y2 = xm_i - mid_vec_unit[0] * l_len, ym_i - mid_vec_unit[1] * l_len
+                    cv2.line(self.fig, (int(x1), int(y1)), (int(x2), int(y2)), self.a_color, self.line_width, lineType=cv2.LINE_AA)
+            
+            
+            
+    
+    def plot_annotation(self):
+        self.plot_right_angle(self.annotation_targets['right_angles'])
+        self.plot_equal_lines(self.annotation_targets['eq_lines'])
+        self.plot_equal_anlges(self.annotation_targets['eq_angles'])
+        self.plot_equal_arcs(self.annotation_targets['eq_arcs'])
         
     def plot(self):
         # plot points
         for p, pos in self.p_pos.items():
             cv2.circle(self.fig, pos, 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
+        
+        # plot annotations
+        if self.annotation:
+            self.plot_annotation()
             
         # plot lines
         for line in self.lines:
@@ -165,14 +383,19 @@ class Plotter():
             text_width = 2
             text_size = 1
             text_bbox_size, _ = cv2.getTextSize(char, self.font, text_size, text_width)
-            # text pos is the top left pos
+            # text_pos is the top left (in image) position
             text_pos = self.get_best_chars_position(text_bbox_size, self.p_pos[point_i])
             cv2.putText(self.fig, char, text_pos, self.font, text_size, 
                         self.c_color, text_width, cv2.LINE_AA)
             
+        
+            
     def save_fig(self, fig_name, fig_dir):
-        cv2.imwrite(f"{fig_dir}/{fig_name}.png", self.fig)
-
+        if '.png' in fig_name or '.jpg' in fig_name:
+            cv2.imwrite(f"{fig_dir}/{fig_name}", self.fig)
+        else:
+            cv2.imwrite(f"{fig_dir}/{fig_name}.png", self.fig)
+            
 if __name__ == '__main__':
     setup_seed(124)
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
@@ -180,17 +403,18 @@ if __name__ == '__main__':
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
-        # clauses_base = [
-        #     "RightTriangle",
-        # ]
-        # clauses_rel = [
-        #     # 'IsCentroidOfTriangle', 
-        #     # 'IsMidsegmentOfTriangle',
-        #     # 'IsAltitudeOfQuadrilateral',
-        #     'IsMidpointOfArc',
-        #     "IsMidsegmentOfQuadrilateral",
-        #     # "IsMidpointOfArc",
-        #     ]
+        clauses_base = [
+            "Parallelogram",
+        ]
+        clauses_rel = [
+            # 'IsCentroidOfTriangle', 
+            # 'IsMidsegmentOfTriangle',
+            # 'IsAltitudeOfQuadrilateral',
+            # 'IsIncenterOfTriangle',
+            # "IsAltitudeOfTriangle",
+            "IsIncenterOfTriangle",
+            # "IsMidpointOfArc"
+            ]
         print('---------- Chosen Predicates ----------')
         print('clauses_base: ', clauses_base)
         print('clauses_rel: ', clauses_rel)
@@ -204,9 +428,9 @@ if __name__ == '__main__':
         )
         states = cg.states
         
-        # states = {'points': ['a', 'b', 'c', 'd', 'e', 'f', 'g'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'f'), ('a', 'f'), ('b', 'd', 'g'), ('a', 'c', 'g')], 'circles': ['e'], 'polygons': [('a', 'b', 'c'), ('a', 'b', 'c', 'f'), ('a', 'c', 'f')], 'constraints': ['Equal(LengthOfLine(ab),LengthOfLine(bc))', 'Equal(LengthOfLine(bc),LengthOfLine(ac))', 'Equal(MeasureOfAngle(abc),60)', 'IsCentroidOfTriangle(d,abc)', 'Cocircular(e,abcf)'], 'constraints_base': ['Equal(LengthOfLine(ab),LengthOfLine(bc))', 'Equal(LengthOfLine(bc),LengthOfLine(ac))', 'Equal(MeasureOfAngle(abc),60)'], 'points_on_circle': {'e': ['a', 'b', 'c', 'f']}}
-        # c_cdls = ['Shape(ab,bc,ca)', 'Shape(ab,bc,ca)', 'Shape(ab,bc,cf,fa)', 'Cocircular(e,abcf)', 'Collinear(bdg)', 'Collinear(agc)']
-        # t_cdls = ['EquilateralTriangle(abc)', 'IsCentroidOfTriangle(d,abc)', 'IsCircumcenterOfQuadrilateral(e,abcf)']
+        states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('b', 'd'), ('b', 'e'), ('c', 'e'), ('d', 'e')], 'circles': [], 'polygons': [('a', 'b', 'c', 'd'), ('b', 'c', 'd'), ('a', 'b', 'd'), ('b', 'c', 'e'), ('b', 'd', 'e'), ('c', 'd', 'e')], 'constraints': ['ParallelBetweenLine(ad,bc)', 'ParallelBetweenLine(ba,cd)', 'Equal(MeasureOfAngle(dbe),MeasureOfAngle(ebc))', 'Equal(MeasureOfAngle(bce),MeasureOfAngle(ecd))', 'Equal(MeasureOfAngle(cde),MeasureOfAngle(edb))'], 'constraints_base': ['ParallelBetweenLine(ad,bc)', 'ParallelBetweenLine(ba,cd)'], 'points_on_circle': {}}
+        c_cdls = ['Shape(ab,bc,cd,da)', 'Polygon(bcd)', 'Shape(bc,cd,db)']
+        t_cdls = ['Parallelogram(abcd)', 'IsIncenterOfTriangle(e,bcd)']  
         
         print('---------- Allocator Inputs ----------')
         print(states)
@@ -226,7 +450,11 @@ if __name__ == '__main__':
             print('\t', c_cdl)
             
         plotter = Plotter(allocator.states)
+        print('---------- Annotation Targets ----------')
+        print(plotter.annotation_targets)
+        
         plotter.plot()
         plotter.save_fig('test', 'imgs_test')
+        
         
         print('==============================================')

@@ -445,7 +445,7 @@ def setup_seed(seed=1234):
     random.seed(seed)
     np.random.seed(seed)
 
-def simplify_and_trim(poly, threshold=1e-3):
+def simplify_and_trim(poly, threshold=1e-5):
     poly = simplify(poly)
      # 将多项式中的浮点数转换为 SymPy 的 Float 类型
     poly = poly.xreplace({n: Float(n) for n in poly.atoms(float)})
@@ -461,6 +461,15 @@ def simplify_and_trim(poly, threshold=1e-3):
     
     # 返回简化后的多项式
     return new_poly
+
+def remove_duplicates(lst):
+    seen = {}
+    result = []
+    for item in lst:
+        if item not in seen:
+            seen[item] = True
+            result.append(item)
+    return result
     
 if __name__ == '__main__':
     # stats_for_formalgeo()

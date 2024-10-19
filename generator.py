@@ -190,6 +190,7 @@ class ClauseGenerator():
             
         
         constr_cdl = self.add_more_lines(text_cdls, n_more_lines)
+        self.find_triangles()
         constr_cdls += constr_cdl
         return constr_cdls, text_cdls
     
@@ -488,7 +489,8 @@ class ClauseGenerator():
             # x<3, create points up to 3
             if len(ori_ps_on_circle) < 3:
                 ps_to_sample = [p for p in self.points 
-                                if p != circle and p not in ori_ps_on_circle]
+                                if p != circle and p not in ori_ps_on_circle
+                                and p not in self.find_unconstrained_points()]
                 if len(ps_to_sample) < 3 - len(ori_ps_on_circle):
                     ps_to_sample = ps_to_sample + self.add_new_points(
                         3-len(ori_ps_on_circle)-len(ps_to_sample)
@@ -535,7 +537,8 @@ class ClauseGenerator():
             # x<3, create points up to 3
             if len(ori_ps_on_circle) < 3:
                 ps_to_sample = [p for p in self.points 
-                                if p != circle and p not in ori_ps_on_circle]
+                                if p != circle and p not in ori_ps_on_circle
+                                and p not in self.find_unconstrained_points()]
                 if len(ps_to_sample) < 3 - len(ori_ps_on_circle):
                     ps_to_sample = ps_to_sample + self.add_new_points(
                         3-len(ori_ps_on_circle)-len(ps_to_sample)
@@ -566,8 +569,8 @@ class ClauseGenerator():
          
         if 'Polygon' in clause:
             items = clause.lstrip('Polygon(').rstrip(')')
-            if self.p_num < len(items):
-                self.add_new_points(len(items) - self.p_num)
+            if self.p_num < 3:
+                self.add_new_points(3 - self.p_num)
             polygons = [p for p in self.polygons if len(p)==len(items)]
             if len(polygons) == 0:
                 if len(items) == 3:
