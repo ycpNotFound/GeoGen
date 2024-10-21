@@ -31,7 +31,7 @@ def get_max_letter(s):
     
 
 class Allocator():
-    def __init__(self, geo_states, construct_cdls, text_cdls, predicate_GDL):
+    def __init__(self, geo_states, construct_cdls, text_cdls):
         self.points = geo_states['points']                     
         self.lines = geo_states['lines']
         self.circles = geo_states['circles']
@@ -44,11 +44,6 @@ class Allocator():
         self.points_on_circle = geo_states['points_on_circle']
         self.construct_cdls = construct_cdls
         self.text_cdls = text_cdls
-        self.predicate_GDL = predicate_GDL
-        self.predicate_ent_names = {s.split('(')[0]: s for s in predicate_GDL['Entity']}
-        self.predicate_rel_names = {s.split('(')[0]: s for s in predicate_GDL['Relation']}
-        # ee_check: geo entity (line segment / circle / arc)
-        # extend: numerical (length / angle measure)
         
         self.clauses = self.construct_cdls + self.constraints
         # merge all cocircular clauses
@@ -69,7 +64,6 @@ class Allocator():
         # if all clauses are visited in one subset
         # then random allocate position for this point
         self.clause_subset = self.find_mini_clauses_subset()
-        self.clause_added = []
         self._formulated_cdls = None
         
     @property
@@ -125,6 +119,7 @@ class Allocator():
     def empty_states(self):
         self.p_pos = {k: None for k in self.points}
         self.p_pos['a'] = [0, 0]
+        self.p_pos_range = {}
         self.clause_subset = self.find_mini_clauses_subset()
         
     @staticmethod
@@ -138,6 +133,7 @@ class Allocator():
     def allocate(self):
         # loop until get in-complex solution
         for i in range(5):
+            self.empty_states()
             self.allocate_for_base(self.text_cdls[0])
             
             for clause in self.clauses:
@@ -180,7 +176,7 @@ class Allocator():
             
             
             # clauses new added
-            self.clauses = sorted(list(set(self.clauses + self.clause_added)), key=max_letter_index)
+            self.clauses = sorted(list(set(self.clauses)), key=max_letter_index)
             
             # delete coincide points and modify clauses
             self.delete_coincide_points()
@@ -533,9 +529,9 @@ class Allocator():
         xc, yc = self.p_pos[C]
         
         if self.p_pos[D] is None or type(self.p_pos[D][0]) not in [float, Float, int]:
-            # mode = random.choice(['random', 'cocircular', 'perp'])
+            mode = random.choice(['random', 'cocircular', 'perp'])
             # mode = 'cocircular'
-            mode = 'perp'
+            # mode = 'perp'
             # self.define_points([D])
     
             if mode == 'cocircular':
@@ -603,7 +599,13 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(85, 95)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
         BA = [xb - xa, yb - ya]
         BA_length = self.distance([xa, yb], [xb, yb])
         BC_length = random.uniform(0.75, 1.5) * BA_length
@@ -637,7 +639,13 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(130, 140)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
         top_angle = -math.radians(90) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
@@ -742,7 +750,13 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(85, 95)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
         top_angle = - math.radians(90) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
@@ -763,7 +777,13 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(85, 95)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
         top_angle = - math.radians(90) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
@@ -784,7 +804,13 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(90, 120)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
         top_angle = - math.radians(random.uniform(60, 120)) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
@@ -809,8 +835,14 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
-        top_angle = - math.radians(random.uniform(100, 145)) 
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(90, 120)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
+        top_angle = - math.radians(random.uniform(100, 135)) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle) 
         ratio = random.uniform(1, 1.5)
@@ -837,7 +869,13 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(85, 95)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
         top_angle = - math.radians(90) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
@@ -1005,9 +1043,9 @@ class Allocator():
         self.define_points(list(points_1 + points_2))
 
         if len(points_1) == 3:
-            self.allocate_triangle(f"Triangle({points_1})")
+            self.allocate_triangle(f"Polygon({points_1})")
         else:
-            self.allocate_quad(f"Quadrilateral({points_1})")
+            self.allocate_quad(f"Polygon({points_1})")
         min_x = min([self.p_pos[p][0] for p in points_1])
         max_x = max([self.p_pos[p][0] for p in points_1])
         min_y = min([self.p_pos[p][1] for p in points_1])
@@ -1421,7 +1459,9 @@ class Allocator():
                     constraint_i = self.p_pos_range.get(char)
                 else:
                     constraint_i = None
-                
+                # if constriant_i solved to be false
+                if constraint_i == False:
+                    continue
                 # if imaginary part have a very small coefficient (<1e-5)
                 if s[0].has(I) or s[1].has(I):
                     s = (simplify_and_trim(s[0]), simplify_and_trim(s[1]))
@@ -1572,7 +1612,6 @@ class Allocator():
                 x_expr, y_expr = self.p_pos[target_p]
                 syms = list(set(list(x_expr.free_symbols) + 
                                 list(y_expr.free_symbols)))
-                syms = list(syms)
                 if len(syms) == 1:
                     sym = syms[0]
                     # transfer ineq to (..) And (..)
@@ -1590,7 +1629,7 @@ class Allocator():
                     else:
                         bound_2 = float(constraint.args[1].lhs)
                     inf = max([min([bound_1, bound_2]), -10])
-                    sup = min([max([bound_1, bound_2]), 20])
+                    sup = min([max([bound_1, bound_2]), 10])
                     val = (sup - inf) / n
                     interval_of_random = [(inf + i*val, inf + (i+1)*val) for i in range(n)]
                 else:
@@ -1600,7 +1639,8 @@ class Allocator():
         best_point = None
         for interval in interval_of_random:
             if target_p == None or self.p_pos[target_p] == None:
-                x = random.uniform(interval[0], interval[1])
+                # x: (-10, 10), y: (5, 10)
+                x = random.uniform(- interval[1], interval[1])
                 y = random.uniform(interval[0], interval[1])
             else:
                 x, y = self.p_pos[target_p]
@@ -1687,7 +1727,7 @@ if __name__ == '__main__':
         print('---------- States ----------')
         cg.print_states()
         
-        allocator = Allocator(cg.states, c_cdls, t_cdls, dl.predicate_GDL)
+        allocator = Allocator(cg.states, c_cdls, t_cdls)
         allocator.allocate()
         
         print("---------- Location ----------")

@@ -186,10 +186,12 @@ def solve_test():
     # draw condition DAG and display solution
     draw_graph(condition_graph, 
                idx="test", 
-               target_condition=target)
+               target_condition=target,
+               img_dir="imgs_test")
     draw_graph(condition_graph, 
                idx="test", 
-               target_condition=None)
+               target_condition=None,
+               img_dir="imgs_test")
     info_dict = display_solution(condition_graph, target, solver.problem.goal)
     print(info_dict['solution_str'])
     print('--------------------------')

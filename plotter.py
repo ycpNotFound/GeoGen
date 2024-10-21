@@ -12,27 +12,31 @@ from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
 
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, find_target_for_construct,
+from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PRESET_COLORS, find_target_for_construct,
                    get_content, get_points, get_predicate_name, get_symbol,
                    max_letter_index, parse_clause, replace_points, setup_seed)
 import cv2
 import networkx as nx
+from utils import hex_to_bgr
+
 
 class Plotter():
     def __init__(self, 
                  allocater_states, 
+                 text_cdls,
+                 construct_cdls, 
                  min_side=250, 
                  max_side=300, 
-                 allocate_char_mode='order', 
-                 annotation=True):
+                 color_config=PRESET_COLORS[0]):
         self.p_pos = allocater_states['p_pos']
         self.lines = allocater_states['lines']
         self.circles = allocater_states['circles']
         self.points_on_circle = allocater_states['points_on_circle']
         # self.clauses = allocater_states['clauses_base'] + allocater_states['clauses']
         self.clauses = allocater_states['clauses']
+        self.text_cdls = text_cdls
+        self.construct_cdls = construct_cdls
         
-        # 
         self.min_side = min_side
         self.max_side = max_side
         
@@ -44,27 +48,17 @@ class Plotter():
         # self.fig = ImageDraw.Draw(image)
         
         # Color: BGR
-        self.l_color = (0, 0, 0)        # line
-        self.p_color = (151, 85, 47)    # point
-        self.c_color = (204, 72, 6)     # char
-        self.a_color = (21, 80, 240)    # annotation
+        self.l_color = hex_to_bgr(color_config['l_color'])    # line
+        self.p_color = hex_to_bgr(color_config['p_color'])    # point
+        self.c_color = hex_to_bgr(color_config['c_color'])    # char
+        self.a_color = hex_to_bgr(color_config['a_color'])    # annotation
+        self.f_color = hex_to_bgr(color_config['f_color'])    # fill_in
         self.line_width = 2
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         
-        # allocate characters: random / in order
-        assert allocate_char_mode in ['random', 'order']
-        self.allocate_char_mode = allocate_char_mode
-        
-        # draw annotations: perp symbols, equal symbols, ...
-        self.annotation = annotation
+        # draw annotations: perp, equal, fill_in_color entity ..
         self.image_cdls = []
-        right_angles, eq_lines, eq_angles, eq_arcs = self.find_annotation_clauses()
-        self.annotation_targets = {
-            "right_angles": right_angles,
-            "eq_lines": eq_lines,
-            "eq_angles": eq_angles,
-            "eq_arcs": eq_arcs
-        }
+        self.annotation_targets = self.find_annotation_clauses()
         
         
     @staticmethod
@@ -204,8 +198,38 @@ class Plotter():
             if not repeated:
                 right_angles_.append(angle_i)
         right_angles = right_angles_
+        
+        # find entity to fill in color, choose quad and circle first
+        entities = []
+        for clause in self.construct_cdls:
+            pred_name, items = parse_clause(clause)
+            if pred_name == "Shape":
+                if len(items) == 4:
+                    entities.append(['Polygon', items])
+            if pred_name == 'Cocircular':
+                entities.append(['Circle', items])
                 
-        return right_angles, eq_lines, eq_angles, eq_arcs
+        # if there's no quad and circle, choose triangle
+        if len(entities) == 0:
+            for clause in self.construct_cdls:
+                pred_name, items = parse_clause(clause)
+                if pred_name == "Shape":
+                    entities.append(['Polygon', items])
+                    
+        # if there're 2 triangles / quads similar / congruent
+        if 'Congruent' in self.text_cdls[0] or 'Similar' in self.text_cdls[0]:
+            _, items = parse_clause(self.text_cdls[0])
+            filled_entity = ['TwoPolygon', items]
+        else:
+            filled_entity = random.choice(entities)
+            
+        return {
+            "right_angles": right_angles,
+            "eq_lines": eq_lines,
+            "eq_angles": eq_angles,
+            "eq_arcs": eq_arcs,
+            "filled_entity": filled_entity
+        }
     
     def plot_right_angle(self, right_angles):
         # plot 'L' for right angle
@@ -270,22 +294,20 @@ class Plotter():
             xc, yc = self.p_pos[angle_1[2]]
             line_len = min(self.distance([xa, ya], [xb, yb]),
                            self.distance([xc, yc], [xb, yb]))
-            radius = int(line_len / 4)
-            print(radius)
-            # get range of arc, ensure BA x BC < 0 (for cv2 > 0)
-            # BA -> BC
-            BA = [xa - xb, ya - yb]
-            BC = [xc - xb, yc - yb]
-            if BA[0] * BC[1] - BA[1] * BC[0] < 0:
-                xb, yb, xc, yc = xc, yc, xb, yb
-                BA = [xa - xb, ya - yb]
-                BC = [xc - xb, yc - yb]
+            radius = min([30, int(line_len / 4)])
+            # ensure BA -> BC clock wise, BA x BC < 0 
+            # for cv2, ensure BA -> BC counter clock wise, BA x BC > 0 
+            # BA = [xa - xb, ya - yb]
+            # BC = [xc - xb, yc - yb]
+            if (xa - xb) * (yc - yb) - (ya - yb) * (xc - xb) < 0:
+                xa, ya, xc, yc = xc, yc, xa, ya
             angle_BC = np.degrees(np.arctan2(yc-yb, xc-xb))
             angle_BA = np.degrees(np.arctan2(ya-yb, xa-xb))
             angle_BC = angle_BC + 360 if angle_BC < 0 else angle_BC
             angle_BA = angle_BA + 360 if angle_BA < 0 else angle_BA
             if angle_BC < angle_BA:
                 angle_BA = angle_BA - 360
+            # print(angle_BA, angle_BC)
             # B as circle center
             cv2.ellipse(self.fig, (xb, yb), (radius, radius), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
             
@@ -293,20 +315,19 @@ class Plotter():
             xa, ya = self.p_pos[angle_2[0]]
             xb, yb = self.p_pos[angle_2[1]]
             xc, yc = self.p_pos[angle_2[2]]
-            # get range of arc, ensure BA x BC < 0 (for cv2 > 0)
-            # BA -> BC
-            BA = [xa - xb, ya - yb]
-            BC = [xc - xb, yc - yb]
-            if BA[0] * BC[1] - BA[1] * BC[0] < 0:
-                xb, yb, xc, yc = xc, yc, xb, yb
-                BA = [xa - xb, ya - yb]
-                BC = [xc - xb, yc - yb]
+            # ensure BA -> BC clock wise, BA x BC < 0 
+            # for cv2, ensure BA -> BC counter clock wise, BA x BC > 0 
+            # BA = [xa - xb, ya - yb]
+            # BC = [xc - xb, yc - yb]
+            if (xa - xb) * (yc - yb) - (ya - yb) * (xc - xb) < 0:
+                xa, ya, xc, yc = xc, yc, xa, ya
             angle_BC = np.degrees(np.arctan2(yc-yb, xc-xb))
             angle_BA = np.degrees(np.arctan2(ya-yb, xa-xb))
             angle_BC = angle_BC + 360 if angle_BC < 0 else angle_BC
             angle_BA = angle_BA + 360 if angle_BA < 0 else angle_BA
             if angle_BC < angle_BA:
                 angle_BA = angle_BA - 360
+            # print(angle_BA, angle_BC)
             # B as circle center, radius -= 5 to distinguish
             cv2.ellipse(self.fig, (xb, yb), (radius-5, radius-5), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
     
@@ -340,42 +361,68 @@ class Plotter():
                     x2, y2 = xm_i - mid_vec_unit[0] * l_len, ym_i - mid_vec_unit[1] * l_len
                     cv2.line(self.fig, (int(x1), int(y1)), (int(x2), int(y2)), self.a_color, self.line_width, lineType=cv2.LINE_AA)
             
+    def plot_fill_in_color(self, filled_entity):
+        ent_type, items = filled_entity
+        if ent_type == 'Polygon':
+            points = [i[0] for i in items]
+            pos = np.array([self.p_pos[p] for p in points])
+            pos = pos.reshape((-1, 1, 2))  
+            cv2.fillPoly(self.fig, [pos], self.f_color)
+        elif ent_type == 'Circle':
+            center_pos = self.p_pos[items[0]]
+            radius = self.get_radius(items[0])
+            cv2.circle(self.fig, center_pos, radius, self.f_color, -1)
+        elif ent_type == 'TwoPolygon':
+            pos_1 = np.array([self.p_pos[p] for p in items[0]])
+            pos_1 = pos_1.reshape((-1, 1, 2))
+            pos_2 = np.array([self.p_pos[p] for p in items[1]])
+            pos_2 = pos_2.reshape((-1, 1, 2))
             
+            if self.f_color != hex_to_bgr("#ffffff"):
+                cv2.fillPoly(self.fig, [pos_1], hex_to_bgr("#9DC7DD")) # blue
+                cv2.fillPoly(self.fig, [pos_2], hex_to_bgr("#B5D69E")) # green
             
+            else:
+                cv2.fillPoly(self.fig, [pos_1], self.f_color) # blue
+                cv2.fillPoly(self.fig, [pos_2], self.f_color) # green
+            
+        else:
+            raise KeyError(ent_type)
     
     def plot_annotation(self):
+        self.plot_fill_in_color(self.annotation_targets['filled_entity'])
         self.plot_right_angle(self.annotation_targets['right_angles'])
         self.plot_equal_lines(self.annotation_targets['eq_lines'])
         self.plot_equal_anlges(self.annotation_targets['eq_angles'])
         self.plot_equal_arcs(self.annotation_targets['eq_arcs'])
         
+        
     def plot(self):
+        # plot annotations first
+        self.plot_annotation()
+        
         # plot points
         for p, pos in self.p_pos.items():
             cv2.circle(self.fig, pos, 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
         
-        # plot annotations
-        if self.annotation:
-            self.plot_annotation()
-            
         # plot lines
         for line in self.lines:
             for i in range(len(line)-1):
                 p1_pos, p2_pos = self.p_pos[line[i]], self.p_pos[line[i+1]]
                 cv2.line(self.fig, p1_pos, p2_pos, self.l_color, self.line_width, lineType=cv2.LINE_AA)
-            
+                
         # plot circles
         for circle in self.circles:
             c_pos = self.p_pos[circle]
             radius = self.get_radius(circle)
             cv2.circle(self.fig, c_pos, radius, color=self.l_color, 
                        thickness=self.line_width, lineType=cv2.LINE_AA)
-            
+        
         # plot chars
-        if self.allocate_char_mode == 'random':
-            chars = random.sample(string.ascii_uppercase, len(self.p_pos))
-        else:
-            chars = [c.upper() for c in self.p_pos]
+        start_char = random.choice(['A', 'E', 'I', 'M', 'R'])
+        # start_char = 'A'
+        start_idx = string.ascii_uppercase.index(start_char)
+        chars = string.ascii_uppercase[start_idx: start_idx + len(self.p_pos)]
         point_mapping = {}
         for point_i, char in zip(self.p_pos, chars):
             point_mapping[point_i] = char
@@ -397,22 +444,22 @@ class Plotter():
             cv2.imwrite(f"{fig_dir}/{fig_name}.png", self.fig)
             
 if __name__ == '__main__':
-    setup_seed(124)
+    setup_seed(1234)
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     for i in range(10):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
         clauses_base = [
-            "Parallelogram",
+            "RightTrapezoid",
         ]
         clauses_rel = [
-            # 'IsCentroidOfTriangle', 
+            'IsBisectorOfAngle', 
             # 'IsMidsegmentOfTriangle',
             # 'IsAltitudeOfQuadrilateral',
             # 'IsIncenterOfTriangle',
             # "IsAltitudeOfTriangle",
-            "IsIncenterOfTriangle",
+            # "IsCircumcenterOfQuadrilateral",
             # "IsMidpointOfArc"
             ]
         print('---------- Chosen Predicates ----------')
@@ -428,16 +475,16 @@ if __name__ == '__main__':
         )
         states = cg.states
         
-        states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('b', 'd'), ('b', 'e'), ('c', 'e'), ('d', 'e')], 'circles': [], 'polygons': [('a', 'b', 'c', 'd'), ('b', 'c', 'd'), ('a', 'b', 'd'), ('b', 'c', 'e'), ('b', 'd', 'e'), ('c', 'd', 'e')], 'constraints': ['ParallelBetweenLine(ad,bc)', 'ParallelBetweenLine(ba,cd)', 'Equal(MeasureOfAngle(dbe),MeasureOfAngle(ebc))', 'Equal(MeasureOfAngle(bce),MeasureOfAngle(ecd))', 'Equal(MeasureOfAngle(cde),MeasureOfAngle(edb))'], 'constraints_base': ['ParallelBetweenLine(ad,bc)', 'ParallelBetweenLine(ba,cd)'], 'points_on_circle': {}}
-        c_cdls = ['Shape(ab,bc,cd,da)', 'Polygon(bcd)', 'Shape(bc,cd,db)']
-        t_cdls = ['Parallelogram(abcd)', 'IsIncenterOfTriangle(e,bcd)']  
+        states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('d', 'e'), ('a', 'c')], 'circles': [], 'polygons': [('a', 'b', 'c', 'd'), ('a', 'b', 'c'), ('a', 'c', 'd')], 'constraints': ['ParallelBetweenLine(ad,bc)', 'Equal(MeasureOfAngle(dab),90)', 'Equal(MeasureOfAngle(abc),90)', 'Equal(MeasureOfAngle(ade),MeasureOfAngle(edc))'], 'constraints_base': ['ParallelBetweenLine(ad,bc)', 'Equal(MeasureOfAngle(dab),90)', 'Equal(MeasureOfAngle(abc),90)'], 'points_on_circle': {}}
+        c_cdls = ['Shape(ab,bc,cd,da)', 'Shape(de)']
+        t_cdls = ['RightTrapezoid(abcd)', 'IsBisectorOfAngle(de,adc)']  
         
         print('---------- Allocator Inputs ----------')
         print(states)
         print('c_cdls: ', c_cdls)
         print('t_cdls: ', t_cdls)
 
-        allocator = Allocator(states, c_cdls, t_cdls, dl.predicate_GDL)
+        allocator = Allocator(states, c_cdls, t_cdls)
         print('---------- Formulated CDLs ----------')
         
             
@@ -449,7 +496,9 @@ if __name__ == '__main__':
         for c_cdl in allocator.formulated_cdls['construct_cdls']:
             print('\t', c_cdl)
             
-        plotter = Plotter(allocator.states)
+        plotter = Plotter(allocator.states, 
+                          allocator.formulated_cdls['text_cdls'],
+                          allocator.formulated_cdls['construct_cdls'])
         print('---------- Annotation Targets ----------')
         print(plotter.annotation_targets)
         

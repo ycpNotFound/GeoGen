@@ -91,6 +91,70 @@ PREDICATES_ATTR = [
     "RatioOfMirrorSimilarTriangle",
     "RatioOfSimilarQuadrilateral",
 ]
+PRESET_COLOR_PROBS = [0.6, 0.08, 0.08, 0.08, 0.08, 0.08]
+PRESET_COLORS = [
+    # line | point | char | annoation | fill_in
+    # Color: BGR
+    {
+        "l_color": "#000000",
+        "p_color": "#2f5597",
+        "c_color": "#0648cc",
+        "a_color": "#f05015",
+        "f_color": "#ffffff"
+        
+    },
+    {
+        "l_color": "#2a2a2a",
+        "p_color": "#000000",
+        "c_color": "#2a2a2a",
+        "a_color": "#2f5597",
+        "f_color": "#D1D3D0"
+        
+    },
+    {
+        "l_color": "#005896",
+        "p_color": "#00406C",
+        "c_color": "#2a2a2a",
+        "a_color": "#f05015",
+        "f_color": "#9DC7DD"
+    },
+    {
+        "l_color": "#638E50",
+        "p_color": "#48683A",
+        "c_color": "#2a2a2a",
+        "a_color": "#DA3585",
+        "f_color": "#B5D69E"
+    },
+    {
+        "l_color": "#D29A42",
+        "p_color": "#956A23",
+        "c_color": "#2a2a2a",
+        "a_color": "#DA3585",
+        "f_color": "#FFE6B2"
+    },
+    {
+        "l_color": "#6B4582",
+        "p_color": "#442C52",
+        "c_color": "#2a2a2a",
+        "a_color": "#DA3585",
+        "f_color": "#C8B0C9"
+    },
+]
+
+def hex_to_bgr(hex_str):
+    rgb_color = tuple(int(hex_str[i:i+2], 16) for i in (1, 3, 5)) 
+    bgr_color = rgb_color[::-1]  # Convert to BGR format 
+    return bgr_color
+
+def bgr_to_hex(b, g, r):
+    # 将每个分量转换为两位的十六进制字符串
+    rb = format(r, '02x')
+    gb = format(g, '02x')
+    bb = format(b, '02x')
+    
+    # 拼接成完整的十六进制颜色码
+    hex_color = f"#{rb}{gb}{bb}"
+    return hex_color
 
 def extract_sqrt_terms(expression):
     # 使用 SymPy 的 args 属性，该属性对于加法表达式返回所有加项，
