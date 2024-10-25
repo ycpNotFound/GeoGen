@@ -5,7 +5,7 @@ from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
 from formalgeo.tools import get_used_pid_and_theorem, debug_print
-
+from copy import deepcopy
 
 def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     """
@@ -32,7 +32,7 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     return p2t_map_fw
 
 
-class ForwardSearcher:
+class Searcher:
 
     def __init__(self, predicate_GDL, theorem_GDL, strategy, max_depth, beam_size, t_info, debug=False):
         """
@@ -107,13 +107,32 @@ class ForwardSearcher:
         :return solved: <bool>, indicate whether problem solved or not.
         :return seqs: <list> of <str>, solved theorem sequences.
         """
-        if self.strategy == "bfs":  # breadth-first search
-            while len(self.stack) > 0:
+        self.leveled_condition = {}
+        
+        while len(self.stack) > 0:
+            beam_count = len(self.stack)
+            if len(self.stack) > self.beam_size:  # select branch with beam size
+                stack = []
+                for i in random.sample(range(len(self.stack)), self.beam_size):
+                    stack.append(self.stack[i])
+                self.stack = stack
+                beam_count = self.beam_size
+
+            for i in range(beam_count):
                 pos, selection = self.stack.pop(0)
                 self.step_size += 1
                 debug_print(self.debug, "\n(pos={}, node_count={}) Current node.".format(pos, self.node_count))
                 timing = time.time()
+                
+                # save leveled condition, new added
+                last_step = len(self.problem.condition.items)
                 solved = self.apply_and_check_goal(selection)
+                if len(self.problem.condition.items) - last_step > 0:
+                    new_condition = deepcopy(self.problem.condition.items[last_step:])
+                    self.leveled_condition[pos] = {}
+                    for i in range(len(new_condition)):
+                        self.leveled_condition[pos][last_step+i] = new_condition[i]
+                    
                 debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
                     solved, time.time() - timing))
                 if solved is None:  # not update, close search branch
@@ -129,81 +148,6 @@ class ForwardSearcher:
                     self.add_selections(pos, selections)
                     debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                                 format(time.time() - timing, len(selections)))
-        elif self.strategy == "dfs":  # deep-first search
-            while len(self.stack) > 0:
-                pos, selection = self.stack.pop()
-                self.step_size += 1
-                debug_print(self.debug, "\n(pos={}, node_count={}) Current node.".format(pos, self.node_count))
-                timing = time.time()
-                solved = self.apply_and_check_goal(selection)
-                debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
-                    solved, time.time() - timing))
-                if solved is None:  # not update, close search branch
-                    continue
-                if solved:  # solved, return result
-                    _, seqs = get_used_pid_and_theorem(self.problem)
-                    return True, seqs
-                else:  # continue search
-                    if len(pos) == self.max_depth:
-                        continue
-                    timing = time.time()
-                    selections = self.get_theorem_selection()
-                    self.add_selections(pos, selections)
-                    debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
-                                format(time.time() - timing, len(selections)))
-        elif self.strategy == "rs":  # random search
-            while len(self.stack) > 0:
-                pos, selection = self.stack.pop(random.randint(0, len(self.stack) - 1))
-                self.step_size += 1
-                debug_print(self.debug, "\n(pos={}, node_count={}) Current node.".format(pos, self.node_count))
-                timing = time.time()
-                solved = self.apply_and_check_goal(selection)
-                debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
-                    solved, time.time() - timing))
-                if solved is None:  # not update, close search branch
-                    continue
-                if solved:  # solved, return result
-                    _, seqs = get_used_pid_and_theorem(self.problem)
-                    return True, seqs
-                else:  # continue search
-                    if len(pos) == self.max_depth:
-                        continue
-                    timing = time.time()
-                    selections = self.get_theorem_selection()
-                    self.add_selections(pos, selections)
-                    debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
-                                format(time.time() - timing, len(selections)))
-        else:  # beam search
-            while len(self.stack) > 0:
-                beam_count = len(self.stack)
-                if len(self.stack) > self.beam_size:  # select branch with beam size
-                    stack = []
-                    for i in random.sample(range(len(self.stack)), self.beam_size):
-                        stack.append(self.stack[i])
-                    self.stack = stack
-                    beam_count = self.beam_size
-
-                for i in range(beam_count):
-                    pos, selection = self.stack.pop(0)
-                    self.step_size += 1
-                    debug_print(self.debug, "\n(pos={}, node_count={}) Current node.".format(pos, self.node_count))
-                    timing = time.time()
-                    solved = self.apply_and_check_goal(selection)
-                    debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
-                        solved, time.time() - timing))
-                    if solved is None:  # not update, close search branch
-                        continue
-                    if solved:  # solved, return result
-                        _, seqs = get_used_pid_and_theorem(self.problem)
-                        return True, seqs
-                    else:  # continue search
-                        if len(pos) == self.max_depth:
-                            continue
-                        timing = time.time()
-                        selections = self.get_theorem_selection()
-                        self.add_selections(pos, selections)
-                        debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
-                                    format(time.time() - timing, len(selections)))
 
         return False, None
 

@@ -12,7 +12,7 @@ from generator import ClauseGenerator
 from utils import (PREDICATES_ENT, PREDICATES_REL, extract_sqrt_terms,
                    find_target_for_construct, get_content, get_points,
                    get_predicate_name, get_symbol, max_letter_index,
-                   parse_clause, replace_points, setup_seed, simplify_and_trim, remove_duplicates, append_lst)
+                   parse_clause, replace_points, setup_seed, simplify_and_trim, remove_duplicates, append_lst, random_generate_line_length, random_generate_angle_measure)
 
 # ClauseGenerator 
 # Allocator
@@ -31,7 +31,11 @@ def get_max_letter(s):
     
 
 class Allocator():
-    def __init__(self, geo_states, construct_cdls, text_cdls):
+    def __init__(self, 
+                 geo_states, 
+                 construct_cdls, 
+                 text_cdls,
+                 allocate_value=False):
         self.points = geo_states['points']                     
         self.lines = geo_states['lines']
         self.circles = geo_states['circles']
@@ -44,6 +48,7 @@ class Allocator():
         self.points_on_circle = geo_states['points_on_circle']
         self.construct_cdls = construct_cdls
         self.text_cdls = text_cdls
+        self.image_cdls = []
         
         self.clauses = self.construct_cdls + self.constraints
         # merge all cocircular clauses
@@ -65,6 +70,10 @@ class Allocator():
         # then random allocate position for this point
         self.clause_subset = self.find_mini_clauses_subset()
         self._formulated_cdls = None
+        
+        # whether to allocate line length or angle measre
+        # True when generating pretrain data, False when generating SFT data
+        self.allocate_value = allocate_value
         
     @property
     def states(self):
@@ -110,9 +119,12 @@ class Allocator():
             
             text_cdls = remove_duplicates(self.text_cdls)
             construct_cdls = remove_duplicates(construct_cdls)
+            if len(self.image_cdls) == 0:
+                self.image_cdls = self.find_image_cdls()
             self._formulated_cdls = {
                 "text_cdls": text_cdls,
-                "construct_cdls": construct_cdls
+                "construct_cdls": construct_cdls,
+                "image_cdls": self.image_cdls
             }
         return self._formulated_cdls
         
@@ -180,8 +192,15 @@ class Allocator():
             
             # delete coincide points and modify clauses
             self.delete_coincide_points()
+            
+            # find triangles and quads, add 'Shape($)' in construct cdls 
             self.find_triangles()
-            # check whether positions satisfy the constraints
+            self.find_quads()
+            self.find_image_cdls()
+            
+            # allocate value of line or angle, random choose
+            if self.allocate_value:
+                self.allocate_for_value()
             return
         
         print('Fail to allocate positions.')
@@ -340,11 +359,93 @@ class Allocator():
                 if all([p in l for p in points]):
                     collinear = True
             
-            if l1_exist and l2_exist and l3_exist and not collinear:
+            if all([l1_exist, l2_exist, l3_exist]) and not collinear:
                 triangles.append(points)
                 
         self.polygons = append_lst(polygons_, triangles)
-    
+        
+    def find_quads(self):
+        # delete all quads first
+        # different from triangle: check counter clock wise
+        polygons_ = []
+        for poly in self.polygons:
+            if len(poly) != 4:
+                polygons_.append(poly)
+                
+        possible_quads = list(itertools.permutations(self.points, 4))
+        quads = []
+        for points in possible_quads:
+            # line must exist
+            l_exist = [False for i in range(4)]
+            l_list = [tuple([points[i], points[(i+1)%4]]) for i in range(4)]
+            for idx, li in enumerate(l_list):
+                for l in self.lines:
+                    if all([p in l for p in li]):
+                        l_exist[idx] = True
+                        break
+            
+            # cannot collinear in pairs
+            collinear = False
+            for i in range(4):
+                l1, l2 = l_list[i], l_list[(i+1)%4]
+                for l in self.lines:
+                    if all([p in l for p in l1+l2]):
+                        collinear = True
+                        break
+                    
+            # AB x AC > 0, AC x AD > 0 (in cv2 < 0)
+            xa, ya = self.p_pos[points[0]]
+            xb, yb = self.p_pos[points[1]]
+            xc, yc = self.p_pos[points[2]]
+            xd, yd = self.p_pos[points[3]]
+            AB = [xb - xa, yb - ya]
+            AC = [xc - xa, yc - ya]
+            AD = [xd - xa, yd - ya]
+            counter_clock_wise_1 = AB[0] * AC[1] - AB[1] * AC[0] < 0
+            counter_clock_wise_2 = AC[0] * AD[1] - AC[1] * AD[0] < 0
+            
+            if all(l_exist + [counter_clock_wise_1, counter_clock_wise_2]) and not collinear:
+                quads.append(points)
+                
+        # delete duplicate quads
+        seen = set()
+        quads = tuple([q for q in quads if not (tuple(sorted(q)) in seen or seen.add(tuple(sorted(q))))])
+        
+        self.polygons = append_lst(polygons_, quads)
+        
+    def find_image_cdls(self):
+        self.image_cdls = []
+        for clause in self.clauses:
+            if 'Equal' in clause:
+                if any([pred in clause for pred in 
+                        ['LengthOfLine', 'MeasureOfAngle', 'LengthOfArc']]):
+                    self.image_cdls.append(clause)
+
+    def allocate_for_value(self):
+        line_flag = random.choice([True, False])
+        added_cdls = []
+        if line_flag:
+            line = random.choice(self.lines)
+            if len(line) > 2:
+                line = line[:2]
+            
+            length = random_generate_line_length()
+            added_cdls.append(f"Equal(LengthOfLine({''.join(line)}),{length})")
+        
+        angle_flag = random.choice([True, False])
+        if angle_flag:
+            poly = random.choice(self.polygons)
+            idx = random.choice(list(range(len(poly))))
+            p1 = poly[idx]
+            p_mid = poly[(idx+1) % len(poly)]
+            p2 = poly[(idx+2) % len(poly)]
+            measure = random_generate_angle_measure(
+                self.p_pos[p_mid], self.p_pos[p1], self.p_pos[p2])
+            added_cdls.append(f"Equal(MeasureOfAngle({''.join([p1, p_mid, p2])}),{measure})")
+        
+        self.text_cdls += added_cdls
+        self.image_cdls += added_cdls
+
     def get_coincide_points(self, x, y, ignore_p=None):
         # find coincide points for target_p, return [] if there's no coincide
         coincide_ps = []
@@ -1710,7 +1811,7 @@ if __name__ == '__main__':
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
             clauses_base, 
             clauses_rel, 
-            n_new_lines=2
+            n_more_lines=2
         )
         print('---------- Chosen Predicates ----------')
         print('clauses_base: ', clauses_base)

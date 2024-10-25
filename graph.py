@@ -128,17 +128,22 @@ class ConditionGraph():
         
         def add_nodes(node: ConditionNode):
             """recursive add parent nodes"""
+            # if node.value[-1] == 0 and node.value[0] in self.ignore_ops:
+            #     return
             if node not in sub_nodes:
                 sub_nodes.append(node)
-            
+            # if node is Angle($) or Line($)
+            if node.value[-1] == 0 and node.value[0] in self.ignore_ops:
+                return
             # self.nodes[idx] -> node
             for idx in node.value[2]: # Recursion end at this
                 if idx == -1:
-                    break 
-                if node.value[-1] == 0 and node.value[0] in self.ignore_ops:
                     break
                 add_nodes(self.nodes[idx])
-                
+                # if parent node is Angle($) or Line($)
+                # if self.nodes[idx].value[-1] == 0 and self.nodes[idx].value[0] in self.ignore_ops:
+                #     continue
+                # else:
                 if self.nodes[idx] not in sub_nodes_adj_table:
                     sub_nodes_adj_table[self.nodes[idx]] = [node]
                 else:
@@ -242,19 +247,22 @@ class ConditionGraph():
         plt.clf()
         
     
-def draw_graph(condition_graph, idx, target_condition=None, img_dir="imgs"):
+def draw_graph(condition_graph: ConditionGraph, idx, target_condition=None, img_dir="imgs"):
     
     if target_condition is not None:
         sub_nodes, sub_nodes_adj_table = condition_graph.backward_construct_sub_graph([target_condition])
-        goal_syms = list(target_condition[1].free_symbols)
-        if len(goal_syms) == 1:
-            goal_sym = goal_syms[0]
+        if hasattr( target_condition[1], "free_symbols"):
+            goal_syms = list(target_condition[1].free_symbols)
+            if len(goal_syms) == 1:
+                goal_str = str(goal_syms[0])
+            else:
+                goal_str = str(target_condition[1]).replace(' ', '')
         else:
-            goal_sym = str(target_condition[1]).replace(' ', '')
+            goal_str = f"{target_condition[0]}({''.join(target_condition[1])})"
         condition_graph.visualize(
             node_list=sub_nodes,
             adj_table=sub_nodes_adj_table,
-            fig_name=f"{idx}_goal_{str(goal_sym)}",
+            fig_name=f"{idx}_goal_{str(goal_str)}",
             img_dir=img_dir
         )
     else:

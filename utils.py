@@ -7,6 +7,7 @@ import numpy as np
 import sympy
 from sympy import Float, Add, Mul, simplify
 from matplotlib import pyplot as plt
+import math
 
 PREDICATES_PRE = [
     # Preset
@@ -371,6 +372,24 @@ def replace_points(predicate, pred_info, new_points, mapping=None):
 
     return predicate, pred_info
 
+
+def replace_for_clause(predicate, p_map):
+    if 'Equal' in predicate:
+        items = predicate.split('Equal(')[-1][:-1]
+        left, right = items.split(',')
+        left = replace_for_clause(left, p_map)
+        right = replace_for_clause(right, p_map)
+        return f'Equal({left},{right})'
+    elif '(' not in predicate and ')' not in predicate:
+        return predicate
+    else:
+        name, letter_part = predicate.split('(')
+        letter_part = letter_part.rstrip(')')
+        letter_part = ''.join(p_map.get(c, c) for c in letter_part)
+        return f"{name}({letter_part})"
+
+
+
 def append_lst(lst, items: list):
     for item in items:
         if item not in lst:
@@ -386,11 +405,11 @@ def parse_clause(clause):
         item_l, item_r = items.split(',')
         predicate_l, predicate_r = None, None
         content_l, content_r = item_l, item_r
-        if not item_l.isdigit():
+        if not item_l.isdigit() and '(' in item_l:
             predicate_l, content_l = parse_clause(item_l)
             if len(content_l) == 1:
                 content_l = content_l[0]
-        if not item_r.isdigit():
+        if not item_r.isdigit() and '(' in item_r:
             predicate_r, content_r = parse_clause(item_r)
             if len(content_r) == 1:
                 content_r = content_r[0]
@@ -402,6 +421,8 @@ def parse_clause(clause):
         else:
             print(predicate_r)
             print('Error')
+    elif '(' not in clause and ')' not in clause:
+        return clause
     else:
         items = re.findall(r'\((.*?)\)', clause)[0]
         items = [i.strip() for i in items.split(',')]
@@ -534,6 +555,62 @@ def remove_duplicates(lst):
             seen[item] = True
             result.append(item)
     return result
+
+def random_generate_line_length():
+    flag = random.choice([0, 1, 2])
+    if flag == 0:   # 2x+1
+        num1 = random.choice(list(range(1, 10)))
+        num2 = random.choice(list(range(1, 10)))
+        symbol = Symbol(random.choice(['x', 'y', 'z', 'a', 'b', 'c']))
+        expr = num1 * symbol + num2
+        res_string = str(expr)
+    elif flag == 1: # 2
+        num = random.choice(list(range(1, 20)))
+        res_string = str(num)
+    elif flag == 2: # x
+        res_string = random.choice(['x', 'y', 'z', 'a', 'b', 'c'])
+    
+    res_string = res_string.replace(' ', '').replace('*', '')
+    return res_string
+
+def random_generate_angle_measure(p_cross, p1, p2):
+    flag = random.choice([0, 1, 2])
+    if flag == 0: # 2x+1
+        num1 = random.choice(list(range(1, 10)))
+        num2 = random.choice(list(range(1, 10)))
+        symbol = Symbol(random.choice(['x', 'y', 'z', 'a', 'b', 'c']))
+        expr = num1 * symbol + num2
+        res_string = str(expr)
+    elif flag == 1: # 2
+        num = get_angle_measure(p_cross, p1, p2)
+        res_string = str(num)
+    elif flag == 2: # x
+        res_string = random.choice(['x', 'y', 'z', 'a', 'b', 'c'])
+    res_string = res_string.replace(' ', '').replace('*', '')
+    return res_string
+
+def get_angle_measure(p_cross, p1, p2):
+    # Calculate the vectors
+    v1 = (p_cross[0] - p1[0], p_cross[1] - p1[1])
+    v2 = (p_cross[0] - p2[0], p_cross[1] - p2[1])
+
+    # Calculate the dot product
+    dot = v1[0] * v2[0] + v1[1] * v2[1]
+
+    # Calculate the magnitudes
+    mag_v1 = math.sqrt(v1[0]**2 + v1[1]**2)
+    mag_v2 = math.sqrt(v2[0]**2 + v2[1]**2)
+
+    # Calculate the cosine of the angle
+    cos_angle = dot / (mag_v1 * mag_v2)
+
+    # Calculate the angle in radians
+    angle_rad = math.acos(cos_angle)
+
+    # Convert to degrees
+    angle_deg = int(angle_rad * 180 / math.pi)
+    assert angle_deg < 180 and angle_deg > 0
+    return angle_deg
     
 if __name__ == '__main__':
     # stats_for_formalgeo()
