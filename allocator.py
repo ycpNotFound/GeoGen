@@ -120,7 +120,7 @@ class Allocator():
             text_cdls = remove_duplicates(self.text_cdls)
             construct_cdls = remove_duplicates(construct_cdls)
             if len(self.image_cdls) == 0:
-                self.image_cdls = self.find_image_cdls()
+                self.find_image_cdls()
             self._formulated_cdls = {
                 "text_cdls": text_cdls,
                 "construct_cdls": construct_cdls,

@@ -16,7 +16,7 @@ from logging.handlers import RotatingFileHandler
 from tqdm import tqdm
 from func_timeout import func_timeout, FunctionTimedOut
 import concurrent.futures
-
+import traceback
 from utils import PRESET_COLORS, PRESET_COLOR_PROBS
 
 def generate_one_sample(dl, 
@@ -34,12 +34,14 @@ def generate_one_sample(dl,
             predicate_rel, 
             n_more_lines=n_more_lines
         )
-        allocator = Allocator(cg.states, c_cdls, t_cdls)
+        allocator = Allocator(cg.states, c_cdls, t_cdls, allocate_value=True)
         allocator.allocate()
         plotter = Plotter(allocator.states,
-                          allocator.formulated_cdls['text_cdls'],
-                          allocator.formulated_cdls['construct_cdls'],
-                          color_config=color_config)
+                            allocator.formulated_cdls['text_cdls'],
+                            allocator.formulated_cdls['construct_cdls'],
+                            allocator.formulated_cdls['image_cdls'],
+                            replace_characters=True,
+                            color_config=color_config)
         plotter.plot()
         fig_name = f"{fig_idx}.png"
         plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
@@ -57,6 +59,8 @@ def generate_one_sample(dl,
         return (True, info)
     except Exception as e:
         print(f"===== Error Occured: {fig_idx} =====")
+        tb = traceback.format_exc()
+        print(tb)
         info = {
             "key": fig_idx,
             "pred_base": predicate_base,
@@ -76,7 +80,7 @@ def generate_one_sample_with_timeout(dl,
                           fig_idx):
     try:
         result = func_timeout(
-            20, 
+            200, 
             generate_one_sample, 
             args=(dl, predicate_base, predicate_rel, n_more_lines, 
                   color_config, fig_dir, fig_idx)
@@ -236,13 +240,13 @@ def task_pretrain():
     task_name = "geo_gen_pretrain"
     input_args_list = []
 
-    num_process = 12
+    num_process = 1
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT + PREDICATES_REL_2, 1))
     pred_rel_combs = [[]]
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=30)
+                                    repeat_times=300)
     print('Num: ', len(input_args_1))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -250,7 +254,7 @@ def task_pretrain():
     input_args_2 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=30)
+                                    repeat_times=300)
     print('Num: ', len(input_args_2))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -258,7 +262,7 @@ def task_pretrain():
     input_args_3 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=10)
+                                    repeat_times=75)
     print('Num: ', len(input_args_3))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -266,10 +270,26 @@ def task_pretrain():
     input_args_4 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=10)
+                                    repeat_times=75)
     print('Num: ', len(input_args_4))
     
-    input_args_list = input_args_1 + input_args_2 + input_args_3 + input_args_4
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_5 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=0,
+                                    repeat_times=10)
+    print('Num: ', len(input_args_5))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_6 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=10)
+    print('Num: ', len(input_args_6))
+    
+    input_args_list = input_args_1 + input_args_2 + input_args_3 + input_args_4 + input_args_5 + input_args_6
     print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
     return seed, task_name, input_args_list, num_process
     

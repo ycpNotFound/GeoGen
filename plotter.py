@@ -98,7 +98,13 @@ class Plotter():
         # clauses
         self.text_cdls = [replace_for_clause(c, mapping) for c in self.text_cdls]
         self.construct_cdls = [replace_for_clause(c, mapping) for c in self.construct_cdls]
-        self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
+        try:
+            self.image_cdls = [replace_for_clause(c, mapping) for c in self.image_cdls]
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            print(tb)
+            print(e)
         return
     
     def get_radius(self, c):
