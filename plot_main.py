@@ -19,7 +19,8 @@ import concurrent.futures
 import traceback
 from utils import PRESET_COLORS, PRESET_COLOR_PROBS
 
-def generate_one_sample(dl, 
+def generate_one_sample(predicate_GDL, 
+                        theorem_GDL,
                         predicate_base, 
                         predicate_rel, 
                         n_more_lines, 
@@ -27,7 +28,7 @@ def generate_one_sample(dl,
                         fig_dir, 
                         fig_idx):
     try:
-        cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
+        cg = ClauseGenerator(predicate_GDL, theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
             predicate_base, 
@@ -71,7 +72,9 @@ def generate_one_sample(dl,
         }
         return (False, info)
     
-def generate_one_sample_with_timeout(dl, 
+def generate_one_sample_with_timeout(
+                          predicate_GDL, 
+                          theorem_GDL, 
                           predicate_base, 
                           predicate_rel, 
                           n_more_lines,
@@ -82,8 +85,8 @@ def generate_one_sample_with_timeout(dl,
         result = func_timeout(
             200, 
             generate_one_sample, 
-            args=(dl, predicate_base, predicate_rel, n_more_lines, 
-                  color_config, fig_dir, fig_idx)
+            args=(predicate_GDL, theorem_GDL, predicate_base, predicate_rel, 
+                  n_more_lines, color_config, fig_dir, fig_idx)
         )
         return result
     
@@ -114,7 +117,9 @@ def run_task(seed,
     
     print("Start Generation ...")
     
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
     cnt = 0
     total_iterations = len(input_args_list)
     result_info = []
@@ -128,8 +133,8 @@ def run_task(seed,
             pred_base, pred_rel, n_more_lines, color_config = args
             result = pool.apply_async(
                 generate_one_sample_with_timeout, 
-                args=(dl, pred_base, pred_rel, n_more_lines, 
-                      color_config, fig_dir, cnt),
+                args=(predicate_GDL, theorem_GDL, pred_base, pred_rel, 
+                      n_more_lines, color_config, fig_dir, cnt),
                 callback=update)
             result_info.append(result)
             cnt += 1
@@ -172,7 +177,7 @@ def run_task(seed,
             failure_count[key] = 0
             
         result = generate_one_sample_with_timeout(
-            dl, predicate_base, predicate_rel, 
+            predicate_GDL, theorem_GDL, predicate_base, predicate_rel, 
             n_more_lines, color_config,fig_dir, key)
         
         success, info = result
