@@ -32,7 +32,7 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     return p2t_map_fw
 
 
-class Searcher:
+class Solver:
 
     def __init__(self, predicate_GDL, theorem_GDL, strategy, max_depth, beam_size, t_info, debug=False):
         """
@@ -108,12 +108,17 @@ class Searcher:
         :return seqs: <list> of <str>, solved theorem sequences.
         """
         self.leveled_condition = {}
-        
+        cur_depth = 0
         while len(self.stack) > 0:
             beam_count = len(self.stack)
-            if len(self.stack) > self.beam_size:  # select branch with beam size
+            ratio = 1
+            if cur_depth > 1:
+                ratio = 2
+                    
+            if len(self.stack) > ratio * self.beam_size:  # select branch with beam size
                 stack = []
-                for i in random.sample(range(len(self.stack)), self.beam_size):
+                
+                for i in random.sample(range(len(self.stack)), ratio * self.beam_size):
                     stack.append(self.stack[i])
                 self.stack = stack
                 beam_count = self.beam_size
@@ -148,7 +153,8 @@ class Searcher:
                     self.add_selections(pos, selections)
                     debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                                 format(time.time() - timing, len(selections)))
-
+            cur_depth += 1
+            
         return False, None
 
     def get_theorem_selection(self):

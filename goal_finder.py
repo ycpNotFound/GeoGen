@@ -2,18 +2,19 @@ from allocator import Allocator
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from plotter import Plotter
-from searcher import Searcher
+from solver import Solver
 import random
 from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed, parse_clause, replace_for_clause
 import json
 
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.data import DatasetLoader
-from formalgeo.parse import parse_theorem_seqs
+from formalgeo.parse import parse_theorem_seqs, inverse_parse_one_theorem
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import ForwardSearcher
-from graph import ConditionGraph, ConditionNode, draw_graph, topological_sort
-
+from graph import ConditionGraph, ConditionNode, draw_graph, topological_sort, display_solution
+from formalgeo.problem.condition import Goal
+from formalgeo.solver import Interactor, BackwardSearcher
 from sympy import total_degree, solve, Eq, Symbol
 from typing import Tuple, Dict
 import re
@@ -73,7 +74,7 @@ def clause_to_nature_language(clauses, natural_template):
     return conditions_res
 
 
-class GoalFinder(): 
+class TargetFinder(): 
     def __init__(self, 
                  dl,
                  t_info,
@@ -89,11 +90,14 @@ class GoalFinder():
         self.points_on_circle = allocater_states['points_on_circle']
         # self.clauses = allocater_states['clauses_base'] + allocater_states['clauses']
         self.clauses = allocater_states['clauses']
+        
         self.text_cdls = text_cdls
         self.constr_cdls = constr_cdls
         self.image_cdls = image_cdls
         self.predicate_GDL = dl.predicate_GDL
+        self.theorem_GDL = dl.theorem_GDL
         self.problem_id = problem_id
+        self.t_info = t_info
         self.debug = debug
         self.replace_characters()
         # self.solver = ForwardSearcher(
@@ -105,14 +109,14 @@ class GoalFinder():
         #     t_info=t_info,
         #     debug=debug
         # )
-        self.solver = Searcher(
+        self.solver = Solver(
             dl.predicate_GDL,
             dl.theorem_GDL,
             strategy="beam_search",
-            max_depth=12, 
+            max_depth=20, 
             beam_size=6,
             t_info=t_info,
-            debug=False
+            debug=True
         )
         self.problem_CDL = {
             "problem_id": problem_id,
@@ -166,12 +170,12 @@ class GoalFinder():
         self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
         return
     
-    def find_new_targets(self, condition_graph: ConditionGraph,):
+    def find_target(self, condition_graph: ConditionGraph,):
         # find variable to solve, choose deepest conditoins
         pos_in_selection_tree = list(self.solver.leveled_condition.keys())
         end_pos = max(pos_in_selection_tree, key=len)
         # end_conditions = list(self.solver.leveled_condition[end_pos].values())
-        end_conditions = self.solver.problem.condition.items[-5:]
+        end_conditions = self.solver.problem.condition.items[-10:]
         problem_level = len(end_pos)
         new_targets_cal = []
         new_targets_prv = []
@@ -192,14 +196,39 @@ class GoalFinder():
             #     new_targets_prv.append(condition)
         
         new_targets = new_targets_cal + new_targets_prv
+        
+        theorems_for_targets = {}
+        for target in new_targets:
+            _, _, theorems = self.find_solution_for_target(condition_graph, target)
+            theorems_for_targets[target] = theorems
         # random choice
         # new_targets =  random.choice(new_targets) 
         # depth first
-        depths = [condition_graph.calculate_depth(t) for t in new_targets]
-        target_idx = sorted(range(len(depths)), key=lambda i: depths[i], reverse=True)[0]
-        new_targets = new_targets[target_idx]
+        # depths = [condition_graph.calculate_depth(t) for t in new_targets]
+        # target_idx = sorted(range(len(depths)), key=lambda i: depths[i], reverse=True)[0]
+        # new_targets = new_targets[target_idx]
         # todo: modify problem level
-        return new_targets, problem_level
+        def diversity_idx(theorem_list):
+            # 1. sort by len of theorems first
+            # 2. sort by token diversity of theorems
+            score_1 = len(theorem_list)
+            token_set = set()
+            for item in theorem_list:
+                tokens = item.split('(')[0].split('_')
+                token_set.update(tokens)
+            score_2 = len(token_set)
+            return (score_1, score_2)
+        
+        chosen_target = max(theorems_for_targets, key=lambda k: diversity_idx(theorems_for_targets[k]))
+        problem_level = None
+        for key, value in self.solver.leveled_condition.items():
+            if chosen_target in list(value.values()):
+                problem_level = len(key)
+                break
+            
+        problem_level = len(theorems_for_targets[chosen_target]) \
+            if problem_level == None else problem_level
+        return chosen_target, problem_level
     
     def find_solution_for_target(self, 
                          condition_graph: ConditionGraph, 
@@ -211,8 +240,14 @@ class GoalFinder():
 
         solutions = []
         solution_dict = {}
+        theorems_formal = []
+        
         for i, node in enumerate(sub_nodes):
             theorem = node.value[3][0]
+            if theorem not in ['prerequisite', 'extended', 'solve_eq']:
+                theorems_formal.append(
+                    inverse_parse_one_theorem(node.value[3], self.solver.parsed_theorem_GDL)
+                )
             statement = str(node).split('|')[0].strip()
             if 'Equation' in statement:
                 pattern = r"Equation\((.*?)\)"
@@ -234,7 +269,7 @@ class GoalFinder():
             }
             
         solution_str = "Solution: \n" + "\n".join(solutions)
-        return solution_dict, solution_str
+        return solution_dict, solution_str, theorems_formal
     
     def create_question(self, target: Tuple):
         # create target and added conditions
@@ -272,7 +307,7 @@ class GoalFinder():
                     target_cdl = f"Value(LengthOfLine({target_line}))"
                     add_cdls = [f"Equal(LengthOfLine({other_line}),{value})"]
                     add_conditions = [f"{other_line} = {value}"]
-                    conclusion = f"{target_line}={target_value}"
+                    conclusion = f"{target_line} = {target_value}"
                     
                 elif 'ma' in str(target_sym):
                     syms = list(target[1].free_symbols)
@@ -300,12 +335,12 @@ class GoalFinder():
                         f"angle {angle_1} = {str(expr_1)}",
                         f"angle {angle_2} = {str(expr_2)}",
                     ]
-                    conclusion = f"{new_sym}={target_value}"
+                    conclusion = f"{new_sym} = {target_value}"
                     
             else: # len(free_symbols) == 1
                 sym = list(target[1].free_symbols)[0]
                 target_value = solve(Eq(target[1], 0))[0]
-                conclusion = f"{sym}={target_value}"
+                conclusion = f"{sym} = {target_value}"
                 if 'll' in str(sym):
                     target_str = f"Find length of {str(sym).split('ll_')[0].upper()}"
                     target_cdl = f"Value(LengthOfLine({str(new_sym)}))"
@@ -328,9 +363,7 @@ class GoalFinder():
         conditions += add_conditions
         text += ', '.join(conditions)
         text += f". {target_str}."
-        self.text_cdls += add_cdls
-        self.image_cdls += add_cdls
-        return target_value, target_cdl, text, add_conditions, conclusion
+        return target_value, target_cdl, text, add_conditions, add_cdls, conclusion
     
     def target_tuple_to_clause(self, target):
         keys = list(self.predicate_GDL['Relation'].keys())
@@ -345,33 +378,75 @@ class GoalFinder():
             j += 1
         clause = f"{target[0]}({''.join(items)})"
         return clause
+    
+    def re_solve_for_target(self, problem_CDL):
+        interact_solver = Interactor(self.predicate_GDL, self.theorem_GDL, self.t_info,
+                        debug=False
+                        )
+        interact_solver.load_problem(problem_CDL)
+
+        for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
+            interact_solver.apply_theorem(t_name, t_branch, t_para)
+        
+        interact_solver.problem.check_goal()
+        
+        # construct graph
+        condition_graph = ConditionGraph(interact_solver.problem.condition.items)
+        condition_graph.construct_graph()
+        target = interact_solver.problem.condition.items[-1]
+        info_dict = display_solution(condition_graph, target, interact_solver.problem.goal)
+        
+      
+        return info_dict
         
     def formulate(self):
         self.solver.init_search(self.problem_CDL)
         self.solver.search()
-        if self.debug:
-            for condition in self.solver.problem.condition.items:
-                print(condition)
+        # if self.debug:
+        #     for condition in self.solver.problem.condition.items:
+        #         print(condition)
             
         condition_graph = ConditionGraph(self.solver.problem.condition.items)
         condition_graph.construct_graph()
+        # find potential geo relation ()
+        target, problem_level = self.find_target(condition_graph)
+        # find solution for this geo relation
+        solution_dict, solution_str, theorems = self.find_solution_for_target(condition_graph, target)
+        # create question and solution for this geo relation
+        target_value, target_cdl, text, add_conditions, add_cdls, conclusion = self.create_question(target)
+        self.text_cdls += add_cdls
+        self.image_cdls += add_cdls
         
-        target, problem_level = self.find_new_targets(condition_graph)
-
-        solution_dict, solution_str = self.find_solution_for_target(condition_graph, target)
-        target_value, target_cdl, text, add_conditions, conclusion = self.create_question(target)
         if len(add_conditions) != 0:
             solution_str += f"\n{', '.join(add_conditions)} => {conclusion}."
         else:
             solution_str += f"Therefore, {conclusion}."
-        if self.debug:
-            draw_graph(condition_graph, 
-                idx="test", 
-                target_condition=target,
-                img_dir="imgs_test")
-            print(solution_str)
-            print('--------------------------')
+        
+        # if self.debug:
+        #     draw_graph(condition_graph, 
+        #         idx="test", 
+        #         target_condition=target,
+        #         img_dir="imgs_test")
             
+        
+        new_problem_CDL = {
+            "problem_id": self.problem_CDL['problem_id'],
+            "construction_cdl": self.constr_cdls,
+            "text_cdl": self.text_cdls,
+            "image_cdl": self.image_cdls,
+            "goal_cdl": target_cdl,
+            "theorem_seqs": theorems,
+            "problem_answer": str(target_value)
+        }
+        
+        new_solution_info = self.re_solve_for_target(new_problem_CDL)
+        
+        if self.debug:
+            print('------------- Forward Search -------------')
+            print(solution_str)
+            print('------------- Interactive -------------')
+            print(new_solution_info['solution_str'])
+        
         info_dict_for_symbolic = {
             "problem_id": "",
             "problem_img": "",
@@ -452,7 +527,7 @@ if __name__ == '__main__':
         
         t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
 
-        goal_finder = GoalFinder(
+        goal_finder = TargetFinder(
             dl,
             t_info,
             allocator.states, 

@@ -6,7 +6,7 @@ from allocator import Allocator
 import random
 import re
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import sympy
 from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
 
@@ -14,12 +14,11 @@ from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PRESET_COLORS, find_target_for_construct,
                    get_content, get_points, get_predicate_name, get_symbol,
-                   max_letter_index, parse_clause, replace_points, setup_seed)
+                   max_letter_index, parse_clause, replace_points, setup_seed, replace_for_clause)
 import cv2
 import networkx as nx
 from utils import hex_to_bgr
 
-FT = ImageFont.truetype("font/times.ttf", 20)
 
 class Plotter():
     def __init__(self, 
@@ -27,9 +26,10 @@ class Plotter():
                  text_cdls,
                  construct_cdls, 
                  image_cdls,
-                 min_side=250, 
-                 max_side=300, 
+                 min_side=350, 
+                 max_side=400, 
                  color_config=PRESET_COLORS[0],
+                 replace_characters=False,
                  debug=False):
         self.p_pos = geo_states['p_pos']
         self.lines = geo_states['lines']
@@ -44,7 +44,11 @@ class Plotter():
         self.min_side = min_side
         self.max_side = max_side
         
+        if replace_characters:
+            self.replace_characters()
+        
         fig_size_x, fig_size_y = self.normalize_positions()
+        self.fig_size = (fig_size_x, fig_size_y)
         # numpy image: (y, x, channel)
         self.fig = np.zeros((fig_size_y, fig_size_x, 3), np.uint8)
         self.fig.fill(255)
@@ -62,11 +66,40 @@ class Plotter():
         
         # draw annotations: perp, equal, fill_in_color entity ..
         self.annotation_targets = self.find_annotation_clauses()
-        
+        font_size = int(min(25, min(self.fig_size) / 15))
+        self.FT = ImageFont.truetype("font/arial.ttf", font_size)
+        if self.debug:
+            print("Font Size: ", font_size)
+            
         
     @staticmethod
     def distance(point1, point2):
         return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+    
+
+    def replace_characters(self):
+        if self.debug:
+            start_char = 'A'
+        else:
+            start_char = random.choice(['A', 'E', 'I', 'M', 'R'])
+        start_idx = string.ascii_uppercase.index(start_char)
+        chars = string.ascii_uppercase[start_idx: start_idx + len(self.p_pos)]
+        mapping = {}
+        for point_i, char in zip(self.p_pos, chars):
+            mapping[point_i] = char
+            
+        # points
+        self.p_pos = {mapping[k]: self.p_pos[k] for k in self.p_pos}
+        # lines / circles
+        self.lines = [tuple([mapping[p] for p in l]) for l in self.lines]
+        self.circles = [mapping[p] for p in self.circles]
+        self.points_on_circle = {mapping[k]: [mapping[x] for x in v] 
+                                 for k, v in self.points_on_circle.items()}
+        # clauses
+        self.text_cdls = [replace_for_clause(c, mapping) for c in self.text_cdls]
+        self.construct_cdls = [replace_for_clause(c, mapping) for c in self.construct_cdls]
+        self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
+        return
     
     def get_radius(self, c):
         p0 = self.points_on_circle[c][0]
@@ -404,18 +437,59 @@ class Plotter():
             xb, yb = self.p_pos[line[1]]
             xm, ym = (xa + xb) / 2, (ya + yb) / 2
             
-            text_width = 2
-            text_size = 0.7
-            text_bbox_size, _ = cv2.getTextSize(length, self.font, text_size, text_width)
-            # text_pos is the top left (in image) position
-            text_pos = self.get_best_chars_position(text_bbox_size, (xm, ym))
-            cv2.putText(self.fig, length, text_pos, self.font, text_size, 
-                        self.c_color, text_width, cv2.LINE_AA)
+            BA_length = self.distance([xb, yb], [xa, ya])
+            BA_unit = ((xa - xb) / BA_length, (ya - yb) / BA_length)
+            BA_perp_unit = (-BA_unit[1], BA_unit[0])
+            # 文字中心在离心方向, (O->m) * BA_perp_unit > 0, add, else minus
+            xo, yo = self.fig_size[0] / 2, self.fig_size[1] / 2
+            vec_1 = (xm - xo) * BA_perp_unit[0] + (ym - yo) * BA_perp_unit[1]
+            if vec_1 > 0:
+                xc, yc = xm + BA_perp_unit[0] * 20, ym + BA_perp_unit[1] * 20
+            else:
+                xc, yc = xm - BA_perp_unit[0] * 20, ym - BA_perp_unit[1] * 20
+            
+            # cv2.circle(self.fig, (int(xc), int(yc)), 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
+            
+            self.fig = Image.fromarray(self.fig)
+            img_draw = ImageDraw.Draw(self.fig)
+            # text_bbox_size = img_draw.textsize(length, font=self.FT)
+            text_bbox = img_draw.textbbox((0, 0), length, font=self.FT)
+            text_bbox_size = (text_bbox[2] - text_bbox[0] + 20, 
+                              text_bbox[3] - text_bbox[1] + 20)
+
+            # 创建一个新图像用于绘制旋转文本
+            text_image = Image.new('RGBA', text_bbox_size, color=None)
+            text_draw = ImageDraw.Draw(text_image)
+            text_draw.text((10, 10), length, fill=self.c_color, font=self.FT)
+            
+            # text_draw.rectangle([(10, 10), (10+text_bbox[2] - text_bbox[0], 10+text_bbox[3] - text_bbox[1])], outline="black", width=2)
+            # text_draw.rectangle([(2, 2), (text_image.width-2, text_image.height-2)], outline="black", width=2)
+            
+            angle = math.degrees(math.atan2(BA_unit[1], BA_unit[0]))
+            angle = 360 + angle if angle < 0 else angle
+            if angle > 0 and angle < 45:
+                angle = angle
+            elif angle > 135 and angle < 225:
+                angle = angle - 180
+            elif angle > 315:
+                angle = angle - 360
+            else:
+                angle = 0
+            # text_image = text_image.rotate(-angle, expand=False)
+            text_pos = (int(xc - text_image.width / 2), 
+                        int(yc - text_image.height / 2))
+            self.fig.paste(text_image, text_pos, text_image)
+            self.fig = np.asarray(self.fig)
+            
+            # cv2.circle(self.fig, text_pos, 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
         
         
     def plot_measure_of_angle(self, measure_of_angle):
         for angle, measure in measure_of_angle:
-            # measure = f"{measure}°"
+            if '+' in measure or '-' in measure:
+                measure = f"({measure})°"
+            else:
+                measure = f"{measure}°"
             xa, ya = self.p_pos[angle[0]]
             xb, yb = self.p_pos[angle[1]]
             xc, yc = self.p_pos[angle[2]]
@@ -427,27 +501,42 @@ class Plotter():
             BD_vec = (BA_unit[0] + BC_unit[0], BA_unit[1] + BC_unit[1])
             
             # base position at angle bisector
-            xd = xb + BD_vec[0] * 30
-            yd = yb + BD_vec[1] * 30
+            xd = xb + BD_vec[0] * 40
+            yd = yb + BD_vec[1] * 40
             
             # cv2.circle(self.fig, (int(xd), int(yd)), 4, color=(0, 0, 0), thickness=-1, lineType=cv2.LINE_AA)
+            # draw arc for angle ABC
+            line_len = min(self.distance([xa, ya], [xb, yb]),
+                           self.distance([xc, yc], [xb, yb]))
+            radius = min([20, int(line_len / 5)])
+            # ensure BA -> BC clock wise, BA x BC < 0 
+            # for cv2, ensure BA -> BC counter clock wise, BA x BC > 0 
+            # BA = [xa - xb, ya - yb]
+            # BC = [xc - xb, yc - yb]
+            if (xa - xb) * (yc - yb) - (ya - yb) * (xc - xb) < 0:
+                xa, ya, xc, yc = xc, yc, xa, ya
+            angle_BC = np.degrees(np.arctan2(yc-yb, xc-xb))
+            angle_BA = np.degrees(np.arctan2(ya-yb, xa-xb))
+            angle_BC = angle_BC + 360 if angle_BC < 0 else angle_BC
+            angle_BA = angle_BA + 360 if angle_BA < 0 else angle_BA
+            if angle_BC < angle_BA:
+                angle_BA = angle_BA - 360
+            # print(angle_BA, angle_BC)
+            # B as circle center
+            cv2.ellipse(self.fig, (xb, yb), (radius, radius), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
             
-            text_width = 2
-            text_size = 0.7
-            text_bbox_size, _ = cv2.getTextSize(measure, self.font, text_size, text_width)
-            # text_pos is the top left (in image) position
+            self.fig = Image.fromarray(self.fig)
+            img_draw = ImageDraw.Draw(self.fig)
+            text_bbox = img_draw.textbbox((0, 0), measure, font=self.FT)
+            text_bbox_size = (text_bbox[2] - text_bbox[0], 
+                              text_bbox[3] - text_bbox[1])
+            # text_bbox_size = img_draw.textsize(measure, font=self.FT)
             text_pos = [int(max(xd - text_bbox_size[0] / 2, 5)),  
-                       int(yd + text_bbox_size[1] / 2)]
-            # text_pos = self.get_best_chars_position(text_bbox_size, (xd, yd))
-            cv2.putText(self.fig, measure, text_pos, self.font, text_size, 
-                        self.c_color, text_width, cv2.LINE_AA)
+                       int(max(yd - text_bbox_size[1] / 2, 5))]
+            img_draw.text(text_pos, measure, font=self.FT, fill=self.c_color)
+            self.fig = np.asarray(self.fig)
             
-            # cv2.circle(self.fig, text_pos, 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
             
-            # self.fig = Image.fromarray(self.fig)
-            # img_draw = ImageDraw.Draw(self.fig)
-            # img_draw.text(text_pos, measure, font=FT, fill=self.c_color)
-            # self.fig = np.asarray(self.fig)
     
     def plot_annotation(self):
         self.plot_fill_in_color(self.annotation_targets['filled_entity'])
@@ -455,10 +544,12 @@ class Plotter():
         self.plot_equal_lines(self.annotation_targets['eq_lines'])
         self.plot_equal_anlges(self.annotation_targets['eq_angles'])
         self.plot_equal_arcs(self.annotation_targets['eq_arcs'])
-        
-    def plot_value(self):
         self.plot_length_of_line(self.annotation_targets['length_of_line'])
         self.plot_measure_of_angle(self.annotation_targets['measure_of_angle'])
+        
+    # def plot_value(self):
+    #     self.plot_length_of_line(self.annotation_targets['length_of_line'])
+    #     self.plot_measure_of_angle(self.annotation_targets['measure_of_angle'])
         
         
     def plot(self):
@@ -486,7 +577,7 @@ class Plotter():
         for point_i in self.p_pos:
             # char, font, size, width
             text_width = 2
-            text_size = 1.2
+            text_size = 1
             text_bbox_size, _ = cv2.getTextSize(point_i, self.font, text_size, text_width)
             # text_pos is the top left (in image) position
             text_pos = self.get_best_chars_position(text_bbox_size, self.p_pos[point_i])
@@ -494,7 +585,7 @@ class Plotter():
                         self.c_color, text_width, cv2.LINE_AA)
         
         # plot value for line length or angle measure
-        self.plot_value()
+        # self.plot_value()
         
             
     def save_fig(self, fig_name, fig_dir):
@@ -510,18 +601,18 @@ if __name__ == '__main__':
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
-        clauses_base = [
-            "RightTrapezoid",
-        ]
-        clauses_rel = [
-            'IsBisectorOfAngle', 
-            # 'IsMidsegmentOfTriangle',
-            # 'IsAltitudeOfQuadrilateral',
-            # 'IsIncenterOfTriangle',
-            # "IsAltitudeOfTriangle",
-            # "IsCircumcenterOfQuadrilateral",
-            # "IsMidpointOfArc"
-            ]
+        # clauses_base = [
+        #     "RightTrapezoid",
+        # ]
+        # clauses_rel = [
+        #     'IsBisectorOfAngle', 
+        #     # 'IsMidsegmentOfTriangle',
+        #     # 'IsAltitudeOfQuadrilateral',
+        #     # 'IsIncenterOfTriangle',
+        #     # "IsAltitudeOfTriangle",
+        #     # "IsCircumcenterOfQuadrilateral",
+        #     # "IsMidpointOfArc"
+        #     ]
         print('---------- Chosen Predicates ----------')
         print('clauses_base: ', clauses_base)
         print('clauses_rel: ', clauses_rel)
@@ -560,6 +651,7 @@ if __name__ == '__main__':
                           allocator.formulated_cdls['text_cdls'],
                           allocator.formulated_cdls['construct_cdls'],
                           allocator.formulated_cdls['image_cdls'],
+                          replace_characters=True,
                           debug=True)
         print('---------- Annotation Targets ----------')
         print(plotter.annotation_targets)

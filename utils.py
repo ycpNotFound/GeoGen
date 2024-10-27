@@ -557,35 +557,40 @@ def remove_duplicates(lst):
     return result
 
 def random_generate_line_length():
-    flag = random.choice([0, 1, 2])
+    flag = random.choice([0, 1])
     if flag == 0:   # 2x+1
         num1 = random.choice(list(range(1, 10)))
         num2 = random.choice(list(range(1, 10)))
         symbol = Symbol(random.choice(['x', 'y', 'z', 'a', 'b', 'c']))
-        expr = num1 * symbol + num2
+        add_flag = random.choice([True, False])
+        if add_flag:
+            expr = num1 * symbol + num2
+        else:
+            expr = num1 * symbol - num2
         res_string = str(expr)
     elif flag == 1: # 2
         num = random.choice(list(range(1, 20)))
         res_string = str(num)
-    elif flag == 2: # x
-        res_string = random.choice(['x', 'y', 'z', 'a', 'b', 'c'])
     
     res_string = res_string.replace(' ', '').replace('*', '')
     return res_string
 
 def random_generate_angle_measure(p_cross, p1, p2):
-    flag = random.choice([0, 1, 2])
+    flag = random.choice([0, 1])
     if flag == 0: # 2x+1
         num1 = random.choice(list(range(1, 10)))
         num2 = random.choice(list(range(1, 10)))
         symbol = Symbol(random.choice(['x', 'y', 'z', 'a', 'b', 'c']))
-        expr = num1 * symbol + num2
+        add_flag = random.choice([True, False])
+        if add_flag:
+            expr = num1 * symbol + num2
+        else:
+            expr = num1 * symbol - num2
         res_string = str(expr)
     elif flag == 1: # 2
         num = get_angle_measure(p_cross, p1, p2)
         res_string = str(num)
-    elif flag == 2: # x
-        res_string = random.choice(['x', 'y', 'z', 'a', 'b', 'c'])
+        
     res_string = res_string.replace(' ', '').replace('*', '')
     return res_string
 
@@ -609,7 +614,7 @@ def get_angle_measure(p_cross, p1, p2):
 
     # Convert to degrees
     angle_deg = int(angle_rad * 180 / math.pi)
-    assert angle_deg < 180 and angle_deg > 0
+    assert angle_deg <= 180 and angle_deg >= 0
     return angle_deg
     
 if __name__ == '__main__':

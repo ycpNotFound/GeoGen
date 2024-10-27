@@ -5,7 +5,7 @@ import re
 import numpy as np
 import sympy
 from sympy import (Eq, Expr, Float, I, Symbol, cos, im, nsimplify, pi,
-                   simplify, solve, symbols, And, StrictLessThan, StrictGreaterThan, oo)
+                   simplify, solve, symbols, And, Or, StrictLessThan, StrictGreaterThan, oo)
 
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
@@ -356,8 +356,10 @@ class Allocator():
                     l2_exist = True
                 if all([p in l for p in l3]):
                     l3_exist = True
-                if all([p in l for p in points]):
-                    collinear = True
+                
+            cos_val = self.get_cos_2(''.join(points))
+            if abs(abs(cos_val) - 1) < 1e-2:
+                collinear = True
             
             if all([l1_exist, l2_exist, l3_exist]) and not collinear:
                 triangles.append(points)
@@ -422,18 +424,19 @@ class Allocator():
                     self.image_cdls.append(clause)
 
     def allocate_for_value(self):
-        line_flag = random.choice([True, False])
+        mode = random.choice([0, 1, 2])
+
         added_cdls = []
-        if line_flag:
+        if mode == 0:
             line = random.choice(self.lines)
             if len(line) > 2:
                 line = line[:2]
             
             length = random_generate_line_length()
-            added_cdls.append(f"Equal(LengthOfLine({''.join(line)}),{length})")
+            if length != '0':
+                added_cdls.append(f"Equal(LengthOfLine({''.join(line)}),{length})")
         
-        angle_flag = random.choice([True, False])
-        if angle_flag:
+        elif mode == 1:
             poly = random.choice(self.polygons)
             idx = random.choice(list(range(len(poly))))
             p1 = poly[idx]
@@ -441,7 +444,10 @@ class Allocator():
             p2 = poly[(idx+2) % len(poly)]
             measure = random_generate_angle_measure(
                 self.p_pos[p_mid], self.p_pos[p1], self.p_pos[p2])
-            added_cdls.append(f"Equal(MeasureOfAngle({''.join([p1, p_mid, p2])}),{measure})")
+            if measure != '0' and measure != '180':
+                added_cdls.append(f"Equal(MeasureOfAngle({''.join([p1, p_mid, p2])}),{measure})")
+        else:
+            pass
         
         self.text_cdls += added_cdls
         self.image_cdls += added_cdls
@@ -1585,6 +1591,8 @@ class Allocator():
                 # when solution is expression:
                 else: # delete solution with too small interval
                     if constraint_i != None:
+                        if type(constraint_i) == Or:
+                            continue
                         sym = list(constraint_i.free_symbols)[0]
                         if constraint_i.args[0].lhs.has(sym):
                             bound_1 = float(constraint_i.args[0].rhs)
