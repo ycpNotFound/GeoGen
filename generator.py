@@ -23,7 +23,8 @@ class ClauseGenerator():
         self.lines = []
         self.circles = []
         self.polygons = []
-
+        self.polygons_used = []
+        
         self.constraints = []
         self.constraints_base = []
         
@@ -595,8 +596,9 @@ class ClauseGenerator():
                 self.define_construct_clauses([f"Polygon({''.join(ps)})"])
                 constr_cdls += [f"Polygon({''.join(ps)})"]
                 
-            polygons = [p for p in self.polygons if len(p)==len(items)]
+            polygons = [p for p in self.polygons if len(p)==len(items) and p not in self.polygons_used]
             points = list(random.choice(polygons))
+            self.polygons_used.append(points)
             if pred_name == 'IsAltitudeOfTriangle':
                 # IsAltitudeOfTriangle(AD, ABC), angle ABC / ACB can't be 90
                 # if == 90, move right angle point to the first 

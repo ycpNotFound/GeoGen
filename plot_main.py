@@ -9,7 +9,7 @@ from allocator import Allocator
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from plotter import Plotter
-from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed
+from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed, parse_clause
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -46,31 +46,34 @@ def generate_one_sample(predicate_GDL,
         plotter.plot()
         fig_name = f"{fig_idx}.png"
         plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
-        info = {
+        task_info = {
             "key": fig_idx,
-            "image": fig_name,
             "pred_base": predicate_base,
             "pred_rel": predicate_rel,
             "n_more_lines": n_more_lines,
             "color_config": color_config,
+        }
+        data_info = {
+            "key": fig_idx,
             "construction_cdl": allocator.formulated_cdls['construct_cdls'],
             "text_cdl": allocator.formulated_cdls['text_cdls'], 
-            "image_cdl": plotter.image_cdls
+            "image_cdl": plotter.image_cdls,
+            "caption_str": plotter.caption_str
         }
-        return (True, info)
+        return (True, data_info)
     except Exception as e:
         print(f"===== Error Occured: {fig_idx} =====")
         tb = traceback.format_exc()
-        print(tb)
-        info = {
+        # print(tb)
+        task_info = {
             "key": fig_idx,
             "pred_base": predicate_base,
             "pred_rel": predicate_rel,
             "n_more_lines": n_more_lines,
             "color_config": color_config,
-            "error_message": str(e)
+            "error_message": tb
         }
-        return (False, info)
+        return (False, task_info)
     
 def generate_one_sample_with_timeout(
                           predicate_GDL, 
@@ -163,39 +166,43 @@ def run_task(seed,
     # re-generate for failure cases
     failure_count = {}
     failure_dict = {}
-    while True:
-        if len(failure_cases) == 0:
-            break
-        init_info = failure_cases.pop(0)
-        predicate_base = init_info['pred_base']
-        predicate_rel = init_info['pred_rel']
-        n_more_lines = init_info['n_more_lines']
-        color_config = init_info['color_config']
-        key = init_info["key"]
-        
-        if key not in failure_count:
-            failure_count[key] = 0
+    
+    with tqdm(total=len(failure_cases), desc="Processing") as pbar:
+        while True:
+            if len(failure_cases) == 0:
+                break
+            init_info = failure_cases.pop(0)
+            predicate_base = init_info['pred_base']
+            predicate_rel = init_info['pred_rel']
+            n_more_lines = init_info['n_more_lines']
+            color_config = init_info['color_config']
+            key = init_info["key"]
             
-        result = generate_one_sample_with_timeout(
-            predicate_GDL, theorem_GDL, predicate_base, predicate_rel, 
-            n_more_lines, color_config,fig_dir, key)
-        
-        success, info = result
-        if success:
-            info_dict[key] = info
-        else: # end if fail accumulated for 3 times
-            if failure_count[key] >= 2:
-                failure_dict[key] = init_info
-                print('Fail for 3 times already: ')
-                print(f'Predicates Base:')
-                for pred in predicate_base:
-                    print(f"\t\t{pred}")
-                print(f'Predicates Rel:')
-                for pred in predicate_rel:
-                    print(f"\t\t{pred}")
-            else:
-                failure_cases.append(info)
-                failure_count[key] += 1
+            if key not in failure_count:
+                failure_count[key] = 0
+                
+            result = generate_one_sample_with_timeout(
+                predicate_GDL, theorem_GDL, predicate_base, predicate_rel, 
+                n_more_lines, color_config,fig_dir, key)
+            
+            success, info = result
+            if success:
+                info_dict[key] = info
+                pbar.update()
+            else: # end if fail accumulated for 3 times
+                if failure_count[key] >= 2:
+                    failure_dict[key] = init_info
+                    print('Fail for 3 times already: ')
+                    print(f'Predicates Base:')
+                    for pred in predicate_base:
+                        print(f"\t\t{pred}")
+                    print(f'Predicates Rel:')
+                    for pred in predicate_rel:
+                        print(f"\t\t{pred}")
+                    pbar.update()
+                else:
+                    failure_cases.append(info)
+                    failure_count[key] += 1
 
     with open(json_file_path, 'w', encoding='utf-8') as f:
         f.write(json.dumps(info_dict, indent=4, ensure_ascii=False))
@@ -239,6 +246,24 @@ def task_0():
     print(f'======== Task: {task_name} ========')
     return seed, task_name, input_args_list, repeat_times, num_process
 
+def task_1():
+    seed = 1234
+    task_name = "geo_gen_ENT_1_REL_2"
+    input_args_list = []
+    num_process = 12
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_1 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=0,
+                                    repeat_times=1)
+    print('Num: ', len(input_args_1))
+
+    
+    input_args_list = input_args_1
+    print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
+    return seed, task_name, input_args_list, num_process
 
 def task_pretrain():
     seed = 1234
@@ -299,8 +324,8 @@ def task_pretrain():
     return seed, task_name, input_args_list, num_process
     
 def main():
-    # run_task(*task_0())
-    run_task(*task_pretrain())
+    run_task(*task_1())
+    # run_task(*task_pretrain())
 
 
 if __name__ == '__main__':

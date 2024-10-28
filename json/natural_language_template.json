@@ -1,6 +1,7 @@
 {
-    "triangle": [
+    "Triangle": [
         "{points} forms a triangle",
+        "the shape {points} forms a triangle",
         "the shape {points} is a triangle"
     ],
     "Parallelogram": [
@@ -20,7 +21,8 @@
     ],
     "RightTriangle": [
         "{points} is a right triangle",
-        "the shape {points} forms a right triangle"
+        "the shape {points} forms a right triangle",
+        "\\triangle {points} has a right angle {points}"
     ],
     "Square": [
         "{points} forms a square",
@@ -62,7 +64,7 @@
         "the shape {points} forms an isosceles right triangle",
         "right triangle {points} is isosceles"
     ],
-
+    
 
     "PerpendicularBetweenLine": [
         "{p1} \\perp {p2}",

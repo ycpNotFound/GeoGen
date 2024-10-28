@@ -157,6 +157,80 @@ def bgr_to_hex(b, g, r):
     hex_color = f"#{rb}{gb}{bb}"
     return hex_color
 
+
+SYMBOL_MAPPING_1 = {
+    "\\triangle": "triangle",
+    "\\perp": "is perpendicular to",
+    "\\parallel": "is parallel to",
+    "\\odot": "circle",
+    "\\angle": "angle",
+    "\\arc": "arc"
+}
+SYMBOL_MAPPING_2 = {
+    "\\triangle": "△",
+    "\\perp": "⊥",
+    "\\parallel": "∥",
+    "\\odot": "⊙",
+    "\\angle": "∠",
+    "\\arc": "⌒"
+}
+
+def clause_to_nature_language(clauses, natural_template):
+    conditions = []
+
+    for clause in clauses:
+        pred, items = parse_clause(clause)
+        if 'Equal' in clause:
+            if pred == 'MeasureOfAngle':
+                if items[1].isalpha() and items[1].isupper():
+                    condition_i = f"\\angle {items[0]} = \\angle {items[1]}"
+                else:
+                    if '90' in clause:
+                        l1 = ''.join(items[0][:2])
+                        l2 = ''.join(items[0][1:])
+                        condition_i = f"{l1} \\perp {l2}"
+                    else:
+                        condition_i = f"\\angle {items[0]} = {items[1]}"
+            if pred == 'LengthOfLine':
+                condition_i = f"{items[0]} = {items[1]}"
+            if pred == 'LengthOfArc':
+                condition_i = f"\\arc {items[0]} = \\arc {items[1]}"
+        elif 'Shape' in clause:
+            continue
+        elif 'Collinear' in clause:
+            points = items[0]
+            condition_i = random.choice([
+                f"points {', '.join(points)} lie on the same line",
+                f"points {', '.join(points)} are collinear",
+                f"the points {', '.join(points)} are aligned in a straight line",
+                f"point {points[1]} lies on line segment {points[0]}{points[2]}",
+            ])
+        elif 'Cocircular' in clause:
+            circle, points = items
+            condition_i = random.choice([
+                f"points {', '.join(points)} lie on the circle {circle}",
+                f"points {', '.join(points)} lie on the same circle centered at point {circle}",
+                f"the points {', '.join(points)} are on circle {circle}"
+            ])
+        elif pred in PREDICATES_ENT:
+            template = random.choice(natural_template[pred])
+            condition_i = template.format(points=items[0])
+        else:
+            template = random.choice(natural_template[pred])
+            condition_i = template.format(p1=items[0], p2=items[1])
+        
+        conditions.append(condition_i)
+        
+    symbol_mapping = random.choice([SYMBOL_MAPPING_1, 
+                                    SYMBOL_MAPPING_2])
+    conditions_res = []
+    for c in conditions:
+        for k, v in symbol_mapping.items():
+            c = c.replace(k, v)
+        conditions_res.append(c)
+        
+    return conditions_res
+
 def extract_sqrt_terms(expression):
     # 使用 SymPy 的 args 属性，该属性对于加法表达式返回所有加项，
     # 对于乘法表达式返回所有因子。
@@ -613,7 +687,7 @@ def get_angle_measure(p_cross, p1, p2):
     angle_rad = math.acos(cos_angle)
 
     # Convert to degrees
-    angle_deg = int(angle_rad * 180 / math.pi)
+    angle_deg = round(angle_rad * 180 / math.pi)
     assert angle_deg <= 180 and angle_deg >= 0
     return angle_deg
     

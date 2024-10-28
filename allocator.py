@@ -176,12 +176,27 @@ class Allocator():
             if self.check_complex():
                 continue
             
+            # check if there's unsolved point
+            allocate_success = True
+            for p in self.points:
+                if self.p_pos[p] is None:
+                    allocate_success = False
+                else:
+                    x, y = self.p_pos[p]
+                    if type(x) not in [Float, float, int] or type(y) not in [Float, float, int]:
+                        allocate_success = False
+            if not allocate_success:
+                continue
+                
             # check if out of figure size
             positions = list(self.p_pos.values())
-            min_x = np.min([pos[0] for pos in positions])
-            max_x = np.max([pos[0] for pos in positions])
-            min_y = np.min([pos[1] for pos in positions])
-            max_y = np.max([pos[1] for pos in positions])
+            try:
+                min_x = np.min([pos[0] for pos in positions])
+                max_x = np.max([pos[0] for pos in positions])
+                min_y = np.min([pos[1] for pos in positions])
+                max_y = np.max([pos[1] for pos in positions])
+            except Exception as e:
+                print(e)
             max_val = max([abs(i) for i in [min_x, max_x, min_y, max_y]])
             if max_val > 80:
                 continue
@@ -416,12 +431,12 @@ class Allocator():
         self.polygons = append_lst(polygons_, quads)
         
     def find_image_cdls(self):
-        self.image_cdls = []
         for clause in self.clauses:
             if 'Equal' in clause:
                 if any([pred in clause for pred in 
                         ['LengthOfLine', 'MeasureOfAngle', 'LengthOfArc']]):
-                    self.image_cdls.append(clause)
+                    if clause not in self.image_cdls:
+                        self.image_cdls.append(clause)
 
     def allocate_for_value(self):
         mode = random.choice([0, 1, 2])
@@ -486,22 +501,26 @@ class Allocator():
         # replace chars in clauses, may delete some clause
         text_cdls = [self.replace_points_for_clause(cdl, mapping) 
                      for cdl in self.text_cdls]
-        
+        text_cdls = [c for c in text_cdls if c != None]
         construct_cdls = [self.replace_points_for_clause(cdl, mapping) 
                           for cdl in self.construct_cdls]
-
+        construct_cdls = [c for c in construct_cdls if c != None]
         clauses = [self.replace_points_for_clause(cdl, mapping) 
                    for cdl in self.clauses]
-       
+        clauses = [c for c in clauses if c != None]
         clauses = remove_duplicates(clauses)
         self.text_cdls = text_cdls
         self.construct_cdls = construct_cdls
         self.clauses = clauses
         
-        # replace chars in lines, circles, p_pos
+        # replace chars in points, lines, circles, p_pos
         for p1, p2 in mapping.items():
             if p1 != p2 : # p1 -> p2
+                # points
                 self.p_pos.pop(p1, None)
+                if p1 in self.points:
+                    self.points.remove(p1)
+                # lines
                 new_lines = []
                 for l in self.lines:
                     if p1 in l:
@@ -510,14 +529,37 @@ class Allocator():
                         # delete repeated
                         seen = set()
                         new_line = tuple([p for p in new_line if not (p in seen or seen.add(p))])
-                        new_lines.append(new_line)
+                        if len(new_line) > 1:
+                            new_lines.append(new_line)
                     else:
                         new_lines.append(l)
                 self.lines = sorted(set(new_lines))
+                # points on circle
+                for c, ps in self.points_on_circle.items():
+                    if p1 in ps:
+                        ps.remove(p1)
+                        if p2 not in ps:
+                            ps.append(p2)
+                    self.points_on_circle[c] = ps
+                # circle
                 if p1 in self.circles:
                     self.circles.remove(p1)
                     self.circles.append(p2)
                     self.points_on_circle[p2] = self.points_on_circle.pop(p1)
+                # polygons
+                new_polygons = []
+                for poly in self.polygons:
+                    if p1 in poly:
+                        # replace points
+                        new_poly = tuple(p2 if p == p1 else p for p in l)
+                        # delete repeated
+                        seen = set()
+                        new_poly = tuple([p for p in new_poly if not (p in seen or seen.add(p))])
+                        if len(new_poly) > 2:
+                            new_polygons.append(new_poly)
+                    else:
+                        new_polygons.append(poly)
+                self.polygons = sorted(set(new_polygons))
         
     def replace_points_for_clause(self, clause, mapping):
         if 'Equal' in clause:
@@ -537,6 +579,8 @@ class Allocator():
                 letters = [mapping.get(c, c) for c in letters]
                 letters = [x for x in letters if not (x in seen or seen.add(x))]
                 items_res.append(''.join(letters))
+            if predicate == 'Collinear' and len(items_res[0]) <= 2:
+                return None
             clause_res = f"{predicate}({','.join(items_res)})"
             return clause_res
             
@@ -601,13 +645,27 @@ class Allocator():
         xb, yb = self.p_pos[B]
         if self.p_pos[C] is None or type(self.p_pos[C][0]) in [Expr, Symbol]:
             # 使用cv2绘图，逆时针布局需要顺时针旋转
-            top_angle = - math.radians(random.uniform(45, 75)) 
-            ratio = random.uniform(0.5, 1.5)
+            mode = random.choice([0, 1, 2])
+            if mode == 0:
+                top_angle = - math.radians(random.uniform(45, 75)) 
+            elif mode == 1:
+                top_angle = - math.radians(30) 
+                self.image_cdls.append(
+                    f"Equal(MeasureOfAngle({''.join([B,A,C])}),30)"
+                )
+            elif mode == 2:
+                top_angle = - math.radians(60) 
+                self.image_cdls.append(
+                    f"Equal(MeasureOfAngle({''.join([B,A,C])}),60)"
+                )
+            interval = random.choice([(0.7, 0.9), (1.1, 1.5)])
+            ratio = random.uniform(interval[0], interval[1])
             cos_val = math.cos(top_angle)
             sin_val = math.sin(top_angle)
             xc = xa + ((xb - xa) * cos_val - (yb - ya) * sin_val) * ratio
             yc = ya + ((xb - xa) * sin_val + (yb - ya) * cos_val) * ratio
             self.p_pos[C] = [xc, yc]
+            
     
     def allocate_quad(self, clause):
         _, items = parse_clause(clause)
@@ -636,36 +694,16 @@ class Allocator():
         xc, yc = self.p_pos[C]
         
         if self.p_pos[D] is None or type(self.p_pos[D][0]) not in [float, Float, int]:
-            mode = random.choice(['random', 'cocircular', 'perp'])
+            mode = random.choice(['random', 'perp'])
             # mode = 'cocircular'
             # mode = 'perp'
             # self.define_points([D])
-    
-            if mode == 'cocircular':
-                x, y = Symbol('x'), Symbol('y')
-                xd, yd = self.p_pos[D]
-                # get circle center position
-                circle_eqs = self.get_circum_circle_eqs((x, y), [A, B, C])
-                solution = solve(circle_eqs, (x, y))
-                xo, yo = solution.get(x), solution.get(y)
-                # find whether there's circle center
-                coincide_ps = self.get_coincide_points(xo, yo)
-                if len(coincide_ps) > 0:
-                    c = coincide_ps[0]
-                    new_clause = f"Cocircular({c},{''.join([A, D])})"
-                    self.allocate_cocircular(new_clause)
-                    self.construct_cdls.append(new_clause)
-                    
-                    position = self.random_allocate_position(target_p=D)
-                    self.update_values(D, position)
-                else:
-                    mode = random.choice(['random', 'perp'])
                     
             if mode == 'random':
                 angle_BAD = - math.radians(random.uniform(100, 150)) 
                 cos_val = math.cos(angle_BAD)
                 sin_val = math.sin(angle_BAD)
-                ratio_AD = random.uniform(0.6, 1.3)
+                ratio_AD = random.uniform(0.8, 1.0)
                 xd = xa + ((xb - xa) * cos_val - (yb - ya) * sin_val) * ratio_AD
                 yd = ya + ((xb - xa) * sin_val + (yb - ya) * cos_val) * ratio_AD
                 xd, yd = xd * ratio_AD, yd * ratio_AD
@@ -726,13 +764,20 @@ class Allocator():
         self.p_pos[C] = [xc, yc]
         
     def allocate_isosceles_triangle(self, clause):
-        # 将一点旋转随机角度, A为顶角
+        # 将一点旋转随机角度, AB=AC
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        xb, yb = self.random_allocate_position()
-        
-        top_angle = -math.radians(random.uniform(45, 135)) 
+        type_flag = random.choice([0, 1])
+        if type_flag == 0:
+            xb, yb = self.random_allocate_position()
+        else:
+            theta = math.radians(random.uniform(130, 140)) 
+            b_len = random.uniform(5, 10)
+            xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
+
+        interval = random.choice([(45, 80), (100, 135)])
+        top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
         xc = xa + (xb - xa) * cos_val - (yb - ya) * sin_val
@@ -792,7 +837,8 @@ class Allocator():
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
-        top_angle = -math.radians(random.uniform(60, 120)) 
+        interval = random.choice([(50, 80), (100, 130)])
+        top_angle = -math.radians(random.uniform(interval[0], interval[1])) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
 
@@ -816,7 +862,8 @@ class Allocator():
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
-        top_angle = - math.radians(random.uniform(45, 135)) 
+        interval = random.choice([(45, 80), (100, 135)])
+        top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
         
@@ -838,7 +885,8 @@ class Allocator():
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
-        top_angle = - math.radians(random.uniform(45, 135)) 
+        interval = random.choice([(45, 80), (100, 135)])
+        top_angle = - math.radians(random.uniform(interval[0], interval[1]))
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
         
@@ -918,7 +966,8 @@ class Allocator():
             theta = math.radians(random.uniform(90, 120)) 
             b_len = random.uniform(5, 10)
             xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
-        top_angle = - math.radians(random.uniform(60, 120)) 
+        interval = random.choice([(60, 80), (100, 120)])
+        top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
         
@@ -1266,7 +1315,29 @@ class Allocator():
                 dot_product = (xb - xa) * (xc - xb) + (yb - ya) * (yc - yb)
                 expr = simplify_and_trim(dot_product)
                 angle_eq = Eq(expr, 0)
-                
+
+                # check AB \\perp collinear ps in BC or AB
+                if type(xb) not in [Float, float, int]:
+                    collinear_ps = [l for l in self.lines if B in l and C in l and len(l) > 2]
+                    if len(collinear_ps) > 0:
+                        D = list(set(collinear_ps[0]) - set([B, C]))[0]
+                        self.define_points([D])
+                        xd, yd = self.p_pos[D]
+                        # AB \\perp DC
+                        dot_product = (xb - xa) * (xc - xd) + (yb - ya) * (yc - yd)
+                        expr = simplify_and_trim(dot_product)
+                        angle_eq = Eq(expr, 0)
+                        
+                    collinear_ps = [l for l in self.lines if B in l and A in l and len(l) > 2]
+                    if len(collinear_ps) > 0:
+                        D = list(set(collinear_ps[0]) - set([B, C]))[0]
+                        self.define_points([D])
+                        xd, yd = self.p_pos[D]
+                        # AD \\perp BC
+                        dot_product = (xd - xa) * (xc - xb) + (yd - ya) * (yc - yb)
+                        expr = simplify_and_trim(dot_product)
+                        angle_eq = Eq(expr, 0)
+                     
                 # A, B, C can't be coinside
                 # ignore_value = [(xa, ya)]
                 # if xb in [float, Float, int] and yb in [float, Float, int]:
@@ -1340,7 +1411,7 @@ class Allocator():
             return False
 
         solution = solve((eq, ) + expand_eq, target)
-        self.update_symbol(solution, char) 
+        self.update_symbol(solution, char, cannot_coincide=False) 
         return 
     
     def allocate_equal_arc(self, arc_1, arc_2):
@@ -1396,9 +1467,10 @@ class Allocator():
         if len(solution) == 2:
             x1, y1 = solution[0]
             x2, y2 = solution[1]
-            dist_1 = (x0 - x1) ** 2 + (y0 - y1) ** 2
-            dist_2 = (x0 - x2) ** 2 + (y0 - y2) ** 2
-            solution = solution[0] if dist_1 < dist_2 else solution[1]
+            if type(x1) in [Float, float] and type(x2) in [Float, float]:
+                dist_1 = (x0 - x1) ** 2 + (y0 - y1) ** 2
+                dist_2 = (x0 - x2) ** 2 + (y0 - y2) ** 2
+                solution = solution[0] if dist_1 < dist_2 else solution[1]
         # update position of target point
         self.update_symbol(solution, char, constraint=solution_inequal, cannot_coincide=False) 
         return 
@@ -1712,37 +1784,43 @@ class Allocator():
         
         else: # position of target_p is expression
             constraint = self.p_pos_range.get(target_p, None)
-            if constraint is None:
-                # no constraint, interval: (0, 2), (2, 4), ... (8, 10)
-                interval_of_random = [(i*2, (i+1)*2) for i in range(n)]
-            else:
+
+            # has constraint, get upper and lower bounds and devide
+            x_expr, y_expr = self.p_pos[target_p]
+            syms = list(set(list(x_expr.free_symbols) + 
+                            list(y_expr.free_symbols)))
+            if len(syms) == 1:
+                sym = syms[0]
                 
-                # has constraint, get upper and lower bounds and devide
-                x_expr, y_expr = self.p_pos[target_p]
-                syms = list(set(list(x_expr.free_symbols) + 
-                                list(y_expr.free_symbols)))
-                if len(syms) == 1:
-                    sym = syms[0]
+                if constraint is None or type(constraint) == Or:
+                    constraint = solve((-20 < x_expr, x_expr < 20, -20 < y_expr, y_expr < 20), sym)
+                
+                if constraint == False:
+                    interval_of_random = [(5, 10) for i in range(n)]
+                else:
                     # transfer ineq to (..) And (..)
                     if type(constraint) == StrictLessThan:
-                        constraint = (-oo < sym) & constraint
+                        constraint = (-20 < sym) & constraint
                     if type(constraint) == StrictGreaterThan:
-                        constraint = constraint & (sym < oo)
-                        
-                    if constraint.args[0].lhs.has(sym):
-                        bound_1 = float(constraint.args[0].rhs)
-                    else:
-                        bound_1 = float(constraint.args[0].lhs)
-                    if constraint.args[1].lhs.has(sym):
-                        bound_2 = float(constraint.args[1].rhs)
-                    else:
-                        bound_2 = float(constraint.args[1].lhs)
+                        constraint = constraint & (sym < 20)
+                    try:
+                        if constraint.args[0].lhs.has(sym):
+                            bound_1 = float(constraint.args[0].rhs)
+                        else:
+                            bound_1 = float(constraint.args[0].lhs)
+                        if constraint.args[1].lhs.has(sym):
+                            bound_2 = float(constraint.args[1].rhs)
+                        else:
+                            bound_2 = float(constraint.args[1].lhs)
+                    except Exception as e:
+                        print(e)
                     inf = max([min([bound_1, bound_2]), -10])
                     sup = min([max([bound_1, bound_2]), 10])
                     val = (sup - inf) / n
                     interval_of_random = [(inf + i*val, inf + (i+1)*val) for i in range(n)]
-                else:
-                    interval_of_random = [(5, 10) for i in range(n)]
+
+            else:
+                interval_of_random = [(5, 10) for i in range(n)]
         
         max_distance = 0
         best_point = None

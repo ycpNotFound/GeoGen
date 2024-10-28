@@ -6,15 +6,16 @@ from allocator import Allocator
 import random
 import re
 import math
+import json
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import sympy
 from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
 
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PRESET_COLORS, find_target_for_construct,
+from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,  PRESET_COLORS, find_target_for_construct,
                    get_content, get_points, get_predicate_name, get_symbol,
-                   max_letter_index, parse_clause, replace_points, setup_seed, replace_for_clause)
+                   max_letter_index, parse_clause, replace_points, setup_seed, replace_for_clause, clause_to_nature_language)
 import cv2
 import networkx as nx
 from utils import hex_to_bgr
@@ -66,10 +67,13 @@ class Plotter():
         
         # draw annotations: perp, equal, fill_in_color entity ..
         self.annotation_targets = self.find_annotation_clauses()
-        font_size = int(min(25, min(self.fig_size) / 15))
+        font_size = int(min(27, min(self.fig_size) / 15))
         self.FT = ImageFont.truetype("font/arial.ttf", font_size)
         if self.debug:
             print("Font Size: ", font_size)
+            
+        natural_template_path = "json/natural_language_template.json"
+        self.natural_template = json.load(open(natural_template_path, 'r'))
             
         
     @staticmethod
@@ -83,6 +87,8 @@ class Plotter():
         else:
             start_char = random.choice(['A', 'E', 'I', 'M', 'R'])
         start_idx = string.ascii_uppercase.index(start_char)
+        if start_idx + len(self.p_pos) > len(string.ascii_uppercase):
+            start_idx = len(string.ascii_uppercase) - len(self.p_pos) - 1
         chars = string.ascii_uppercase[start_idx: start_idx + len(self.p_pos)]
         mapping = {}
         for point_i, char in zip(self.p_pos, chars):
@@ -98,20 +104,14 @@ class Plotter():
         # clauses
         self.text_cdls = [replace_for_clause(c, mapping) for c in self.text_cdls]
         self.construct_cdls = [replace_for_clause(c, mapping) for c in self.construct_cdls]
-        try:
-            self.image_cdls = [replace_for_clause(c, mapping) for c in self.image_cdls]
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            print(tb)
-            print(e)
+        self.image_cdls = [replace_for_clause(c, mapping) for c in self.image_cdls]
         return
     
     def get_radius(self, c):
         p0 = self.points_on_circle[c][0]
         xc, yc = self.p_pos[c]
         x1, y1 = self.p_pos[p0]
-        return int(self.distance([xc, yc], [x1, y1]))
+        return self.distance([xc, yc], [x1, y1])
             
     def normalize_positions(self, pad_size=50):
         # normalize positions for points, add padding and return fig size
@@ -196,32 +196,44 @@ class Plotter():
     def find_annotation_clauses(self):
         right_angles, eq_lines, eq_angles, eq_arcs = [], [], [], []
         length_of_line, measure_of_angle = [], []
-
-        for clause in self.image_cdls:
+        for clause in self.image_cdls[:]:
             if 'Equal' in clause:
                 _, items = parse_clause(clause)
                 if 'LengthOfLine' in clause:
                     if clause.count('LengthOfLine') == 2: 
                         # annotate eq lines
+                        if len(items[0]) != 2 or len(items[1]) != 2:
+                            self.image_cdls.remove(clause)
+                            continue
                         eq_lines.append([tuple(items[0]), tuple(items[1])])
                     else: 
                         # annotate length for line
+                        if len(items[0]) != 2:
+                            self.image_cdls.remove(clause)
                         length_of_line.append([tuple(items[0]), items[1]])
                     
                 if 'MeasureOfAngle' in clause:
                     if clause.count('MeasureOfAngle') == 1: 
+                        if len(items[0]) != 3:
+                            self.image_cdls.remove(clause)
+                            continue
                         if '90' in clause: # annotate perpendicular
                             right_angles.append(tuple(items[0]))
                         else: # annotate measure for angle
                             measure_of_angle.append([tuple(items[0]), items[1]])
                     elif clause.count('MeasureOfAngle') == 2: 
                         # annotate eq angles
+                        if len(items[0]) != 3 or len(items[1]) != 3:
+                            self.image_cdls.remove(clause)
+                            continue
                         eq_angles.append([tuple(items[0]), tuple(items[1])])
-                        
                 if 'LengthOfArc' in clause:
                     if clause.count('LengthOfArc') == 2:
+                        if len(items[0]) != 3 or len(items[1]) != 3:
+                            self.image_cdls.remove(clause)
+                            continue
                         eq_arcs.append([tuple(items[0]), tuple(items[1])])
-
+                        
         # find AB = BC = CA 
         G_eq_line = nx.Graph()
         for eq_line in eq_lines:
@@ -343,6 +355,8 @@ class Plotter():
             line_len = min(self.distance([xa, ya], [xb, yb]),
                            self.distance([xc, yc], [xb, yb]))
             radius = min([30, int(line_len / 4)])
+            if radius <= 8:
+                continue
             # ensure BA -> BC clock wise, BA x BC < 0 
             # for cv2, ensure BA -> BC counter clock wise, BA x BC > 0 
             # BA = [xa - xb, ya - yb]
@@ -376,8 +390,9 @@ class Plotter():
             if angle_BC < angle_BA:
                 angle_BA = angle_BA - 360
             # print(angle_BA, angle_BC)
-            # B as circle center, radius -= 5 to distinguish
-            cv2.ellipse(self.fig, (xb, yb), (radius-5, radius-5), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
+            # B as circle center, radius -= delta to distinguish with the other
+            delta_r = min(5, radius // 2)
+            cv2.ellipse(self.fig, (xb, yb), (radius-delta_r, radius-delta_r), 0, angle_BA, angle_BC, self.a_color, self.line_width, lineType=cv2.LINE_AA)
     
     def plot_equal_arcs(self, eq_arcs):
         for idx, eq_arc in enumerate(eq_arcs):
@@ -419,7 +434,7 @@ class Plotter():
         elif ent_type == 'Circle':
             center_pos = self.p_pos[items[0]]
             radius = self.get_radius(items[0])
-            cv2.circle(self.fig, center_pos, radius, self.f_color, -1)
+            cv2.circle(self.fig, center_pos, int(radius), self.f_color, -1)
         elif ent_type == 'TwoPolygon':
             pos_1 = np.array([self.p_pos[p] for p in items[0]])
             pos_1 = pos_1.reshape((-1, 1, 2))
@@ -450,9 +465,9 @@ class Plotter():
             xo, yo = self.fig_size[0] / 2, self.fig_size[1] / 2
             vec_1 = (xm - xo) * BA_perp_unit[0] + (ym - yo) * BA_perp_unit[1]
             if vec_1 > 0:
-                xc, yc = xm + BA_perp_unit[0] * 20, ym + BA_perp_unit[1] * 20
+                xc, yc = xm + BA_perp_unit[0] * 35, ym + BA_perp_unit[1] * 35
             else:
-                xc, yc = xm - BA_perp_unit[0] * 20, ym - BA_perp_unit[1] * 20
+                xc, yc = xm - BA_perp_unit[0] * 35, ym - BA_perp_unit[1] * 35
             
             # cv2.circle(self.fig, (int(xc), int(yc)), 4, color=self.p_color, thickness=-1, lineType=cv2.LINE_AA)
             
@@ -463,24 +478,14 @@ class Plotter():
             text_bbox_size = (text_bbox[2] - text_bbox[0] + 20, 
                               text_bbox[3] - text_bbox[1] + 20)
 
-            # 创建一个新图像用于绘制旋转文本
+
             text_image = Image.new('RGBA', text_bbox_size, color=None)
             text_draw = ImageDraw.Draw(text_image)
             text_draw.text((10, 10), length, fill=self.c_color, font=self.FT)
             
             # text_draw.rectangle([(10, 10), (10+text_bbox[2] - text_bbox[0], 10+text_bbox[3] - text_bbox[1])], outline="black", width=2)
             # text_draw.rectangle([(2, 2), (text_image.width-2, text_image.height-2)], outline="black", width=2)
-            
-            angle = math.degrees(math.atan2(BA_unit[1], BA_unit[0]))
-            angle = 360 + angle if angle < 0 else angle
-            if angle > 0 and angle < 45:
-                angle = angle
-            elif angle > 135 and angle < 225:
-                angle = angle - 180
-            elif angle > 315:
-                angle = angle - 360
-            else:
-                angle = 0
+
             # text_image = text_image.rotate(-angle, expand=False)
             text_pos = (int(xc - text_image.width / 2), 
                         int(yc - text_image.height / 2))
@@ -556,6 +561,72 @@ class Plotter():
     # def plot_value(self):
     #     self.plot_length_of_line(self.annotation_targets['length_of_line'])
     #     self.plot_measure_of_angle(self.annotation_targets['measure_of_angle'])
+    
+    def formulate_caption(self):
+        caption_str = random.choice([
+            "The diagram shows a geometric figure with ",
+            "This is a geometric diagram featuring ",
+            "The figure depicts a geometric diagram involving ",
+            "In this diagram, the geometric pattern consists of ",
+            "The geometric construction in this figure includes "
+        ])
+        # summarize of relation
+        relations = []
+        for clause in self.text_cdls:
+            name, _ = parse_clause(clause)
+            if name in PREDICATES_ENT and name != 'Triangle':
+                relations.append(name.lower())
+            elif name in PREDICATES_REL_2:
+                if name == 'SimilarBetweenTriangle':
+                    relations.append('similar triangles')
+                elif name == 'CongruentBetweenTriangle':
+                    relations.append('congruent triangles')
+                elif name == 'SimilarBetweenQuadrilateral':
+                    relations.append('similar quadrilaterals')
+                elif name == 'CongruentBetweenQuadrilateral':
+                    relations.append('congruent quadrilaterals')
+            else:
+                if 'Perpendicular' in name:
+                    relations.append('perpendicular lines')
+                elif 'Parallel' in name:
+                    relations.append('parallel lines')
+                elif 'Circle' in name or 'Arc' in name:
+                    relations.append('circle')
+                elif 'Angle' in name:
+                    relations.append('angles')
+                elif 'Quadrilateral' in name:
+                    relations.append('quadrilateral')
+                elif 'Triangle' in name:
+                    relations.append('triangles')
+        relations = list(set(relations))
+        if len(relations) == 1:
+            caption_str += f"{relations[0]}. "
+        elif len(relations) == 2:
+            caption_str += f"{relations[0]} and {relations[1]}. "
+        else:
+            caption_str += f"{', '.join(relations[:-1])} and {relations[1]}. "
+        caption_str += "Here is detailed description:\n"
+        # points
+        points = list(self.p_pos.keys())
+        caption_str += f"Points: $ {', '.join(points)} $ .\n"
+
+        # lines or circle
+        lines = [''.join(l) for l in self.lines]
+        caption_str += f"Lines: $ {', '.join(lines)} $ .\n"
+        if len(self.circles) != 0:
+            caption_str += f"Circles: $ {', '.join(self.circles)} $ .\n"
+        else:
+            caption_str += f"Circles: there's no circle in the diagram.\n"
+        # clause
+        caption_str += f"Geometry Relations:\n- "
+        caption_list = clause_to_nature_language(
+            self.text_cdls + self.construct_cdls,
+            self.natural_template
+        )
+        caption_str += '.\n- '.join(caption_list) + '. '
+        if self.debug:
+            print(caption_str)
+        self.caption_str = caption_str
         
         
     def plot(self):
@@ -576,7 +647,7 @@ class Plotter():
         for circle in self.circles:
             c_pos = self.p_pos[circle]
             radius = self.get_radius(circle)
-            cv2.circle(self.fig, c_pos, radius, color=self.l_color, 
+            cv2.circle(self.fig, c_pos, int(radius), color=self.l_color, 
                        thickness=self.line_width, lineType=cv2.LINE_AA)
         
         # plot chars
@@ -590,10 +661,9 @@ class Plotter():
             cv2.putText(self.fig, point_i, text_pos, self.font, text_size, 
                         self.c_color, text_width, cv2.LINE_AA)
         
-        # plot value for line length or angle measure
-        # self.plot_value()
-        
-            
+        self.formulate_caption()
+
+
     def save_fig(self, fig_name, fig_dir):
         if '.png' in fig_name or '.jpg' in fig_name:
             cv2.imwrite(f"{fig_dir}/{fig_name}", self.fig)
@@ -603,16 +673,16 @@ class Plotter():
 if __name__ == '__main__':
     setup_seed(1234)
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    for i in range(10):
+    for i in range(100):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
         # clauses_base = [
-        #     "RightTrapezoid",
+        #     "Triangle",
         # ]
         # clauses_rel = [
-        #     'IsBisectorOfAngle', 
-        #     # 'IsMidsegmentOfTriangle',
+        #     'IsMidpointOfLine', 
+        #     'IsAltitudeOfTriangle',
         #     # 'IsAltitudeOfQuadrilateral',
         #     # 'IsIncenterOfTriangle',
         #     # "IsAltitudeOfTriangle",
@@ -632,9 +702,9 @@ if __name__ == '__main__':
         )
         states = cg.states
         
-        # states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('d', 'e'), ('a', 'c')], 'circles': [], 'polygons': [('a', 'b', 'c', 'd'), ('a', 'b', 'c'), ('a', 'c', 'd')], 'constraints': ['ParallelBetweenLine(ad,bc)', 'Equal(MeasureOfAngle(dab),90)', 'Equal(MeasureOfAngle(abc),90)', 'Equal(MeasureOfAngle(ade),MeasureOfAngle(edc))'], 'constraints_base': ['ParallelBetweenLine(ad,bc)', 'Equal(MeasureOfAngle(dab),90)', 'Equal(MeasureOfAngle(abc),90)'], 'points_on_circle': {}}
-        # c_cdls = ['Shape(ab,bc,cd,da)', 'Shape(de)']
-        # t_cdls = ['RightTrapezoid(abcd)', 'IsBisectorOfAngle(de,adc)']  
+        # states = {'points': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'lines': [('b', 'c'), ('e', 'f'), ('a', 'b', 'e'), ('c', 'd', 'f'), ('g', 'h'), ('c', 'd'), ('a', 'c', 'g'), ('a', 'd', 'h')], 'circles': [], 'polygons': [('a', 'b', 'c'), ('a', 'b', 'c', 'd'), ('a', 'c', 'd'), ('a', 'g', 'h')], 'constraints': ['Equal(MeasureOfAngle(cab),90)', 'Equal(LengthOfLine(ab),LengthOfLine(ac))', 'Equal(LengthOfLine(ae),LengthOfLine(eb))', 'Equal(LengthOfLine(cf),LengthOfLine(fd))', 'Polygon(abcd)', 'Collinear(aeb)', 'Collinear(dfc)', 'Equal(LengthOfLine(ag),LengthOfLine(gc))', 'Equal(LengthOfLine(ah),LengthOfLine(hd))', 'Collinear(agc)', 'Collinear(ahd)'], 'constraints_base': ['Equal(MeasureOfAngle(cab),90)', 'Equal(LengthOfLine(ab),LengthOfLine(ac))'], 'points_on_circle': {}}
+        # c_cdls = ['Shape(ab,bc,ca)', 'Polygon(abcd)', 'Shape(ef)', 'Shape(ab,bc,cd,da)', 'Collinear(aeb)', 'Collinear(dfc)', 'Shape(gh)', 'Shape(ac,cd,da)', 'Collinear(agc)', 'Collinear(ahd)']
+        # t_cdls = ['IsoscelesRightTriangle(abc)', 'IsMidsegmentOfQuadrilateral(ef,abcd)', 'IsMidsegmentOfTriangle(gh,acd)']
         
         print('---------- Allocator Inputs ----------')
         print(states)

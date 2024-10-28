@@ -4,7 +4,7 @@ from generator import ClauseGenerator
 from plotter import Plotter
 from solver import Solver
 import random
-from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed, parse_clause, replace_for_clause
+from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed, parse_clause, replace_for_clause, clause_to_nature_language
 import json
 
 from formalgeo.core import EquationKiller as EqKiller
@@ -22,56 +22,6 @@ import string
 import json
 import numpy as np
 from utils import PRESET_COLORS, PRESET_COLOR_PROBS
-
-SYMBOL_MAPPING_1 = {
-    "\\triangle": "triangle",
-    "\\perp": "is perpendicular to",
-    "\\parallel": "is parallel to",
-    "\\odot": "circle",
-    "\\angle": "angle",
-    "\\arc": "arc"
-}
-SYMBOL_MAPPING_2 = {
-    "\\triangle": "△",
-    "\\perp": "⊥",
-    "\\parallel": "∥",
-    "\\odot": "⊙",
-    "\\angle": "∠",
-    "\\arc": "⌒"
-}
-
-def clause_to_nature_language(clauses, natural_template):
-    conditions = []
-
-    for clause in clauses:
-        pred, items = parse_clause(clause)
-        if 'Equal' in clause:
-            if pred == 'MeasureOfAngle':
-                if items[1].isalpha() and items[1].isupper():
-                    condition_i = f"\\angle {items[0]} = \\angle {items[1]}"
-                else:
-                    condition_i = f"\\angle {items[0]} = {items[1]}"
-            if pred == 'LengthOfLine':
-                condition_i = f"{items[0]} = {items[1]}"
-            if pred == 'LengthOfArc':
-                condition_i = f"\\arc {items[0]} = \\arc {items[1]}"
-        elif pred in PREDICATES_ENT:
-            template = random.choice(natural_template[pred])
-            condition_i = template.format(points=items[0])
-        else:
-            template = random.choice(natural_template[pred])
-            condition_i = template.format(p1=items[0], p2=items[1])
-        conditions.append(condition_i)
-        
-    symbol_mapping = random.choice([SYMBOL_MAPPING_1, 
-                                    SYMBOL_MAPPING_2])
-    conditions_res = []
-    for c in conditions:
-        for k, v in symbol_mapping.items():
-            c = c.replace(k, v)
-        conditions_res.append(c)
-        
-    return conditions_res
 
 
 class TargetFinder(): 
