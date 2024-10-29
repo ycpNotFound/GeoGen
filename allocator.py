@@ -735,16 +735,28 @@ class Allocator():
                 B = [xd - xa, yd - ya]
                 expr = A[0] * B[1] - A[1] * B[0]
                 inequality = expr < 0
-                solution_ineq_1 = solve(inequality, inequality.free_symbols.pop())
+                solution_ineq_1 = None
+                if len(inequality.free_symbols) > 0:
+                    solution_ineq_1 = solve(inequality, inequality.free_symbols.pop())
                 
                 # D is on the left of BC, BC x BD > 0 (for cv2 < 0)
                 A = [xc - xb, yc - yb]
                 B = [xd - xb, yd - yb]
                 expr = A[0] * B[1] - A[1] * B[0]
                 inequality = expr < 0
-                solution_ineq_2 = solve(inequality, inequality.free_symbols.pop())
-                solution_ineq = simplify(solution_ineq_1 & solution_ineq_2)
-                self.p_pos_range[D] = solution_ineq
+                solution_ineq_2 = None
+                if len(inequality.free_symbols) > 0: 
+                    solution_ineq_2 = solve(inequality, inequality.free_symbols.pop())
+                    
+                if solution_ineq_1 is not None and solution_ineq_2 is not None:
+                    self.p_pos_range[D] = simplify(solution_ineq_1 & solution_ineq_2)
+                elif solution_ineq_1 is not None:
+                    self.p_pos_range[D] = simplify(solution_ineq_1)
+                elif solution_ineq_2 is not None:
+                    self.p_pos_range[D] = simplify(solution_ineq_2)
+                else:
+                    pass
+
                 position = self.random_allocate_position(target_p=D)
                 self.update_values(D, position)
 
