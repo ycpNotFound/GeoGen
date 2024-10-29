@@ -64,7 +64,7 @@ def generate_one_sample(predicate_GDL,
     except Exception as e:
         print(f"===== Error Occured: {fig_idx} =====")
         tb = traceback.format_exc()
-        # print(tb)
+        print(tb)
         task_info = {
             "key": fig_idx,
             "pred_base": predicate_base,
@@ -270,7 +270,7 @@ def task_pretrain():
     task_name = "geo_gen_pretrain"
     input_args_list = []
 
-    num_process = 1
+    num_process = 6
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT + PREDICATES_REL_2, 1))
     pred_rel_combs = [[]]
     input_args_1 = build_input_args(pred_base_combs, 
@@ -292,7 +292,7 @@ def task_pretrain():
     input_args_3 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=75)
+                                    repeat_times=100)
     print('Num: ', len(input_args_3))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -300,7 +300,7 @@ def task_pretrain():
     input_args_4 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=75)
+                                    repeat_times=100)
     print('Num: ', len(input_args_4))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -324,8 +324,8 @@ def task_pretrain():
     return seed, task_name, input_args_list, num_process
     
 def main():
-    run_task(*task_1())
-    # run_task(*task_pretrain())
+    # run_task(*task_1())
+    run_task(*task_pretrain())
 
 
 if __name__ == '__main__':
