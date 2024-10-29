@@ -58,7 +58,8 @@ def generate_one_sample(predicate_GDL,
             "construction_cdl": allocator.formulated_cdls['construct_cdls'],
             "text_cdl": allocator.formulated_cdls['text_cdls'], 
             "image_cdl": plotter.image_cdls,
-            "caption_str": plotter.caption_str
+            "caption_str": plotter.caption_str,
+            "positions": plotter.p_pos
         }
         return (True, data_info)
     except Exception as e:
@@ -324,8 +325,8 @@ def task_pretrain():
     return seed, task_name, input_args_list, num_process
     
 def main():
-    # run_task(*task_1())
-    run_task(*task_pretrain())
+    run_task(*task_1())
+    # run_task(*task_pretrain())
 
 
 if __name__ == '__main__':

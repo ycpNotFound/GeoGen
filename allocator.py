@@ -439,6 +439,7 @@ class Allocator():
                         self.image_cdls.append(clause)
 
     def allocate_for_value(self):
+        # allocate value for random line or angle
         mode = random.choice([0, 1, 2])
 
         added_cdls = []
@@ -452,15 +453,23 @@ class Allocator():
                 added_cdls.append(f"Equal(LengthOfLine({''.join(line)}),{length})")
         
         elif mode == 1:
-            poly = random.choice(self.polygons)
-            idx = random.choice(list(range(len(poly))))
-            p1 = poly[idx]
-            p_mid = poly[(idx+1) % len(poly)]
-            p2 = poly[(idx+2) % len(poly)]
-            measure = random_generate_angle_measure(
-                self.p_pos[p_mid], self.p_pos[p1], self.p_pos[p2])
-            if measure != '0' and measure != '180':
-                added_cdls.append(f"Equal(MeasureOfAngle({''.join([p1, p_mid, p2])}),{measure})")
+            for i in range(5): # try 5 times
+                poly = random.choice(self.polygons)
+                idx = random.choice(list(range(len(poly))))
+                p1 = poly[idx]
+                p_mid = poly[(idx+1) % len(poly)]
+                p2 = poly[(idx+2) % len(poly)]
+                # find angle that hasn't been allocated
+                for cdl in self.image_cdls:
+                    name, items = parse_clause(cdl)
+                    if name == 'MaeasureOfAngle':
+                        if p_mid == items[0][1] and p1 in items[0] and p2 in items[0]:
+                            continue
+                measure = random_generate_angle_measure(
+                    self.p_pos[p_mid], self.p_pos[p1], self.p_pos[p2])
+                if measure != '0' and measure != '180':
+                    added_cdls.append(f"Equal(MeasureOfAngle({''.join([p1, p_mid, p2])}),{measure})")
+                break
         else:
             pass
         
@@ -650,14 +659,14 @@ class Allocator():
                 top_angle = - math.radians(random.uniform(45, 75)) 
             elif mode == 1:
                 top_angle = - math.radians(30) 
-                self.image_cdls.append(
-                    f"Equal(MeasureOfAngle({''.join([B,A,C])}),30)"
-                )
+                new_cdl = f"Equal(MeasureOfAngle({''.join([B,A,C])}),30)"
+                self.image_cdls.append(new_cdl)
+                self.text_cdls.append(new_cdl)
             elif mode == 2:
                 top_angle = - math.radians(60) 
-                self.image_cdls.append(
-                    f"Equal(MeasureOfAngle({''.join([B,A,C])}),60)"
-                )
+                new_cdl = f"Equal(MeasureOfAngle({''.join([B,A,C])}),60)"
+                self.image_cdls.append(new_cdl)
+                self.text_cdls.append(new_cdl)
             interval = random.choice([(0.7, 0.9), (1.1, 1.5)])
             ratio = random.uniform(interval[0], interval[1])
             cos_val = math.cos(top_angle)

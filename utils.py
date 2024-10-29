@@ -92,6 +92,28 @@ PREDICATES_ATTR = [
     "RatioOfMirrorSimilarTriangle",
     "RatioOfSimilarQuadrilateral",
 ]
+PREDICATES_TO_NAMES = {
+    "PerpendicularBetweenLine": "perpendicular lines",
+    "ParallelBetweenLine": "parallel lines",
+    "IsTangentOfCircle": "tangent line",
+    "IsDiameterOfCircle": "diameter of circle",
+    "IsMidpointOfLine": "midpoint",
+    "IsBisectorOfAngle": "angle bisector",
+    "IsPerpendicularBisectorOfLine": "perpendicular bisector",
+    "IsAltitudeOfTriangle": "altitude line",
+    "IsMedianOfTriangle": "median line",
+    "IsIncenterOfTriangle": "incenter",
+    "IsMidsegmentOfTriangle": "midegment",
+    "IsMidpointOfArc": "midpoint",
+    "IsMidsegmentOfQuadrilateral": "midsegment",
+    "IsCentroidOfTriangle": "centroid",
+    "IsCircumcenterOfTriangle": "circumcenter",
+    "IsCircumcenterOfQuadrilateral": "circumcenter",
+    "SimilarBetweenTriangle": "similar triangles",
+    "SimilarBetweenQuadrilateral": "similar quadrilaterals",
+    "CongruentBetweenTriangle": "congruent triangles",
+    "CongruentBetweenQuadrilateral": "congruent quadrilaterals"
+}
 PRESET_COLOR_PROBS = [0.6, 0.08, 0.08, 0.08, 0.08, 0.08]
 PRESET_COLORS = [
     # line | point | char | annoation | fill_in
@@ -190,7 +212,10 @@ def clause_to_nature_language(clauses, natural_template):
                         l2 = ''.join(items[0][1:])
                         condition_i = f"{l1} \\perp {l2}"
                     else:
-                        condition_i = f"\\angle {items[0]} = {items[1]}"
+                        if '+' in items[1] or '-' in items[1]:
+                            condition_i = f"\\angle {items[0]} = ({items[1]})°"
+                        else:
+                            condition_i = f"\\angle {items[0]} = {items[1]}°"
             if pred == 'LengthOfLine':
                 condition_i = f"{items[0]} = {items[1]}"
             if pred == 'LengthOfArc':
@@ -202,8 +227,9 @@ def clause_to_nature_language(clauses, natural_template):
             condition_i = random.choice([
                 f"points {', '.join(points)} lie on the same line",
                 f"points {', '.join(points)} are collinear",
-                f"the points {', '.join(points)} are aligned in a straight line",
-                f"point {points[1]} lies on line segment {points[0]}{points[2]}",
+                f"points {', '.join(points)} are aligned in a straight line",
+                f"the point {points[1]} lies on line segment {points[0]}{points[2]}",
+                f"the point {points[1]} is on the line segment {points[0]}{points[2]}"
             ])
         elif 'Cocircular' in clause:
             circle, points = items
@@ -219,6 +245,7 @@ def clause_to_nature_language(clauses, natural_template):
             template = random.choice(natural_template[pred])
             condition_i = template.format(p1=items[0], p2=items[1])
         
+        condition_i = condition_i[0].upper() + condition_i[1:]
         conditions.append(condition_i)
         
     symbol_mapping = random.choice([SYMBOL_MAPPING_1, 
@@ -230,6 +257,16 @@ def clause_to_nature_language(clauses, natural_template):
         conditions_res.append(c)
         
     return conditions_res
+
+def convert_upper_to_lower(name): 
+    # IsoscelesRightTriangle -> isosceles right triangle
+    converted_name = name[0].lower()
+    for char in name[1:]:
+        if char.isupper():
+            converted_name += ' '
+            char = char.lower()
+        converted_name += char
+    return converted_name
 
 def extract_sqrt_terms(expression):
     # 使用 SymPy 的 args 属性，该属性对于加法表达式返回所有加项，

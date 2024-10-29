@@ -13,9 +13,9 @@ from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
 
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,  PRESET_COLORS, find_target_for_construct,
+from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,  PRESET_COLORS, PREDICATES_TO_NAMES, find_target_for_construct,
                    get_content, get_points, get_predicate_name, get_symbol,
-                   max_letter_index, parse_clause, replace_points, setup_seed, replace_for_clause, clause_to_nature_language)
+                   max_letter_index, parse_clause, replace_points, setup_seed, replace_for_clause, clause_to_nature_language, convert_upper_to_lower)
 import cv2
 import networkx as nx
 from utils import hex_to_bgr
@@ -27,8 +27,8 @@ class Plotter():
                  text_cdls,
                  construct_cdls, 
                  image_cdls,
-                 min_side=350, 
-                 max_side=400, 
+                 min_side=300, 
+                 max_side=350, 
                  color_config=PRESET_COLORS[0],
                  replace_characters=False,
                  debug=False):
@@ -573,39 +573,19 @@ class Plotter():
         # summarize of relation
         relations = []
         for clause in self.text_cdls:
-            name, _ = parse_clause(clause)
-            if name in PREDICATES_ENT and name != 'Triangle':
-                relations.append(name.lower())
-            elif name in PREDICATES_REL_2:
-                if name == 'SimilarBetweenTriangle':
-                    relations.append('similar triangles')
-                elif name == 'CongruentBetweenTriangle':
-                    relations.append('congruent triangles')
-                elif name == 'SimilarBetweenQuadrilateral':
-                    relations.append('similar quadrilaterals')
-                elif name == 'CongruentBetweenQuadrilateral':
-                    relations.append('congruent quadrilaterals')
-            else:
-                if 'Perpendicular' in name:
-                    relations.append('perpendicular lines')
-                elif 'Parallel' in name:
-                    relations.append('parallel lines')
-                elif 'Circle' in name or 'Arc' in name:
-                    relations.append('circle')
-                elif 'Angle' in name:
-                    relations.append('angles')
-                elif 'Quadrilateral' in name:
-                    relations.append('quadrilateral')
-                elif 'Triangle' in name:
-                    relations.append('triangles')
+            predicate, _ = parse_clause(clause)
+            if predicate in PREDICATES_ENT:
+                relations.append(convert_upper_to_lower(predicate))
+            elif predicate in PREDICATES_REL or predicate in PREDICATES_REL_2:
+                relations.append(PREDICATES_TO_NAMES[predicate])
         relations = list(set(relations))
         if len(relations) == 1:
             caption_str += f"{relations[0]}. "
         elif len(relations) == 2:
             caption_str += f"{relations[0]} and {relations[1]}. "
         else:
-            caption_str += f"{', '.join(relations[:-1])} and {relations[1]}. "
-        caption_str += "Here is detailed description:\n"
+            caption_str += f"{', '.join(relations[:-1])} and {relations[-1]}. "
+        caption_str += "Here is a detailed description:\n"
         # points
         points = list(self.p_pos.keys())
         caption_str += f"Points: $ {', '.join(points)} $ .\n"
@@ -671,18 +651,20 @@ class Plotter():
             cv2.imwrite(f"{fig_dir}/{fig_name}.png", self.fig)
             
 if __name__ == '__main__':
-    setup_seed(1234)
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    setup_seed(124)
+    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
     for i in range(100):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
         # clauses_base = [
-        #     "Triangle",
+        #     "Trapezoid",
         # ]
         # clauses_rel = [
-        #     'IsMidpointOfLine', 
-        #     'IsAltitudeOfTriangle',
+        #     'IsCircumcenterOfQuadrilateral', 
+        #     'IsMidpointOfArc',
         #     # 'IsAltitudeOfQuadrilateral',
         #     # 'IsIncenterOfTriangle',
         #     # "IsAltitudeOfTriangle",
@@ -693,7 +675,7 @@ if __name__ == '__main__':
         print('clauses_base: ', clauses_base)
         print('clauses_rel: ', clauses_rel)
         
-        cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
+        cg = ClauseGenerator(predicate_GDL, theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
             clauses_base, 
