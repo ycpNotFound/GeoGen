@@ -1,27 +1,27 @@
-from allocator import Allocator
-from formalgeo.data import DatasetLoader
-from generator import ClauseGenerator
-from plotter import Plotter
-from solver import Solver
-import random
-from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed, parse_clause, replace_for_clause, clause_to_nature_language
 import json
-
-from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.data import DatasetLoader
-from formalgeo.parse import parse_theorem_seqs, inverse_parse_one_theorem
-from formalgeo.problem.condition import Goal
-from formalgeo.solver import ForwardSearcher
-from graph import ConditionGraph, ConditionNode, draw_graph, topological_sort, display_solution
-from formalgeo.problem.condition import Goal
-from formalgeo.solver import Interactor, BackwardSearcher
-from sympy import total_degree, solve, Eq, Symbol
-from typing import Tuple, Dict
+import random
 import re
 import string
-import json
+from typing import Dict, Tuple
+
 import numpy as np
-from utils import PRESET_COLORS, PRESET_COLOR_PROBS
+from sympy import Eq, Symbol, solve, total_degree
+
+from allocator import Allocator
+from formalgeo.core import EquationKiller as EqKiller
+from formalgeo.data import DatasetLoader
+from formalgeo.parse import inverse_parse_one_theorem, parse_theorem_seqs
+from formalgeo.problem.condition import Goal
+from formalgeo.solver import BackwardSearcher, ForwardSearcher, Interactor
+from generator import ClauseGenerator
+from graph import (ConditionGraph, ConditionNode, display_solution, draw_graph,
+                   topological_sort)
+from plotter import Plotter
+from solver import FormalGeoSolver, InterGPSSolver
+from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
+                   PRESET_COLOR_PROBS, PRESET_COLORS,
+                   clause_to_nature_language, parse_clause, replace_for_clause,
+                   setup_seed)
 
 
 class TargetFinder(): 
@@ -33,6 +33,8 @@ class TargetFinder():
                  constr_cdls,
                  image_cdls,
                  problem_id=0,
+                 replace_characters=False,
+                 solver_type='formalgeo',
                  debug=False):
         self.p_pos = allocater_states['p_pos']
         self.lines = allocater_states['lines']
@@ -49,32 +51,35 @@ class TargetFinder():
         self.problem_id = problem_id
         self.t_info = t_info
         self.debug = debug
-        self.replace_characters()
-        # self.solver = ForwardSearcher(
-        #     dl.predicate_GDL,
-        #     dl.theorem_GDL,
-        #     strategy="beam_search",
-        #     max_depth=12, 
-        #     beam_size=6,
-        #     t_info=t_info,
-        #     debug=debug
-        # )
-        self.solver = Solver(
-            dl.predicate_GDL,
-            dl.theorem_GDL,
-            strategy="beam_search",
-            max_depth=20, 
-            beam_size=6,
-            t_info=t_info,
-            debug=True
-        )
+        
+        if replace_characters:
+            self.replace_characters()
+
+        assert solver_type in ['formalgeo', 'intergps']
+        if solver_type == 'formalgeo':
+            self.solver = FormalGeoSolver(
+                dl.predicate_GDL,
+                dl.theorem_GDL,
+                strategy="beam_search",
+                max_depth=20, 
+                beam_size=6,
+                t_info=t_info,
+                debug=False
+            )
+        elif solver_type == 'intergps':
+            self.solver = InterGPSSolver(
+                debug=debug
+            )
         self.problem_CDL = {
             "problem_id": problem_id,
             "construction_cdl": self.constr_cdls,
             "text_cdl": self.text_cdls,
             "image_cdl": self.image_cdls,
             "goal_cdl": f"Value(LengthOfLine({''.join(self.lines[0])}))",
-            "problem_answer": "1"
+            "problem_answer": "1",
+            "point_positions": self.p_pos,
+            "line_instances": self.lines,
+            "circle_instances": self.circles
         }
         natural_template_path = "json/natural_language_template.json"
         self.natural_template = json.load(open(natural_template_path, 'r'))
@@ -120,7 +125,7 @@ class TargetFinder():
         self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
         return
     
-    def find_target(self, condition_graph: ConditionGraph,):
+    def find_target(self, condition_graph: ConditionGraph):
         # find variable to solve, choose deepest conditoins
         pos_in_selection_tree = list(self.solver.leveled_condition.keys())
         end_pos = max(pos_in_selection_tree, key=len)
@@ -430,18 +435,18 @@ if __name__ == '__main__':
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=2)
-        clauses_base = [
-            "RightTrapezoid",
-        ]
-        clauses_rel = [
-            'IsBisectorOfAngle', 
-            # 'IsMidsegmentOfTriangle',
-            # 'IsAltitudeOfQuadrilateral',
-            # 'IsIncenterOfTriangle',
-            # "IsAltitudeOfTriangle",
-            # "IsCircumcenterOfQuadrilateral",
-            # "IsMidpointOfArc"
-            ]
+        # clauses_base = [
+        #     "RightTrapezoid",
+        # ]
+        # clauses_rel = [
+        #     'IsBisectorOfAngle', 
+        #     # 'IsMidsegmentOfTriangle',
+        #     # 'IsAltitudeOfQuadrilateral',
+        #     # 'IsIncenterOfTriangle',
+        #     # "IsAltitudeOfTriangle",
+        #     # "IsCircumcenterOfQuadrilateral",
+        #     # "IsMidpointOfArc"
+        #     ]
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
@@ -476,6 +481,14 @@ if __name__ == '__main__':
             
         
         t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+        
+        plotter = Plotter(allocator.states,
+                            allocator.formulated_cdls['text_cdls'],
+                            allocator.formulated_cdls['construct_cdls'],
+                            allocator.formulated_cdls['image_cdls'],
+                            replace_characters=False)
+        plotter.plot()
+        plotter.save_fig('test', 'imgs_test')
 
         goal_finder = TargetFinder(
             dl,
@@ -484,24 +497,13 @@ if __name__ == '__main__':
             allocator.formulated_cdls['text_cdls'],
             allocator.formulated_cdls['construct_cdls'],
             allocator.image_cdls,
+            replace_characters=False,
+            solver_type='intergps',
             debug=True
         )
         info_dict_for_symbolic, info_dict_for_llm = goal_finder.formulate()
         print('---------- Target and Solution ----------')
         print(info_dict_for_llm['problem_text_en'])
         print(info_dict_for_llm['solution_str'])
-        
-        
-        for i in range(10):
-            plotter = Plotter(goal_finder.states, 
-                            goal_finder.text_cdls,
-                            goal_finder.constr_cdls,
-                            goal_finder.image_cdls,
-                            debug=True,
-                            color_config = np.random.choice(
-                        PRESET_COLORS, p=PRESET_COLOR_PROBS)
-                            )
-            plotter.plot()
-            plotter.save_fig('test', 'imgs_test')
 
-            print('==============================================')
+        print('==============================================')

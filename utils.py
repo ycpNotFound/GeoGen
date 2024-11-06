@@ -116,7 +116,7 @@ PREDICATES_TO_NAMES = {
 }
 PRESET_COLOR_PROBS = [0.6, 0.08, 0.08, 0.08, 0.08, 0.08]
 PRESET_COLORS = [
-    # line | point | char | annoation | fill_in
+    # l: line | p: point | c: char | a: annoation | f: fill_in
     # Color: BGR
     {
         "l_color": "#000000",
@@ -196,6 +196,7 @@ SYMBOL_MAPPING_2 = {
     "\\angle": "∠",
     "\\arc": "⌒"
 }
+
 
 def clause_to_nature_language(clauses, natural_template):
     conditions = []
@@ -727,6 +728,168 @@ def get_angle_measure(p_cross, p1, p2):
     angle_deg = round(angle_rad * 180 / math.pi)
     assert angle_deg <= 180 and angle_deg >= 0
     return angle_deg
+
+def formalgeo_to_intergps(clause):
+    name, items = parse_clause(clause)
+    logic_form_list = []
+    if name in ['Triangle', 'Parallelogram', 'Rectangle', 'Rhombus', 'Square', 'Trapezoid', 'Kite']:
+        points = list(items[0])
+        logic_form = f"{name}({','.join(points)})"
+        logic_form_list.append(logic_form)
+        
+    if name == 'Collinear':
+        points = list(items[0])
+        assert len(points) == 3
+        p1, p2, p3 = points
+        logic_form = f"PointLiesOnLine({p2},Line({p1},{p3}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'Cocircular':
+        circle, points = items
+        for p in points:
+            logic_form = f"PointLiesOnCircle({p},Circle({circle}))"
+            logic_form_list.append(logic_form)
+            
+    elif name == 'RightTriangle':
+        p1, p2, p3 = items[0]
+        logic_form_list += [
+            f"Polygon({','.join(items[0])})",
+            f"Perpendicular(Line({p1},{p2}),Line({p2},{p3})"
+        ]
+        
+    elif name == 'EquilateralTriangle':
+        points = list(items[0])
+        logic_form = f"Equilateral(Triangle({','.join(points)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsoscelesTriangle':
+        points = list(items[0])
+        logic_form = f"Isosceles(Triangle({','.join(points)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'RightTrapezoid':
+        points = list(items[0])
+        p1, p2, p3, p4 = points
+        # DA \perp BA, AB \perp CB
+        logic_form_list += [
+            f"Trapezoid({','.join(points)})",
+            f"Perpendicular(Line({p4},{p1}),Line({p2},{p1})",
+            f"Perpendicular(Line({p1},{p2}),Line({p3},{p2})",
+        ]
+        
+    elif name == 'IsoscelesTrapezoid':
+        points = list(items[0])
+        logic_form = f"Isosceles(Trapezoid({','.join(points)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsoscelesRightTriangle':
+        points = list(items[0])
+        p1, p2, p3 = points
+        logic_form_list += [
+            f"Polygon({','.join(points)})",
+            f"Perpendicular(Line({p1},{p2}),Line({p2},{p3})"
+            f"Isosceles(Triangle({','.join(points)}))"
+        ]
+
+    elif name == 'PerpendicularBetweenLine':
+        l1, l2 = items
+        logic_form = f"Perpendicular(Line({','.join(l1)}),Line({','.join(l2)})"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'ParallelBetweenLine':
+        l1, l2 = items
+        logic_form = f"Parallel(Line({','.join(l1)}),Line({','.join(l2)})"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsTangentOfCircle':
+        line, circle = items
+        logic_form = f"Tangent(Line({','.join(line)}),Circle({circle}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsDiameterOfCircle':
+        line, circle = items
+        logic_form = f"IsDiameterOf(Line({','.join(line)}),Circle({circle}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsMidpointOfLine':
+        mid_p, line = items
+        logic_form = f"IsMidpoint(Point({mid_p}),Line({','.join(line)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsBisectorOfAngle':
+        line, angle = items
+        logic_form = f"BisectsAngle(Line({','.join(line)}),Angle({','.join(angle)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsPerpendicularBisectorOfLine':
+        l1, l2 = items
+        logic_form = f"IsPerpendicularBisectorOf(Line({','.join(l1)}),Line({','.join(l2)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsAltitudeOfTriangle':
+        line, tri = items
+        logic_form = f"IsAltitudeOf(Line({','.join(line)}),Triangle({','.join(tri)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsMedianOfTriangle':
+        line, tri = items
+        logic_form = f"IsMedianOf(Line({','.join(line)}),Triangle({','.join(tri)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsIncenterOfTriangle':
+        p, tri = items
+        logic_form = f"IsIncenter(Point({p}),Triangle({','.join(tri)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsMidsegmentOfTriangle':
+        line, tri = items
+        logic_form = f"IsMidsegmentOf(Line({','.join(line)}),Triangle({','.join(tri)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsMidpointOfArc':
+        p0, arc = items
+        c, p1, p2 = arc
+        logic_form = f"Equals(MeasureOf(Arc({p0},{p1})),MeasureOf(Arc({p1},{p2})))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsMidsegmentOfQuadrilateral':
+        line, quad = items
+        logic_form = f"IsMidsegmentOf(Line({','.join(line)}),Quadrilateral({','.join(quad)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'IsCentroidOfTriangle':
+        p, tri = items
+        logic_form = f"IsCentroidOf(Point({p}),Triangle({','.join(tri)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name in ['IsCircumcenterOfTriangle', 'IsCircumcenterOfQuadrilateral']:
+        circle, points = items
+        for p in points:
+            logic_form = f"PointLiesOnCircle({p},Circle({circle}))"
+            logic_form_list.append(logic_form)
+            
+    elif name == 'SimilarBetweenTriangle':
+        poly1, poly2 = items
+        logic_form = f"Similar(Triangle({','.join(poly1)}),Triangle({','.join(poly2)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'SimilarBetweenQuadrilateral':
+        poly1, poly2 = items
+        logic_form = f"Similar(Quadrilatera({','.join(poly1)}),Quadrilatera({','.join(poly2)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'CongruentBetweenTriangle':
+        poly1, poly2 = items
+        logic_form = f"Congruent(Triangle({','.join(poly1)}),Triangle({','.join(poly2)}))"
+        logic_form_list.append(logic_form)
+        
+    elif name == 'CongruentBetweenQuadrilateral':
+        poly1, poly2 = items
+        logic_form = f"Congruent(Quadrilateral({','.join(poly1)}),Quadrilateral({','.join(poly2)}))"
+        logic_form_list.append(logic_form)
+    
+    return logic_form_list
+    
     
 if __name__ == '__main__':
     # stats_for_formalgeo()

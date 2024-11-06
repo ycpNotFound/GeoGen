@@ -74,7 +74,6 @@ class Plotter():
             
         natural_template_path = "json/natural_language_template.json"
         self.natural_template = json.load(open(natural_template_path, 'r'))
-            
         
     @staticmethod
     def distance(point1, point2):

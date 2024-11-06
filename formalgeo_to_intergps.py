@@ -1,0 +1,5 @@
+
+
+FORMALGEO_TO_INTERGPS = {
+    
+}

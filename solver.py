@@ -6,6 +6,10 @@ from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
 from formalgeo.tools import get_used_pid_and_theorem, debug_print
 from copy import deepcopy
+from inter_gps_solver.extended_definition import ExtendedDefinition
+from inter_gps_solver.logic_parser import LogicParser
+from inter_gps_solver.logic_solver import LogicSolver
+from utils import parse_clause, formalgeo_to_intergps
 
 def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     """
@@ -32,7 +36,7 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     return p2t_map_fw
 
 
-class Solver:
+class FormalGeoSolver:
 
     def __init__(self, predicate_GDL, theorem_GDL, strategy, max_depth, beam_size, t_info, debug=False):
         """
@@ -197,6 +201,7 @@ class Solver:
             time.time() - timing, len(logic_selections), logic_selections))
         timing = time.time()
         algebra_selections = self.try_theorem_algebra(related_syms)
+        # algebra_selections = []
         debug_print(self.debug, "(timing={:.4f}s) Get {} algebra-related selections: {}.".format(
             time.time() - timing, len(algebra_selections), algebra_selections))
 
@@ -271,6 +276,8 @@ class Solver:
 
                 if len(conclusions) > 0:
                     selections.append(((t_name, t_branch, t_para), tuple(conclusions)))
+                    if len(selections) > self.beam_size:
+                        return selections
         # sele_to_remove = []
         # for sele in selections:
         #     if sele[0][0] == 'round_angle':
@@ -322,6 +329,8 @@ class Solver:
 
                         if len(conclusions) > 0:
                             selections.append(((t_name, t_branch, theorem_para), tuple(conclusions)))
+                            if len(selections) > self.beam_size:
+                                return selections
         return selections
 
     def apply_and_check_goal(self, selection):
@@ -360,3 +369,95 @@ class Solver:
         for selection in selections:
             self.stack.append((tuple(pos + [self.node_count[depth]]), selection))
             self.node_count[depth] += 1
+
+
+
+class InterGPSSolver:
+    def __init__(self,
+                 debug=True):
+        self.debug = debug
+        self.logic = None
+        
+    def prepare_for_intergps(self, problem_CDL):
+        text_logic_forms = []
+        for c in problem_CDL['text_cdl']:
+            text_logic_forms += formalgeo_to_intergps(c)
+           
+        diagram_logic_forms = []
+        for c in problem_CDL['construction_cdl'] + problem_CDL['image_cdl']:
+            diagram_logic_forms += formalgeo_to_intergps(c)
+
+        text_parser = {
+            "text_logic_forms": text_logic_forms
+        }
+        lines = []
+        for l in problem_CDL['line_instances']:
+            if len(l) > 2:
+                l = (l[0], l[-1])
+            lines.append(''.join(l))
+        diagram_parser = {
+            "point_positions": problem_CDL['point_positions'],
+            "line_instances": lines,
+            "circle_instances": problem_CDL['circle_instances'],
+            "diagram_logic_forms": diagram_logic_forms
+        }
+        return text_parser, diagram_parser
+        
+    
+    def init_search(self, problem_CDL):
+        text_parser, diagram_parser = self.prepare_for_intergps(problem_CDL)
+        parser = LogicParser(ExtendedDefinition(debug=self.debug))
+        parser.logic.point_positions = diagram_parser['point_positions']
+        isLetter = lambda ch: ch.upper() and len(ch) == 1
+        parser.logic.define_point([_ for _ in parser.logic.point_positions if isLetter(_)])
+        if self.debug:
+            print(parser.logic.point_positions)
+        
+        lines = diagram_parser['line_instances']  # ['AB', 'AC', 'AD', 'BC', 'BD', 'CD']
+        for line in lines:
+            line = line.strip()
+            if len(line) == 2 and isLetter(line[0]) and isLetter(line[1]):
+                parser.logic.define_line(line[0], line[1])
+
+        circles = diagram_parser['circle_instances']  # ['O']
+        for point in circles:
+            parser.logic.define_circle(point)
+            
+        # Parse diagram logic forms
+        logic_forms = diagram_parser['diagram_logic_forms']
+        logic_forms = sorted(logic_forms, key=lambda x: x.find("Perpendicular") != -1)  # put 'Perpendicular' to the end
+
+        for logic_form in logic_forms:
+            if logic_form.strip() != "":
+                if self.debug:
+                    print("The diagram logic form is", logic_form)
+                try:
+                    parse_tree = parser.parse(logic_form) # ['Equals', ['LengthOf', ['Line', 'A', 'C']], '10']
+                    parser.dfsParseTree(parse_tree)
+                except Exception as e:
+                    if self.debug:
+                        print("\033[0;0;41mError:\033[0m", repr(e))
+                        
+        ## Parse text logic forms
+        target = None
+        text_logic_forms = text_parser["text_logic_forms"]
+        for text in text_logic_forms:
+            if self.debug:
+                print("The text logic form is", text)
+            if text.find('Find') != -1:
+                target = parser.findTarget(parser.parse(text)) # ['Value', 'A', 'C']
+            else:
+                res = parser.parse(text)
+                parser.dfsParseTree(res)
+
+        self.logic = parser.logic
+
+    def search(self):
+        ## Set up, initialize and run the logic solver
+        if self.logic is None:
+            raise ValueError(self.logic)
+        solver = LogicSolver(self.logic)
+        solver.initSearch()
+        answer, steps, step_lst = solver.beamSearch()
+
+        return answer, steps, step_lst
