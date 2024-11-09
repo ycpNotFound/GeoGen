@@ -1,28 +1,24 @@
+from formalgeo.solver import ForwardSearcher
+from formalgeo.data import DatasetLoader
+import json
 
-def bgr_to_hex(b, g, r):
-    # 将每个分量转换为两位的十六进制字符串
-    rb = format(r, '02x')
-    gb = format(g, '02x')
-    bb = format(b, '02x')
-    
-    # 拼接成完整的十六进制颜色码
-    hex_color = f"#{rb}{gb}{bb}"
-    return hex_color
+dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+problem_idx = 1
+problem_CDL = dl.get_problem(pid=problem_idx)
 
+solver = ForwardSearcher(
+    dl.predicate_GDL,
+    dl.theorem_GDL,
+    strategy="beam_search",
+    max_depth=12, 
+    beam_size=6,
+    t_info=t_info,
+    debug=True
+)
 
-colors = [
-        (151, 85, 47),
-        (204, 72, 6),
-        (21, 80, 240),
-        (208, 211, 208),
-        (150, 88, 0),
-        (151, 85, 47),
-        (42, 42, 42),
-        (201, 176, 200),
-        (208, 211, 208)
-    ]
+solver.init_search(problem_CDL)
+solver.search()
 
 
-for c in colors:
-    hex_color = bgr_to_hex(*c)
-    print(f'bgr: {c}, hex: {hex_color}')
+print(solver.problem.condition.items()) # 包含了搜索中生成的所有条件

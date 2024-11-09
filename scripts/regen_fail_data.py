@@ -67,10 +67,11 @@ def re_generate(
     fig_name = f"{key}.png"
     plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
     data_info = {
-        "construction_cdl": allocator.formulated_cdls['construct_cdls'],
-        "text_cdl": allocator.formulated_cdls['text_cdls'], 
+        "construction_cdl": plotter.construct_cdls,
+        "text_cdl": plotter.text_cdls, 
         "image_cdl": plotter.image_cdls,
-        "caption_str": plotter.caption_str
+        "caption_str": plotter.caption_str,
+        "positions": plotter.p_pos
     }
     return data_info
     
