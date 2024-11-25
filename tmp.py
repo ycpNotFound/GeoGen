@@ -1,24 +1,24 @@
+from formalgeo.solver import ForwardSearcher
+from formalgeo.data import DatasetLoader
 import json
-import os
 
-def test_1():
-    theorem_freq = json.load(open('json/theorem_freq.json', encoding='utf-8'))
-    theorem_zero = [k for k in theorem_freq if theorem_freq[k] == 0]
+dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+problem_idx = 1
+problem_CDL = dl.get_problem(pid=problem_idx)
 
-    theorem_gdl = json.load(open('json/theorem_GDL.json', encoding='utf-8'))
-    theorem_gdl_new = {}
-    for k, v in theorem_gdl.items():
-        name = k.split('(')[0]
-        if name not in theorem_zero:
-            theorem_gdl_new[k] = v
-    with open('json/theorem_GDL_new.json', 'w', encoding='utf-8') as f:
-        json.dump(theorem_gdl_new, f, indent=2, ensure_ascii=False)
+solver = ForwardSearcher(
+    dl.predicate_GDL,
+    dl.theorem_GDL,
+    strategy="beam_search",
+    max_depth=12, 
+    beam_size=6,
+    t_info=t_info,
+    debug=True
+)
 
-def test_2():
-    from utils import parse_clause
-    name, items = parse_clause('Equation(ll_ac-sqrt(2)*ll_bd)')
-    print(name)
-    print(items)
-    
-if __name__ == '__main__':
-    test_2()
+solver.init_search(problem_CDL)
+solver.search()
+
+
+print(solver.problem.condition.items()) # 包含了搜索中生成的所有条件

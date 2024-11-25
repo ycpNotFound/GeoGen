@@ -1279,9 +1279,9 @@ class Allocator():
             
         if bbox_x > bbox_y:
             offset_x = random.uniform(-3, 3)
-            offset_y = random.uniform(max(1, ratio)*bbox_y, 1.25*bbox_y)
+            offset_y = random.uniform(max(1.2, ratio)*bbox_y, 1.25*bbox_y)
         else:
-            offset_x = random.uniform(max(1, ratio)*bbox_x, 1.25*bbox_x)
+            offset_x = random.uniform(max(1.2, ratio)*bbox_x, 1.25*bbox_x)
             offset_y = random.uniform(-3, 3)
         
         positions_1 = [self.p_pos[p] for p in points_1]

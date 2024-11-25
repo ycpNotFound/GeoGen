@@ -55,8 +55,8 @@ def generate_one_sample(predicate_GDL,
         }
         data_info = {
             "key": fig_idx,
-            "construction_cdl": allocator.formulated_cdls['construct_cdls'],
-            "text_cdl": allocator.formulated_cdls['text_cdls'], 
+            "construction_cdl": plotter.construct_cdls,
+            "text_cdl": plotter.text_cdls, 
             "image_cdl": plotter.image_cdls,
             "caption_str": plotter.caption_str,
             "positions": plotter.p_pos
@@ -271,7 +271,7 @@ def task_pretrain():
     task_name = "geo_gen_pretrain"
     input_args_list = []
 
-    num_process = 6
+    num_process = 12
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT + PREDICATES_REL_2, 1))
     pred_rel_combs = [[]]
     input_args_1 = build_input_args(pred_base_combs, 
@@ -325,8 +325,8 @@ def task_pretrain():
     return seed, task_name, input_args_list, num_process
     
 def main():
-    run_task(*task_1())
-    # run_task(*task_pretrain())
+    # run_task(*task_1())
+    run_task(*task_pretrain())
 
 
 if __name__ == '__main__':
