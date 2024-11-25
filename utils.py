@@ -92,6 +92,8 @@ PREDICATES_ATTR = [
     "RatioOfMirrorSimilarTriangle",
     "RatioOfSimilarQuadrilateral",
 ]
+PREDICATES = PREDICATES_PRE + PREDICATES_ENT + PREDICATES_ATTR + PREDICATES_REL + PREDICATES_REL_2
+
 PREDICATES_TO_NAMES = {
     "PerpendicularBetweenLine": "perpendicular lines",
     "ParallelBetweenLine": "parallel lines",
@@ -186,7 +188,8 @@ SYMBOL_MAPPING_1 = {
     "\\parallel": "is parallel to",
     "\\odot": "circle",
     "\\angle": "angle",
-    "\\arc": "arc"
+    "\\arc": "arc",
+    "\\sqrt": "sqrt of",
 }
 SYMBOL_MAPPING_2 = {
     "\\triangle": "△",
@@ -194,33 +197,41 @@ SYMBOL_MAPPING_2 = {
     "\\parallel": "∥",
     "\\odot": "⊙",
     "\\angle": "∠",
-    "\\arc": "⌒"
+    "\\arc": "⌒",
+    "\\sqrt": "√"
 }
 
 
-def clause_to_nature_language(clauses, natural_template):
+def clause_to_nature_language(clauses, natural_template, upper=True, symbol2nature=None):
     conditions = []
 
     for clause in clauses:
         pred, items = parse_clause(clause)
+        if 'Value' in clause:
+            clause = clause.replace('Value', 'Equal')
         if 'Equal' in clause:
+            if 'sqrt' in items[1]:
+                items = tuple([
+                    items[0],
+                    items[1].replace('sqrt', '\\sqrt')
+                ])
             if pred == 'MeasureOfAngle':
-                if items[1].isalpha() and items[1].isupper():
+                if items[1].isalpha():
                     condition_i = f"\\angle {items[0]} = \\angle {items[1]}"
                 else:
-                    if '90' in clause:
-                        l1 = ''.join(items[0][:2])
-                        l2 = ''.join(items[0][1:])
-                        condition_i = f"{l1} \\perp {l2}"
+                    if '+' in items[1] or '-' in items[1]:
+                        condition_i = f"\\angle {items[0]} = ({items[1]})°"
                     else:
-                        if '+' in items[1] or '-' in items[1]:
-                            condition_i = f"\\angle {items[0]} = ({items[1]})°"
-                        else:
-                            condition_i = f"\\angle {items[0]} = {items[1]}°"
-            if pred == 'LengthOfLine':
+                        condition_i = f"\\angle {items[0]} = {items[1]}°"
+            elif pred == 'LengthOfLine':
                 condition_i = f"{items[0]} = {items[1]}"
-            if pred == 'LengthOfArc':
+            elif pred == 'LengthOfArc':
                 condition_i = f"\\arc {items[0]} = \\arc {items[1]}"
+            elif pred == 'RatioOfSimilarTriangle':
+                tri_1, tri_2 = items[0][:3], items[0][3:]
+                condition_i = f"ratio of similar \\triangle {tri_1} and \\triangle {tri_2} = {items[1]}"
+            else:
+                raise KeyError(pred)
         elif 'Shape' in clause:
             continue
         elif 'Collinear' in clause:
@@ -242,15 +253,38 @@ def clause_to_nature_language(clauses, natural_template):
         elif pred in PREDICATES_ENT:
             template = random.choice(natural_template[pred])
             condition_i = template.format(points=items[0])
-        else:
+        elif pred in PREDICATES_REL + PREDICATES_REL_2:
             template = random.choice(natural_template[pred])
             condition_i = template.format(p1=items[0], p2=items[1])
-        
-        condition_i = condition_i[0].upper() + condition_i[1:]
+        elif 'Mirror' in clause:
+            pred = pred.replace('Mirror', '')
+            template = random.choice(natural_template[pred])
+            p1 = items[0]
+            p2 = ''.join([list(items[1])[0]] + list(items[1])[1:][::-1])
+            condition_i = template.format(p1=p1, p2=p2)
+            
+        elif 'Polygon' == pred:
+            condition_i = f"{items[0]} is a polygon"
+        elif 'Equation' == pred:
+            condition_i = f"{items[0]} = 0"
+        elif 'Line' == pred:
+            condition_i = f"line {items[0]}"
+        elif 'Angle' == pred:
+            condition_i = f"\\angle {items[0]}"
+        else:
+            raise KeyError(clause)
+        if upper:
+            condition_i = condition_i[0].upper() + condition_i[1:]
         conditions.append(condition_i)
-        
-    symbol_mapping = random.choice([SYMBOL_MAPPING_1, 
+    
+    if symbol2nature is None:
+        symbol_mapping = random.choice([SYMBOL_MAPPING_1, 
                                     SYMBOL_MAPPING_2])
+    elif symbol2nature == True:
+        symbol_mapping = SYMBOL_MAPPING_1
+    else:
+        symbol_mapping = SYMBOL_MAPPING_2
+        
     conditions_res = []
     for c in conditions:
         for k, v in symbol_mapping.items():
@@ -328,75 +362,6 @@ def move_subtractions_to_rhs(eq):
     return result
 
 
-def read_json(json_path):
-    data = json.load(open(json_path, 'r', encoding='utf-8'))
-    return data
-
-def load_theorems_and_predicates():
-    path_1 = "doc/predicates.txt"
-    path_2 = "doc/theorems.txt"
-    
-    with open(path_1, 'r') as f1:
-        preds = f1.readlines()
-        preds = [s.strip() for s in preds]
-        
-    with open(path_2, 'r') as f2:
-        theos = f2.readlines()
-        theos = [s.strip() for s in theos]
-        
-    return preds, theos
-
-def stats_for_formalgeo():
-    split = "train"
-    data_path = f"datasets/processed_data/fgo_{split}.json"
-    data = read_json(data_path)
-    preds, theos = load_theorems_and_predicates()
-    
-    cdl_list, theo_list = [], []
-    for key, value in data.items():
-        cdl_list_i = value['construction_cdl'] + value['text_cdl']
-        
-            
-        cdl_list_1 = [s.split('(')[0] for s in cdl_list_i]
-        cdl_list_2 = []
-        for s in cdl_list_i:
-            if 'Equal' in s:
-                s = s.split('Equal(')[-1][:-1]
-                s = s.split('(')[0]
-                if s[0].isupper():
-                    cdl_list_2.append(s)
-        
-        cdl_list_i = cdl_list_1 + cdl_list_2
-        theo_list_i = value['theorem_seqs']
-        theo_list_i = [s.split('(')[0] for s in theo_list_i]
-        
-        cdl_list += cdl_list_i
-        theo_list += theo_list_i
-    
-    cdl_count = Counter(cdl_list)
-    theo_count = Counter(theo_list)
-    
-    preds_not_used = set(preds) - set(list(cdl_count.keys()))
-    print(f"{'-'*10} Predicats not used : {'-'*10}")
-    for p in preds_not_used:
-        print(p)
-        
-    theo_not_used = set(theos) - set(list(theo_count.keys()))
-    print("{'-'*10} Theorems not used: {'-'*10}")
-    for t in theo_not_used:
-        print(t)
-        
-    pred_sorted = sorted(list(cdl_count.keys()), key=lambda x: cdl_count[x], reverse=True)
-    print(f"{'-'*10} Predicats Stats: {'-'*10}")
-    for p in pred_sorted:
-        print(f"{cdl_count[p]} - {p}")
-        
-    theo_sorted = sorted(list(theo_count.keys()), key=lambda x: theo_count[x], reverse=True)
-    print(f"{'-'*10} Theorem Stats: {'-'*10}")
-    for t in theo_sorted:
-        print(f"{theo_count[t]} - {t}")
-        
-    return cdl_count, theo_count
 
 
 # Tools for generator
@@ -510,6 +475,8 @@ def append_lst(lst, items: list):
     return lst
 
 def parse_clause(clause):
+    if 'Value' in clause:
+        clause = clause.replace('Value', 'Equal')
     if 'Equal' in clause:
         pattern =  r'Equal\((.*)\)'
         match = re.search(pattern, clause)
@@ -517,11 +484,11 @@ def parse_clause(clause):
         item_l, item_r = items.split(',')
         predicate_l, predicate_r = None, None
         content_l, content_r = item_l, item_r
-        if not item_l.isdigit() and '(' in item_l:
+        if not item_l.isdigit() and item_l.split('(')[0] in PREDICATES:
             predicate_l, content_l = parse_clause(item_l)
             if len(content_l) == 1:
                 content_l = content_l[0]
-        if not item_r.isdigit() and '(' in item_r:
+        if not item_r.isdigit() and item_r.split('(')[0] in PREDICATES:
             predicate_r, content_r = parse_clause(item_r)
             if len(content_r) == 1:
                 content_r = content_r[0]
@@ -536,7 +503,8 @@ def parse_clause(clause):
     elif '(' not in clause and ')' not in clause:
         return clause
     else:
-        items = re.findall(r'\((.*?)\)', clause)[0]
+        # "Equation(ll_ac-sqrt(2)*ll_bd)"
+        items = '('.join(clause.split('(')[1:])[:-1]
         items = [i.strip() for i in items.split(',')]
         predicate = clause.split('(')[0].strip()
         
@@ -754,7 +722,7 @@ def formalgeo_to_intergps(clause):
         p1, p2, p3 = items[0]
         logic_form_list += [
             f"Polygon({','.join(items[0])})",
-            f"Perpendicular(Line({p1},{p2}),Line({p2},{p3})"
+            f"Perpendicular(Line({p1},{p2}),Line({p2},{p3}))"
         ]
         
     elif name == 'EquilateralTriangle':
@@ -773,8 +741,8 @@ def formalgeo_to_intergps(clause):
         # DA \perp BA, AB \perp CB
         logic_form_list += [
             f"Trapezoid({','.join(points)})",
-            f"Perpendicular(Line({p4},{p1}),Line({p2},{p1})",
-            f"Perpendicular(Line({p1},{p2}),Line({p3},{p2})",
+            f"Perpendicular(Line({p4},{p1}),Line({p2},{p1}))",
+            f"Perpendicular(Line({p1},{p2}),Line({p3},{p2}))",
         ]
         
     elif name == 'IsoscelesTrapezoid':
@@ -787,18 +755,18 @@ def formalgeo_to_intergps(clause):
         p1, p2, p3 = points
         logic_form_list += [
             f"Polygon({','.join(points)})",
-            f"Perpendicular(Line({p1},{p2}),Line({p2},{p3})"
+            f"Perpendicular(Line({p1},{p2}),Line({p2},{p3}))",
             f"Isosceles(Triangle({','.join(points)}))"
         ]
 
     elif name == 'PerpendicularBetweenLine':
         l1, l2 = items
-        logic_form = f"Perpendicular(Line({','.join(l1)}),Line({','.join(l2)})"
+        logic_form = f"Perpendicular(Line({','.join(l1)}),Line({','.join(l2)}))"
         logic_form_list.append(logic_form)
         
     elif name == 'ParallelBetweenLine':
         l1, l2 = items
-        logic_form = f"Parallel(Line({','.join(l1)}),Line({','.join(l2)})"
+        logic_form = f"Parallel(Line({','.join(l1)}),Line({','.join(l2)}))"
         logic_form_list.append(logic_form)
         
     elif name == 'IsTangentOfCircle':
@@ -813,7 +781,7 @@ def formalgeo_to_intergps(clause):
         
     elif name == 'IsMidpointOfLine':
         mid_p, line = items
-        logic_form = f"IsMidpoint(Point({mid_p}),Line({','.join(line)}))"
+        logic_form = f"IsMidpointOf(Point({mid_p}),Line({','.join(line)}))"
         logic_form_list.append(logic_form)
         
     elif name == 'IsBisectorOfAngle':
@@ -892,7 +860,30 @@ def formalgeo_to_intergps(clause):
     
     
 if __name__ == '__main__':
-    # stats_for_formalgeo()
-    s = "Cocircular(O,ABC)"
-    a = get_content(s)
-    print(a)
+    from inter_gps_solver.logic_parser import LogicParser
+    from inter_gps_solver.extended_definition import ExtendedDefinition
+    data = json.load(open('json/predicate_GDL.json', 'r'))
+    for clause in data['Entity']:
+        name, _ = parse_clause(clause)
+        if name not in PREDICATES_ENT:
+            continue
+        logic_forms = formalgeo_to_intergps(clause)
+        print(clause + ' -> ' + ', '.join(logic_forms))
+        parser = LogicParser(ExtendedDefinition(debug=True))
+        parser.logic.point_positions = None
+        for logic_form in logic_forms:
+            parse_tree = parser.parse(logic_form)
+            parser.dfsParseTree(parse_tree)
+    
+    for clause in data['Relation']:
+        name, _ = parse_clause(clause)
+        if name not in PREDICATES_REL:
+            continue
+        logic_forms = formalgeo_to_intergps(clause)
+        print(clause + ' -> ' + ', '.join(logic_forms))
+        parser = LogicParser(ExtendedDefinition(debug=True))
+        parser.logic.point_positions = None
+        for logic_form in logic_forms:
+            parse_tree = parser.parse(logic_form)
+            parser.dfsParseTree(parse_tree)
+    

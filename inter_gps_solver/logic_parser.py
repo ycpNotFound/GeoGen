@@ -247,19 +247,21 @@ class LogicParser:
     def dfsParseTree(self, tree):
         identifier = tree[0]
 
-        ''' 1. Geometric Shapes '''
+        # ''' 1. Geometric Shapes '''
         if identifier == "Angle":
             if len(tree) == 4:
                 self.logic.defineAngle(tree[1], tree[2], tree[3])
-        if identifier == "Line":
+        elif identifier == "Line":
             self.logic.defineLine(tree[1], tree[2])
-        if identifier in ["Quadrilateral", "Parallelogram", "Rhombus", "Rectangle", "Square", "Trapezoid", "Kite"]:
+        elif identifier in ["Quadrilateral", "Parallelogram", "Rhombus", "Rectangle", "Square", "Trapezoid", "Kite"]:
             self.parseQuad(tree)
-        if identifier == "Polygon":
+        elif identifier in ["Polygon", "Triangle"]:
             self.logic.definePolygon(tree[1:])
+        
 
-        ''' 2. Unary Geometric Attributes '''
-        if identifier == "Equilateral" and tree[1][0] == "Triangle":
+        # ''' 2. Unary Geometric Attributes '''
+
+        elif identifier == "Equilateral" and tree[1][0] == "Triangle":
             a, b, c = tree[1][1:]
             self.logic.lineEqual([a, b], [b, c])
             self.logic.lineEqual([a, b], [a, c])
@@ -267,31 +269,37 @@ class LogicParser:
             self.logic.defineAngle(b, a, c, 60)
             self.logic.defineAngle(a, c, b, 60)
 
-        if identifier == "Isosceles" and tree[1][0] == "Triangle":
-            if self.logic.point_positions is not None:
+        elif identifier == "Isosceles":
+            if tree[1][0] == "Triangle":
+                if self.logic.point_positions is not None:
+                    points = tree[1][1:]
+                    positions = [self.logic.point_positions[x] for x in points]
+                    fdis = lambda x, y: ((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2) ** 0.5
+                    mindis, minid = 999999, -1
+                    for i in range(3):
+                        nowdis = abs(
+                            fdis(positions[i], positions[1 - min(i, 1)]) - fdis(positions[i], positions[3 - max(1, i)]))
+                        if nowdis < mindis:
+                            mindis, minid = nowdis, i
+                    o, p, q = points[minid], points[1 - min(minid, 1)], points[3 - max(minid, 1)]
+                    self.logic.lineEqual([o, p], [o, q])
+                    self.logic.angleEqual([o, p, q], [o, q, p])
+            elif tree[1][0] == "Trapezoid":
                 points = tree[1][1:]
-                positions = [self.logic.point_positions[x] for x in points]
-                fdis = lambda x, y: ((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2) ** 0.5
-                mindis, minid = 999999, -1
-                for i in range(3):
-                    nowdis = abs(
-                        fdis(positions[i], positions[1 - min(i, 1)]) - fdis(positions[i], positions[3 - max(1, i)]))
-                    if nowdis < mindis:
-                        mindis, minid = nowdis, i
-                o, p, q = points[minid], points[1 - min(minid, 1)], points[3 - max(minid, 1)]
-                self.logic.lineEqual([o, p], [o, q])
-                self.logic.angleEqual([o, p, q], [o, q, p])
+                p1, p2, p3, p4 = points
+                self.logic.lineEqual([p1, p2], [p3, p4])
+                self.logic.angleEqual([p1, p2, p3], [p2, p3, p4])
 
-        ''' 4. Binary Geometric Relations '''
-        if identifier == "PointLiesOnLine":
+        # ''' 4. Binary Geometric Relations '''
+        elif identifier == "PointLiesOnLine":
             self.PointLiesOnLine(tree[1], tree[2])
-        if identifier == "PointLiesOnCircle":
+        elif identifier == "PointLiesOnCircle":
             self.PointLiesOnCircle(tree[1], tree[2])
-        if identifier == "Parallel":
+        elif identifier == "Parallel":
             self.Parallel(tree[1], tree[2])
-        if identifier == "Perpendicular":
+        elif identifier == "Perpendicular":
             self.Perpendicular(tree[1], tree[2])
-        if identifier == "IntersectAt":
+        elif identifier == "IntersectAt":
             if tree[1][0] == "Line":
                 for i in range(1, len(tree) - 1):
                     self.PointLiesOnLine(tree[-1][1], tree[i])
@@ -300,17 +308,17 @@ class LogicParser:
                     self.PointLiesOnCircle(tree[-1][1], tree[i])
             else:
                 raise RuntimeError("No such format for IntersectAt.")
-        if identifier == "BisectsAngle":
+        elif identifier == "BisectsAngle":
             self.BisectsAngle(tree[1], tree[2])
-        if identifier == "Congruent":
+        elif identifier == "Congruent":
             if tree[1][0] == "Triangle":
                 self.logic.defineCongruentTriangle(tree[1][1:], tree[2][1:])
             # Do not implement the polygon with sides > 3.
-        if identifier == "Similar":
+        elif identifier == "Similar":
             if tree[1][0] == "Triangle":
                 self.logic.defineSimilarTriangle(tree[1][1:], tree[2][1:])
             # Do not implement the polygon with sides > 3.
-        if identifier in ["Tangent", "Secant", "CircumscribedTo", "InscribedIn"]:
+        elif identifier in ["Tangent", "Secant", "CircumscribedTo", "InscribedIn"]:
             if identifier == "InscribedIn":
                 assert tree[2][0] == "Circle"
                 self.dfsParseTree(tree[1])
@@ -320,8 +328,8 @@ class LogicParser:
                     self.PointLiesOnLine(tree[2][1], ['Line', tree[1][1], tree[1][3]])
                     self.PointLiesOnLine(tree[2][1], ['Line', tree[1][2], tree[1][4]])
 
-        ''' 5. A-IsXOf-B  Geometric Relations '''
-        if identifier == "IsMidpointOf":
+        # ''' 5. A-IsXOf-B  Geometric Relations '''
+        elif identifier == "IsMidpointOf":
             # IsMidpointOf(Point, Line/LegOf)
             if tree[2][0] == "Line":
                 self.Midpoint(tree[1][1], tree[2][1:])
@@ -329,7 +337,7 @@ class LogicParser:
                 self.Midpoint(tree[1][1], self.LegOf(tree[2][1]))
             else:
                 raise RuntimeError("No such format for IsMidpointOf.")
-        if identifier == "IsCentroidOf":
+        elif identifier == "IsCentroidOf":
             o = tree[1][1]
             points = self.logic.find_all_lines_for_point(o)
             if len(tree[2]) == 4:
@@ -347,7 +355,7 @@ class LogicParser:
                         self.logic.lineEqual([p, a], [p, c])
                         self.getValue(["LengthOf", ["Line", p, o]], self.getValue(["LengthOf", ["Line", b, o]]) * 2)
 
-        if identifier == "IsIncenterOf":
+        elif identifier == "IsIncenterOf":
             o = tree[1][1]
             if len(tree[2]) == 4:
                 # Triangle
@@ -355,17 +363,17 @@ class LogicParser:
                 self.logic.angleEqual([b, a, o], [c, a, o])
                 self.logic.angleEqual([a, b, o], [c, b, o])
                 self.logic.angleEqual([a, c, o], [b, c, o])
-        if identifier == "IsRadiusOf":
+        elif identifier == "IsRadiusOf":
             if tree[2][1] == tree[1][1]:
                 self.PointLiesOnCircle(tree[1][2], tree[2])
             else:
                 self.PointLiesOnCircle(tree[1][1], tree[2])
-        if identifier == "IsDiameterOf":
+        elif identifier == "IsDiameterOf":
             # print (tree[1], tree[2])
             self.PointLiesOnLine(tree[2][1], tree[1])
             self.PointLiesOnCircle(tree[1][1], tree[2])
             self.PointLiesOnCircle(tree[1][2], tree[2])
-        if identifier == "IsMidsegmentOf":
+        elif identifier == "IsMidsegmentOf":
             segs = []
             for i in range(1, 3):
                 for k in range(1, 4):
@@ -377,15 +385,15 @@ class LogicParser:
             baseline = [x for x in tree[2][1:] if x not in segs[0] or x not in segs[1]]
             assert len(baseline) == 2, "Find Midsegment Error."
             self.Parallel(tree[1][1:], baseline)
-        if identifier == "IsChordOf":
+        elif identifier == "IsChordOf":
             self.PointLiesOnCircle(tree[1][1], tree[2])
             self.PointLiesOnCircle(tree[1][2], tree[2])
-        if identifier == "IsDiagonalOf":
+        elif identifier == "IsDiagonalOf":
             if len(tree[2]) == 5:
                 self.parseQuad(tree[2])
 
-        '''6. Numerical Attributes and Relations'''
-        if identifier == "Equals":
+        # '''6. Numerical Attributes and Relations'''
+        elif identifier == "Equals":
             if tree[1][0] == "RadiusOf":
                 O = tree[1][1][1]
                 for p in self.logic.find_points_on_circle(O):
@@ -406,6 +414,9 @@ class LogicParser:
                 # val = tree[2]
                 # print (tree[1], tree[2], val)
                 self.getValue(tree[1], val)
+        else:
+            print('parse error: ', tree)
+            raise KeyError(identifier)
 
     def _find_angle(self, phrase):
         if len(phrase) == 4:

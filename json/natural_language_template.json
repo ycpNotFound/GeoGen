@@ -128,7 +128,7 @@
 
     "SimilarBetweenTriangle": [
         "\\triangle {p1} is similar to \\triangle {p2}",
-        "\\triangle {p2} is similar to\\triangle {p1}"
+        "\\triangle {p2} is similar to \\triangle {p1}"
     ],
     "SimilarBetweenQuadrilateral": [
         "quadrilateral {p1} is similar to quadrilateral {p2}",

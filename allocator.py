@@ -348,6 +348,39 @@ class Allocator():
             return [x, y]
                 
         return None
+
+    def sort_points_counter_clockwise(self, points):
+        n = len(points)
+        if n < 3:
+            raise ValueError("至少需要三个点来定义多边形")
+        
+        # 找到最左下角的点作为起始点
+        start_index = 0
+        coords = [self.p_pos[p] for p in points]
+        for i in range(1, n):
+            if coords[i][1] < coords[start_index][1] or \
+            (coords[i][1] == coords[start_index][1] and coords[i][0] < coords[start_index][0]):
+                start_index = i
+        
+        # 将起始点移到列表的开头
+        points = points[start_index:] + points[:start_index]
+        coords = coords[start_index:] + coords[:start_index]
+        
+        # 排序其余点
+        sorted_indices = [0]  # 起始点总是第一个
+        for i in range(1, n):
+            j = 0
+            l1 = (sorted_indices[j], sorted_indices[-1])
+            l2 = (sorted_indices[j], coords[i])
+            cross_prod = self.get_cross_product(l1, l2)
+            while j < len(sorted_indices) and cross_prod < 0:
+                j += 1
+            sorted_indices.insert(j, i)
+        
+        # 根据排序后的索引重排点和坐标
+        sorted_points = [points[i] for i in sorted_indices]
+        return sorted_points
+
     
     def find_triangles(self):
         # delete all triangles first
@@ -356,7 +389,7 @@ class Allocator():
             if len(poly) != 3:
                 polygons_.append(poly)
                 
-        possible_triangles = list(itertools.combinations(self.points, 3))
+        possible_triangles = list(itertools.permutations(self.points, 3))
         triangles = []
         for points in possible_triangles:
             l1 = tuple([points[0], points[1]])
@@ -375,10 +408,19 @@ class Allocator():
             cos_val = self.get_cos_2(''.join(points))
             if abs(abs(cos_val) - 1) < 1e-2:
                 collinear = True
-            
-            if all([l1_exist, l2_exist, l3_exist]) and not collinear:
+            # AB x AC > 0 (in cv2 < 0)
+            xa, ya = self.p_pos[points[0]]
+            xb, yb = self.p_pos[points[1]]
+            xc, yc = self.p_pos[points[2]]
+            AB = [xb - xa, yb - ya]
+            AC = [xc - xa, yc - ya]
+            counter_clock_wise = AB[0] * AC[1] - AB[1] * AC[0] < 0
+            if all([l1_exist, l2_exist, l3_exist, counter_clock_wise]) and not collinear:
                 triangles.append(points)
-                
+        
+        # delete duplicate quads
+        seen = set()
+        triangles = tuple([q for q in triangles if not (tuple(sorted(q)) in seen or seen.add(tuple(sorted(q))))])  
         self.polygons = append_lst(polygons_, triangles)
         
     def find_quads(self):
@@ -1537,6 +1579,18 @@ class Allocator():
         AB = (xb - xa, yb - ya)
         CD = (xd - xc, yd - yc)
         return AB[0]*CD[0] + AB[1]*CD[1]
+    
+    def get_cross_product(self, line_1, line_2):
+        # AB \times CD
+        p1, p2 = line_1
+        p3, p4 = line_2
+        xa, ya = self.p_pos[p1]
+        xb, yb = self.p_pos[p2]
+        xc, yc = self.p_pos[p3]
+        xd, yd = self.p_pos[p4]
+        AB = (xb - xa, yb - ya)
+        CD = (xd - xc, yd - yc)
+        return AB[0] * CD[1] - AB[1] * CD[0]
     
     def get_line_length(self, line):
         p1, p2 = line

@@ -275,9 +275,9 @@ class Problem:
                 self.add("Angle", same_angle, premise, ("extended", None, None))
 
         # 6.Angle expand (vertical angle).
-        for angle in self.condition.get_items_by_predicate("Angle"):
-            premise = (self.condition.get_id_by_predicate_and_item("Angle", angle),)
-            self.add("Angle", (angle[2], angle[1], angle[0]), premise, ("extended", None, None))
+        # for angle in self.condition.get_items_by_predicate("Angle"):
+        #     premise = (self.condition.get_id_by_predicate_and_item("Angle", angle),)
+        #     self.add("Angle", (angle[2], angle[1], angle[0]), premise, ("extended", None, None))
 
     def _add_shape(self, shape, premise, theorem):
         """pass"""
@@ -383,6 +383,8 @@ class Problem:
         for a_point in a_points:
             for b_point in b_points:
                 same_angles.append((a_point, v, b_point))
+                # reverse angle regards to be same
+                # same_angles.append((b_point, v, a_point))
 
         return same_angles
 

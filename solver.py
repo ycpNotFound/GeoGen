@@ -10,6 +10,8 @@ from inter_gps_solver.extended_definition import ExtendedDefinition
 from inter_gps_solver.logic_parser import LogicParser
 from inter_gps_solver.logic_solver import LogicSolver
 from utils import parse_clause, formalgeo_to_intergps
+from sympy import Eq, solve
+from copy import copy
 
 def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     """
@@ -19,6 +21,8 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     """
     p2t_map_fw = {}
     for t_name in t_info:
+        if t_name == 'angle_addition': 
+            a = 1
         if t_info[t_name][1] == 0 or t_info[t_name][0] == 3:  # skip no used and diff t
             continue
         for t_branch in parsed_theorem_GDL[t_name]["body"]:
@@ -38,7 +42,7 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
 
 class FormalGeoSolver:
 
-    def __init__(self, predicate_GDL, theorem_GDL, strategy, max_depth, beam_size, t_info, debug=False):
+    def __init__(self, predicate_GDL, theorem_GDL, strategy, max_depth, beam_size, t_info, t_freq_info, debug=False):
         """
         Initialize Forward Searcher.
         :param predicate_GDL: predicate GDL.
@@ -56,7 +60,8 @@ class FormalGeoSolver:
         self.strategy = strategy
         self.debug = debug
         self.p2t_map = get_p2t_map_fw(t_info, self.parsed_theorem_GDL)
-
+        self.t_freq_info = t_freq_info
+        
         self.problem = None
         self.stack = None
         self.last_step = None
@@ -104,28 +109,102 @@ class FormalGeoSolver:
         self.add_selections([], selections)
         debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                     format(time.time() - timing, len(selections)))
+    
+    def solve_equations(self):
+        # solve equation through subs value of solved symbols
+        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
+        value_of_sym = {
+            k: v for k, v in 
+            self.problem.condition.value_of_sym.items()
+            if v is not None
+        }
+        for expr in eq_exprs:
+            solved = False 
+            eq_idx = eq_exprs[expr][0]
+            premise = [eq_idx]
+            syms_in_expr = list(expr.free_symbols)
+            expr_new = copy(expr)
+            
+            for sym, value in value_of_sym.items():
+                if sym in syms_in_expr and value != None:
+                    premise_expr = sym - value
+                    for i, c in enumerate(self.problem.condition.items):
+                        if c[0] == 'Equation' and c[1] == premise_expr:
+                            premise.append(i)
+                    expr_new = expr_new.subs(sym, value)
+            
+            last_step = len(self.problem.condition.items)
+            
+            # can solve to value 
+            if len(expr_new.free_symbols) == 1:
+                sym = list(expr_new.free_symbols)[0]
+                eq = Eq(expr_new, 0)
+                results = solve(eq, sym)
 
+                if self.problem.condition.value_of_sym[sym] is None:
+                    solved = True
+                    solved_results = results[0]
+                    self.problem.set_value_of_sym(sym, solved_results, premise)
+
+            # can get new numerical relation
+            elif len(expr_new.free_symbols) == 2 and len(expr.free_symbols) > 2:
+                solved = True
+                self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
+                # remove the past equation
+                self.problem.condition.simplified_equation.pop(expr)
+                # add condition idx of new equation
+                self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
+                    
+            if not solved:
+                continue
+            
+            # add condition in `leveled_condition`
+            if len(self.problem.condition.items) - last_step > 0:
+                new_condition = deepcopy(self.problem.condition.items[last_step:])
+                # find position in search tree
+                pos = list(self.leveled_condition.keys())[-1]
+                for k, v in self.leveled_condition.items():
+                    ids = list(v.keys())
+                    if eq_idx in ids:
+                        pos = k
+                # copy from `add_selections`
+                depth = len(pos) + 1
+                if depth not in self.node_count:
+                    self.node_count[depth] = 1
+                new_pos = tuple(list(pos) + [self.node_count[depth]])
+                self.node_count[depth] += 1
+                self.leveled_condition[new_pos] = {}
+                for i in range(len(new_condition)):
+                    self.leveled_condition[new_pos][last_step+i] = new_condition[i]
+                    
+        return 
+    
     def search(self):
         """
         Search problem and return search result.
         :return solved: <bool>, indicate whether problem solved or not.
         :return seqs: <list> of <str>, solved theorem sequences.
+        self.problem.condition.items
         """
         self.leveled_condition = {}
         cur_depth = 0
         while len(self.stack) > 0:
             beam_count = len(self.stack)
-            ratio = 1
-            if cur_depth > 1:
-                ratio = 2
+            if cur_depth == 0 or cur_depth == 1:
+                beam_count = 200
+            elif cur_depth == 2:
+                beam_count = 50
+            else:
+                beam_count = self.beam_size
                     
-            if len(self.stack) > ratio * self.beam_size:  # select branch with beam size
+            if len(self.stack) > beam_count:  
                 stack = []
-                
-                for i in random.sample(range(len(self.stack)), ratio * self.beam_size):
+                for i in random.sample(range(len(self.stack)), beam_count):
                     stack.append(self.stack[i])
                 self.stack = stack
-                beam_count = self.beam_size
+                # beam_count = self.beam_size
+            else:
+                beam_count = len(self.stack)
 
             for i in range(beam_count):
                 pos, selection = self.stack.pop(0)
@@ -153,15 +232,65 @@ class FormalGeoSolver:
                     if len(pos) == self.max_depth:
                         continue
                     timing = time.time()
-                    selections = self.get_theorem_selection()
+                    selections = self.get_theorem_selection(
+                        sample_num_per_th=3
+                    )
                     self.add_selections(pos, selections)
                     debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                                 format(time.time() - timing, len(selections)))
+            
+            self.solve_equations()
+            self.problem.check_goal()
+            solved = self.problem.goal.solved
+            if solved:  # solved, return result
+                _, seqs = get_used_pid_and_theorem(self.problem)
+                return True, seqs
+                
             cur_depth += 1
             
         return False, None
+    
+    def bfs_search(self):
+        self.leveled_condition = {}
+        cur_depth = 0
+        
+        while len(self.stack) > 0:
+            cur_stack_len = len(self.stack)
+            for i in range(cur_stack_len):
+                pos, selection = self.stack.pop(0)
+                self.step_size += 1
+                debug_print(self.debug, "\n(pos={}, node_count={}) Current node.".format(pos, self.node_count))
+                timing = time.time()
+                
+                # save leveled condition, new added
+                last_step = len(self.problem.condition.items)
+                solved = self.apply_and_check_goal(selection)
+                if len(self.problem.condition.items) - last_step > 0:
+                    new_condition = deepcopy(self.problem.condition.items[last_step:])
+                    self.leveled_condition[pos] = {}
+                    for i in range(len(new_condition)):
+                        self.leveled_condition[pos][last_step+i] = new_condition[i]
+                        
+                debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
+                solved, time.time() - timing))
+                if solved is None:  # not update, close search branch
+                    continue
+                if solved:  # solved, return result
+                    _, seqs = get_used_pid_and_theorem(self.problem)
+                    return True, seqs
+                else:  # continue search
+                    if len(pos) == self.max_depth:
+                        continue
+                    timing = time.time()
+                    selections = self.get_theorem_selection()
+                    self.add_selections(pos, selections)
+                    debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".format(time.time() - timing, len(selections)))
+                    
+            cur_depth += 1
+            
+        return False, None    
 
-    def get_theorem_selection(self):
+    def get_theorem_selection(self, sample_num_per_th=None):
         """
         Return theorem selections according to <self.last_step>.
         :return selections: <list> of ((t_name, t_branch, t_para), ((predicate, item, premise))).
@@ -172,6 +301,7 @@ class FormalGeoSolver:
         related_pres = []  # new added predicates
         related_syms = []  # new added/updated equations
         for step in range(self.last_step, self.problem.condition.step_count):  # get related conditions
+        # for step in range(0, self.problem.condition.step_count):
             for _id in self.problem.condition.ids_of_step[step]:
                 if self.problem.condition.items[_id][0] == "Equation":
                     for sym in self.problem.condition.items[_id][1].free_symbols:
@@ -196,11 +326,17 @@ class FormalGeoSolver:
         debug_print(self.debug, "Related syms: {}.".format(related_syms))
 
         timing = time.time()
-        logic_selections = self.try_theorem_logic(related_pres)
+        logic_selections = self.try_theorem_logic(
+            related_pres, 
+            sample_num_per_th
+        )
         debug_print(self.debug, "(timing={:.4f}s) Get {} logic-related selections: {}.".format(
             time.time() - timing, len(logic_selections), logic_selections))
         timing = time.time()
-        algebra_selections = self.try_theorem_algebra(related_syms)
+        algebra_selections = self.try_theorem_algebra(
+            related_syms, 
+            sample_num_per_th
+        )
         # algebra_selections = []
         debug_print(self.debug, "(timing={:.4f}s) Get {} algebra-related selections: {}.".format(
             time.time() - timing, len(algebra_selections), algebra_selections))
@@ -239,28 +375,63 @@ class FormalGeoSolver:
                 else:
                     if t_para not in self.problem_p_paras:
                         selections.pop(i)
-                        
-        # sele_to_remove = []
-        # for sele in selections:
-        #     if sele[0][0] == 'round_angle':
-        #         sele_to_remove.append(sele)
-        # for sele in sele_to_remove:
-        #     selections.remove(sele)
+
             
         debug_print(self.debug, "(timing={:.4f}s) Get {}  selections: {}.".format(
             time.time() - timing, len(selections), selections))
 
+        selections = sorted(
+            selections, 
+            key=lambda item: self.t_freq_info[item[0][0]],
+            reverse=True
+        )
         return selections
+    
+    def pre_select_theorems(self, selections, sample_num_per_th=None):
 
-    def try_theorem_logic(self, related_pres):
+        if sample_num_per_th == None:
+            sample_num_per_th = self.beam_size
+            
+        selection_dict = {}
+        for item in selections:
+            if item[0] not in selection_dict: 
+                selection_dict[item[0]] = [item]
+            else:
+                selection_dict[item[0]].append(item)
+        
+        pre_selections = []
+        for k, v in selection_dict.items():
+            if 'similar' in k or 'congruent' in k:
+                continue
+            else:
+                pre_selections += random.sample(
+                    v, min(sample_num_per_th, len(v)))
+            # if len(v) > sample_num_per_th:
+            #     pre_selections += random.sample(v, sample_num_per_th)
+            # else:
+            #     pre_selections += v
+            
+        pre_selections = sorted(
+            pre_selections, 
+            key=lambda item: self.t_freq_info[item[0]],
+            reverse=True
+        )
+        # frequency = [self.t_freq_info[item[0]] for item in pre_selections]
+        return pre_selections
+
+    def try_theorem_logic(self, related_pres, sample_num_per_th=None):
         """
         Try a theorem and return can-added conclusions.
         :param related_pres: <list>, list of tuple('t_name', 't_branch', letters).
         :return selections: <list> of ((t_name, t_branch, t_para, t_timing), ((predicate, item, premise))).
         """
-
+        if sample_num_per_th is None:
+            sample_num_per_th = self.beam_size 
         selections = []
+        # related_pres_ = self.pre_select_theorems(related_pres, sample_num_per_th=sample_num_per_th)
         for t_name, t_branch, t_letters in related_pres:
+            if 'angle_addition' in t_name:
+                a = 1
             gpl = self.parsed_theorem_GDL[t_name]["body"][t_branch]
             results = GPLExecutor.run(gpl, self.problem, t_letters)  # get gpl reasoned result
             for letters, premise, conclusion in results:
@@ -276,8 +447,8 @@ class FormalGeoSolver:
 
                 if len(conclusions) > 0:
                     selections.append(((t_name, t_branch, t_para), tuple(conclusions)))
-                    if len(selections) > self.beam_size:
-                        return selections
+                    # if len(selections) > self.beam_size:
+                    #     return selections
         # sele_to_remove = []
         # for sele in selections:
         #     if sele[0][0] == 'round_angle':
@@ -287,12 +458,14 @@ class FormalGeoSolver:
             
         return selections
 
-    def try_theorem_algebra(self, related_syms):
+    def try_theorem_algebra(self, related_syms, sample_num_per_th=None):
         """
         Try a theorem and return can-added conclusions.
         :param related_syms: <list>, related syms.
         :return selections: <list> of ((t_name, t_branch, t_para, t_timing), ((predicate, item, premise))).
         """
+        if sample_num_per_th is None:
+            sample_num_per_th = self.beam_size 
         paras_of_attrs = {}  # <dict>, {attr: [para]}
         for sym in related_syms:
             attr, paras = self.problem.condition.attr_of_sym[sym]
@@ -310,7 +483,10 @@ class FormalGeoSolver:
         selections = []
         for related_attr in paras_of_attrs:
             related_paras = set(paras_of_attrs[related_attr])
-            for t_name, t_branch, p_vars in self.p2t_map[related_attr]:
+            related_theorems = self.pre_select_theorems(self.p2t_map[related_attr], sample_num_per_th)
+            # if related_attr == 'MeasureOfAngle':
+            #     a = 1
+            for t_name, t_branch, p_vars in related_theorems:
                 gpl = self.parsed_theorem_GDL[t_name]["body"][t_branch]  # run gdl
                 for related_para in related_paras:
                     letters = {}
@@ -329,8 +505,8 @@ class FormalGeoSolver:
 
                         if len(conclusions) > 0:
                             selections.append(((t_name, t_branch, theorem_para), tuple(conclusions)))
-                            if len(selections) > self.beam_size:
-                                return selections
+                            # if len(selections) > self.beam_size:
+                            #     return selections
         return selections
 
     def apply_and_check_goal(self, selection):

@@ -3,7 +3,7 @@ import random
 import re
 from copy import deepcopy
 from typing import Dict, List, Tuple, Union
-
+from collections import deque, defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -23,7 +23,8 @@ from utils import move_subtractions_to_rhs
 # show_available_datasets()
 
 class ConditionNode():
-    def __init__(self, value):
+    def __init__(self, idx, value):
+        self.idx = idx
         self.value = value
         if type(self.value[1]) == tuple:
             self.v_str = f"{self.value[0]}\\n{''.join(self.value[1])}"
@@ -32,9 +33,9 @@ class ConditionNode():
     
     def __repr__(self) -> str:
         if type(self.value[1]) == tuple:
-            return f"{self.value[0]}({','.join(self.value[1])}) | {self.value[2]}"
+            return f"{self.value[0]}({','.join(self.value[1])}) | {self.idx} | {self.value[2]} | {self.value[-1]} | {self.value[3][0]}"
         else:
-            return f"{self.value[0]}({str(self.value[1])}) | {self.value[2]}"
+            return f"{self.value[0]}({str(self.value[1])}) | {self.idx} | {self.value[2]} | {self.value[-1]} | {self.value[3][0]}"
         
             
 class ConditionGraph():
@@ -51,8 +52,8 @@ class ConditionGraph():
         self.end_nodes = None
         
     def construct_graph(self):
-        for condition in self.conditions:
-            node = ConditionNode(condition)
+        for i, condition in enumerate(self.conditions):
+            node = ConditionNode(i, condition)
             if node not in self.nodes:
                 self.nodes.append(node)
 
@@ -243,9 +244,11 @@ class ConditionGraph():
         plt.title(f'Condition Graph Vis of {fig_name}')
         
         fig_name = f"graph_{fig_name}"
+        if '*' in fig_name:
+            fig_name = fig_name.replace('*', '')
         plt.savefig(f"{img_dir}/{fig_name}.png", dpi=1000)
         plt.clf()
-        
+        plt.close('all')
     
 def draw_graph(condition_graph: ConditionGraph, idx, target_condition=None, img_dir="imgs"):
     
@@ -293,6 +296,33 @@ def topological_sort(nodes, nodes_adj_table):
     # Since the stack is built in reverse order, we need to reverse it before returning
     return stack[::-1]
 
+
+def topological_sort_bfs(nodes, nodes_adj_table):
+    # 计算每个节点的入度
+    in_degree = {node: 0 for node in nodes}
+    for neighbors in nodes_adj_table.values():
+        for neighbor in neighbors:
+            in_degree[neighbor] += 1
+    
+    # 初始化队列，将所有入度为0的节点加入队列
+    queue = deque([node for node in nodes if in_degree[node] == 0])
+    result = []
+    
+    while queue:
+        node = queue.popleft()
+        result.append(node)
+        
+        # 遍历当前节点的所有邻居
+        for neighbor in nodes_adj_table.get(node, []):
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+    
+    # 检查是否存在环
+    if len(result) != len(nodes):
+        raise ValueError("The graph has at least one cycle; topological sorting is not possible.")
+    
+    return result
 
     
 def display_solution(condition_graph: ConditionGraph, 

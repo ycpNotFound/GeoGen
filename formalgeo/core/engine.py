@@ -1,10 +1,9 @@
 import copy
-from sympy import symbols, solve, Float
+from sympy import symbols, solve, Float, Poly
 from func_timeout import func_set_timeout, FunctionTimedOut
 from formalgeo.parse import get_equation_from_tree
 from formalgeo.tools import rough_equal
 import warnings
-
 
 class EquationKiller:
     solve_eqs = True  # whether to solve the equation in the intermediate process
@@ -180,7 +179,7 @@ class EquationKiller:
         return mini_syms
 
     @staticmethod
-    @func_set_timeout(2)
+    # @func_set_timeout(2)
     def simplification_value_replace(problem):
         """
         Simplify equations by replacing sym with known value.
@@ -210,6 +209,8 @@ class EquationKiller:
 
             for eq in problem.condition.simplified_equation:  # value replace
                 if eq in remove_lists:
+                    continue
+                if len(eq.free_symbols) != 1:
                     continue
                 raw_eq = eq
                 simplified = False
@@ -485,9 +486,17 @@ class EquationKiller:
         if len(target_expr.free_symbols) == 0:
             return target_expr, premise
 
+        linear_exprs = []
+        for expr in list(problem.condition.simplified_equation):
+        # 检查表达式是否是线性的
+            poly = Poly(expr)
+            if poly.total_degree() == 1:
+                linear_exprs.append(expr)
+
         target_sym, mini_eqs, n_m = EquationKiller.get_minimum_target_equations(  # get mini equations
             target_expr,
-            list(problem.condition.simplified_equation)
+            # list(problem.condition.simplified_equation)
+            linear_exprs
         )
 
         if len(mini_eqs) == 0:  # no mini equations, can't solve
@@ -516,6 +525,13 @@ class EquationKiller:
             solved = False
             p = int((head + tail) / 2)
             try_mini_eqs = copy.copy(mini_eqs[0:p + 1])
+            
+            # if too complex: return
+            all_symbols = set()
+            for expr in try_mini_eqs:
+                all_symbols.update(expr.free_symbols)
+            if len(all_symbols) >= 4:
+                return None, []
 
             if EquationKiller.sym_simplify:
                 try:
@@ -523,7 +539,7 @@ class EquationKiller:
                 except FunctionTimedOut:
                     msg = "Timeout when simplify equations by sym replace."
                     warnings.warn(msg)
-
+            
             try:
                 results = EquationKiller.solve(try_mini_eqs)  # solve equations
             except FunctionTimedOut:

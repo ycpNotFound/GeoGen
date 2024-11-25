@@ -87,6 +87,9 @@ def inverse_parse_equation(item, problem):
             if attr == "Free":
                 attr = items[0][0]
             else:
+                # if len(items[0]) == 6:
+                #     attr = attr + f"({''.join(items[0][:3])},{''.join(items[0][3:])})"
+                # else:
                 attr = attr + "(" + "".join(items[0]) + ")"
             return "Value({},{})".format(attr, str(problem.condition.value_of_sym[syms[0]]).replace(" ", ""))
     elif len(syms) == 2 and (item == (syms[0] - syms[1]) or item == (syms[1] - syms[0])):

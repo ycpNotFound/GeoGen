@@ -1,0 +1,108 @@
+{
+    "('Equation', ma_dab - 45, (58, 62, 67), ('solve_eq', None, None), 30)": [
+        "Solution: ",
+        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_abc+ma_bda+ma_dab-180 = 0. ",
+        "Step 2: <because> ad is the altitude of △ abc, <therefore> bd ⊥ ad, ∠ bda = 90°. ",
+        "Step 3: <because> abc is an isosceles right triangle, <therefore> ∠ abd = 45°. ",
+        "Step 4: <by> solve_eq, <because> ∠ abd = 45°, ∠ bda = 90°, ma_abc+ma_bda+ma_dab-180 = 0, <therefore> ∠ dab = 45°. "
+    ],
+    "('Equation', ma_cad - 45, (59, 64, 68), ('solve_eq', None, None), 30)": [
+        "Solution: ",
+        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_adc+ma_bca+ma_cad-180 = 0. ",
+        "Step 2: <because> ad is the altitude of △ abc, <therefore> ad ⊥ cd, ∠ adc = 90°. ",
+        "Step 3: <because> right triangle abc is isosceles, <therefore> ∠ bca = 45°. ",
+        "Step 4: <by> solve_eq, <because> ∠ bca = 45°, ∠ adc = 90°, ma_adc+ma_bca+ma_cad-180 = 0, <therefore> ∠ cad = 45°. "
+    ],
+    "('Equation', -ll_bc + 2*ll_da, (52, 110), ('right_triangle_property_length_of_median', '1', ('c', 'a', 'b', 'd')), 68)": [
+        "Solution: ",
+        "Step 1: <because> abc is an isosceles right triangle, <therefore> △ abc is isosceles, cab is a right triangle. ",
+        "Step 2: <by> isosceles_triangle_property_line_coincidence, <because> △ abc is isosceles, ad is the altitude of △ abc, <therefore> ad is the median of △ abc. ",
+        "Step 3: <by> right_triangle_property_length_of_median, <because> cab is a right triangle, ad is the median of △ abc, <therefore> -ll_bc+2*ll_da = 0. "
+    ],
+    "('Equation', ll_ac - sqrt(2)*ll_bd, (130, 131), ('solve_eq', None, None), 70)": [
+        "Solution: ",
+        "Step 1: <by> line_addition, <because> points b, d, c are aligned in a straight line, <therefore> ll_bc-ll_bd-ll_dc = 0. ",
+        "Step 2: <because> ad is the altitude of △ abc, <therefore> ad ⊥ cd, ad ⊥ bd, ∠ adc = 90°, ∠ bda = 90°. ",
+        "Step 3: <by> right_triangle_judgment_angle, <because> ∠ adc = 90°, <therefore> △ adc has a right angle adc. ",
+        "Step 4: <by> right_triangle_property_pythagorean, <because> △ adc has a right angle adc, <therefore> -ll_ac**2+ll_da**2+ll_dc**2 = 0. ",
+        "Step 5: <by> right_triangle_judgment_angle, <because> ∠ bda = 90°, <therefore> the shape bda forms a right triangle. ",
+        "Step 6: <by> right_triangle_property_pythagorean, <because> the shape bda forms a right triangle, <therefore> -ll_ab**2+ll_bd**2+ll_da**2 = 0. ",
+        "Step 7: <because> abc is an isosceles right triangle, <therefore> △ abc is isosceles, △ cab has a right angle cab, ab = ac, ∠ abd = ∠ bca, ca ⊥ ba, ∠ cab = 90°. ",
+        "Step 8: <by> isosceles_triangle_property_line_coincidence, <because> △ abc is isosceles, ad is the altitude of △ abc, <therefore> ad is the median of △ abc, d is the midpoint of bc, bd = dc. ",
+        "Step 9: <by> right_triangle_property_pythagorean, <because> △ cab has a right angle cab, <therefore> ll_ab**2+ll_ac**2-ll_bc**2 = 0. ",
+        "Step 10: <by> similar_triangle_judgment_aa, <because> ∠ cab = 90°, ∠ abd = ∠ bca, ∠ bda = 90°, <therefore> △ abd is similar to △ bca. ",
+        "Step 11: <by> similar_triangle_property_line_ratio, <because> △ abd is similar to △ bca, <therefore> ll_ac-ll_bd*rst_bcaabd = 0. ",
+        "Step 12: <by> solve_eq, <because> ab = ac, ll_bc-ll_bd-ll_dc = 0, ll_ab**2+ll_ac**2-ll_bc**2 = 0, bd = dc, -ll_ab**2+ll_bd**2+ll_da**2 = 0, -ll_ac**2+ll_da**2+ll_dc**2 = 0, ll_ac-ll_bd*rst_bcaabd = 0, <therefore> ratio of similar △ bca and △ abd = √(2). ",
+        "Step 13: <by> solve_eq, <because> ll_ac-ll_bd*rst_bcaabd = 0, ratio of similar △ bca and △ abd = √(2), <therefore> ll_ac-sqrt(2)*ll_bd = 0. "
+    ],
+    "('Equation', ll_ab - sqrt(2)*ll_da, (131, 132), ('solve_eq', None, None), 70)": [
+        "Solution: ",
+        "Step 1: <because> ad is the altitude of △ abc, <therefore> cd ⊥ ad, bd ⊥ ad, ∠ adc = 90°, ∠ bda = 90°. ",
+        "Step 2: <by> right_triangle_judgment_angle, <because> ∠ adc = 90°, <therefore> the shape adc forms a right triangle. ",
+        "Step 3: <by> right_triangle_property_pythagorean, <because> the shape adc forms a right triangle, <therefore> -ll_ac**2+ll_da**2+ll_dc**2 = 0. ",
+        "Step 4: <by> right_triangle_judgment_angle, <because> ∠ bda = 90°, <therefore> △ bda has a right angle bda. ",
+        "Step 5: <by> right_triangle_property_pythagorean, <because> △ bda has a right angle bda, <therefore> -ll_ab**2+ll_bd**2+ll_da**2 = 0. ",
+        "Step 6: <by> line_addition, <because> the point d is on the line segment bc, <therefore> ll_bc-ll_bd-ll_dc = 0. ",
+        "Step 7: <because> the shape abc forms an isosceles right triangle, <therefore> the shape cab forms a right triangle, abc is an isosceles triangle, ca ⊥ ba, ∠ abd = ∠ bca, ab = ac, ∠ cab = 90°. ",
+        "Step 8: <by> right_triangle_property_pythagorean, <because> the shape cab forms a right triangle, <therefore> ll_ab**2+ll_ac**2-ll_bc**2 = 0. ",
+        "Step 9: <by> similar_triangle_judgment_aa, <because> ∠ cab = 90°, ∠ abd = ∠ bca, ∠ bda = 90°, <therefore> △ bca is similar to △ abd, △ bda is similar to △ cab. ",
+        "Step 10: <by> similar_triangle_property_line_ratio, <because> △ bda is similar to △ cab, <therefore> ll_ab-ll_da*rst_bcaabd = 0. ",
+        "Step 11: <by> similar_triangle_property_line_ratio, <because> △ bca is similar to △ abd, <therefore> ll_ac-ll_bd*rst_bcaabd = 0. ",
+        "Step 12: <by> isosceles_triangle_property_line_coincidence, <because> abc is an isosceles triangle, ad is the altitude of △ abc, <therefore> ad is the median of △ abc, d is the midpoint of bc, bd = dc. ",
+        "Step 13: <by> solve_eq, <because> ab = ac, ll_bc-ll_bd-ll_dc = 0, ll_ab**2+ll_ac**2-ll_bc**2 = 0, bd = dc, -ll_ab**2+ll_bd**2+ll_da**2 = 0, -ll_ac**2+ll_da**2+ll_dc**2 = 0, ll_ac-ll_bd*rst_bcaabd = 0, <therefore> ratio of similar △ bca and △ abd = √(2). ",
+        "Step 14: <by> solve_eq, <because> ratio of similar △ bca and △ abd = √(2), ll_ab-ll_da*rst_bcaabd = 0, <therefore> ll_ab-sqrt(2)*ll_da = 0. "
+    ],
+    "('Equation', -sqrt(2)*ll_ab + ll_bc, (131, 133), ('solve_eq', None, None), 70)": [
+        "Solution: ",
+        "Step 1: <because> ad is the altitude of △ abc, <therefore> ad ⊥ cd, bd ⊥ ad, ∠ adc = 90°, ∠ bda = 90°. ",
+        "Step 2: <by> right_triangle_judgment_angle, <because> ∠ adc = 90°, <therefore> △ adc has a right angle adc. ",
+        "Step 3: <by> right_triangle_property_pythagorean, <because> △ adc has a right angle adc, <therefore> -ll_ac**2+ll_da**2+ll_dc**2 = 0. ",
+        "Step 4: <by> right_triangle_judgment_angle, <because> ∠ bda = 90°, <therefore> bda is a right triangle. ",
+        "Step 5: <by> right_triangle_property_pythagorean, <because> bda is a right triangle, <therefore> -ll_ab**2+ll_bd**2+ll_da**2 = 0. ",
+        "Step 6: <by> line_addition, <because> the point d lies on line segment bc, <therefore> ll_bc-ll_bd-ll_dc = 0. ",
+        "Step 7: <because> right triangle abc is isosceles, <therefore> cab is a right triangle, the shape abc forms an isosceles triangle, ca ⊥ ba, ∠ abd = ∠ bca, ab = ac, ∠ cab = 90°. ",
+        "Step 8: <by> right_triangle_property_pythagorean, <because> cab is a right triangle, <therefore> ll_ab**2+ll_ac**2-ll_bc**2 = 0. ",
+        "Step 9: <by> similar_triangle_judgment_aa, <because> ∠ cab = 90°, ∠ abd = ∠ bca, ∠ bda = 90°, <therefore> △ abd is similar to △ bca, △ dab is similar to △ abc. ",
+        "Step 10: <by> similar_triangle_property_line_ratio, <because> △ dab is similar to △ abc, <therefore> -ll_ab*rst_bcaabd+ll_bc = 0. ",
+        "Step 11: <by> similar_triangle_property_line_ratio, <because> △ abd is similar to △ bca, <therefore> ll_ac-ll_bd*rst_bcaabd = 0. ",
+        "Step 12: <by> isosceles_triangle_property_line_coincidence, <because> the shape abc forms an isosceles triangle, ad is the altitude of △ abc, <therefore> ad is the median of △ abc, d is the midpoint of bc, bd = dc. ",
+        "Step 13: <by> solve_eq, <because> ab = ac, ll_bc-ll_bd-ll_dc = 0, ll_ab**2+ll_ac**2-ll_bc**2 = 0, bd = dc, -ll_ab**2+ll_bd**2+ll_da**2 = 0, -ll_ac**2+ll_da**2+ll_dc**2 = 0, ll_ac-ll_bd*rst_bcaabd = 0, <therefore> ratio of similar △ bca and △ abd = √(2). ",
+        "Step 14: <by> solve_eq, <because> ratio of similar △ bca and △ abd = √(2), -ll_ab*rst_bcaabd+ll_bc = 0, <therefore> -sqrt(2)*ll_ab+ll_bc = 0. "
+    ],
+    "('Equation', -sqrt(2)*ll_ac/2 + ll_bd, (136, 137), ('solve_eq', None, None), 70)": [
+        "Solution: ",
+        "Step 1: <by> line_addition, <because> the point d lies on line segment bc, <therefore> ll_bc-ll_bd-ll_dc = 0. ",
+        "Step 2: <because> ad is the altitude of △ abc, <therefore> cd ⊥ ad, bd ⊥ ad, ∠ adc = 90°, ∠ bda = 90°. ",
+        "Step 3: <by> right_triangle_judgment_angle, <because> ∠ adc = 90°, <therefore> adc is a right triangle. ",
+        "Step 4: <by> right_triangle_property_pythagorean, <because> adc is a right triangle, <therefore> -ll_ac**2+ll_da**2+ll_dc**2 = 0. ",
+        "Step 5: <by> right_triangle_judgment_angle, <because> ∠ bda = 90°, <therefore> bda is a right triangle. ",
+        "Step 6: <by> right_triangle_property_pythagorean, <because> bda is a right triangle, <therefore> -ll_ab**2+ll_bd**2+ll_da**2 = 0. ",
+        "Step 7: <because> the shape abc forms an isosceles right triangle, <therefore> △ abc is isosceles, cab is a right triangle, ab = ac, ∠ abd = ∠ bca, ca ⊥ ba, ∠ cab = 90°. ",
+        "Step 8: <by> isosceles_triangle_property_line_coincidence, <because> △ abc is isosceles, ad is the altitude of △ abc, <therefore> ad is the median of △ abc, the midpoint of bc is d, bd = dc. ",
+        "Step 9: <by> right_triangle_property_pythagorean, <because> cab is a right triangle, <therefore> ll_ab**2+ll_ac**2-ll_bc**2 = 0. ",
+        "Step 10: <by> similar_triangle_judgment_aa, <because> ∠ cab = 90°, ∠ abd = ∠ bca, ∠ bda = 90°, <therefore> △ bca is similar to △ abd, △ abc is similar to △ dab, △ bda is similar to △ cab. ",
+        "Step 11: <by> similar_triangle_property_line_ratio, <because> △ abc is similar to △ dab, <therefore> -ll_ab*rst_bcaabd+ll_bc = 0. ",
+        "Step 12: <by> similar_triangle_property_line_ratio, <because> △ bda is similar to △ cab, <therefore> ll_ab-ll_da*rst_bcaabd = 0. ",
+        "Step 13: <by> similar_triangle_property_line_ratio, <because> △ bca is similar to △ abd, <therefore> ll_ac-ll_bd*rst_bcaabd = 0. ",
+        "Step 14: <by> similar_triangle_judgment_aa, <because> ∠ cab = 90°, ∠ abd = ∠ bca, ∠ bda = 90°, <therefore> △ bca is similar to △ abd. ",
+        "Step 15: <by> similar_triangle_property_line_ratio, <because> △ bca is similar to △ abd, <therefore> -ll_ac*rst_abdbca+ll_bd = 0. ",
+        "Step 16: <by> solve_eq, <because> ab = ac, ll_bc-ll_bd-ll_dc = 0, ll_ab**2+ll_ac**2-ll_bc**2 = 0, bd = dc, -ll_ab**2+ll_bd**2+ll_da**2 = 0, -ll_ac**2+ll_da**2+ll_dc**2 = 0, ll_ac-ll_bd*rst_bcaabd = 0, ll_ab-ll_da*rst_bcaabd = 0, -ll_ab*rst_bcaabd+ll_bc = 0, -ll_ac*rst_abdbca+ll_bd = 0, <therefore> ratio of similar △ abd and △ bca = √(2)/2. ",
+        "Step 17: <by> solve_eq, <because> -ll_ac*rst_abdbca+ll_bd = 0, ratio of similar △ abd and △ bca = √(2)/2, <therefore> -sqrt(2)*ll_ac/2+ll_bd = 0. "
+    ],
+    "('IsoscelesTriangle', ('d', 'c', 'a'), (45, 59, 126), ('isosceles_triangle_judgment_angle_equal', '1', ('d', 'c', 'a')), 70)": [
+        "Solution: ",
+        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_adc+ma_bca+ma_cad-180 = 0. ",
+        "Step 2: <because> ad is the altitude of △ abc, <therefore> cd ⊥ ad, ∠ adc = 90°. ",
+        "Step 3: <because> the shape abc forms an isosceles right triangle, <therefore> ∠ bca = 45°. ",
+        "Step 4: <by> solve_eq, <because> ∠ bca = 45°, ∠ adc = 90°, ma_adc+ma_bca+ma_cad-180 = 0, <therefore> ∠ cad = 45°. ",
+        "Step 5: <by> isosceles_triangle_judgment_angle_equal, <because> ∠ bca = 45°, ∠ cad = 45°, <therefore> dca is an isosceles triangle. "
+    ],
+    "('IsoscelesTriangle', ('d', 'a', 'b'), (37, 134), ('isosceles_triangle_judgment_angle_equal', '1', ('d', 'a', 'b')), 71)": [
+        "Solution: ",
+        "Step 1: <because> ad is the altitude of △ abc, <therefore> ad ⊥ bd, ∠ bda = 90°. ",
+        "Step 2: <because> the shape abc forms an isosceles right triangle, <therefore> abc is an isosceles triangle, △ cab has a right angle cab, ∠ abd = ∠ bca, ba ⊥ ca, ∠ cab = 90°. ",
+        "Step 3: <by> similar_triangle_judgment_aa, <because> ∠ cab = 90°, ∠ abd = ∠ bca, ∠ bda = 90°, <therefore> △ bca is similar to △ abd. ",
+        "Step 4: <by> similar_triangle_property_angle_equal, <because> △ bca is similar to △ abd, <therefore> ∠ abd = ∠ dab. ",
+        "Step 5: <by> isosceles_triangle_judgment_angle_equal, <because> ∠ abd = ∠ dab, <therefore> the shape dab forms an isosceles triangle. "
+    ]
+}
