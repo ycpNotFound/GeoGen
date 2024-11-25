@@ -116,7 +116,7 @@ PREDICATES_TO_NAMES = {
     "CongruentBetweenTriangle": "congruent triangles",
     "CongruentBetweenQuadrilateral": "congruent quadrilaterals"
 }
-PRESET_COLOR_PROBS = [0.6, 0.08, 0.08, 0.08, 0.08, 0.08]
+PRESET_COLOR_PROBS = [0.5, 0.06, 0.06, 0.06, 0.06, 0.06, 0.2]
 PRESET_COLORS = [
     # l: line | p: point | c: char | a: annoation | f: fill_in
     # Color: BGR
@@ -125,8 +125,7 @@ PRESET_COLORS = [
         "p_color": "#2f5597",
         "c_color": "#0648cc",
         "a_color": "#f05015",
-        "f_color": "#ffffff"
-        
+        "f_color": "#ffffff"   
     },
     {
         "l_color": "#2a2a2a",
@@ -163,6 +162,13 @@ PRESET_COLORS = [
         "c_color": "#2a2a2a",
         "a_color": "#DA3585",
         "f_color": "#C8B0C9"
+    },
+    {
+        "l_color": "#282828",
+        "p_color": "#000000",
+        "c_color": "#282828",
+        "a_color": "#282828",
+        "f_color": "#ffffff"
     },
 ]
 
@@ -657,16 +663,8 @@ def random_generate_line_length():
 
 def random_generate_angle_measure(p_cross, p1, p2):
     flag = random.choice([0, 1])
-    if flag == 0: # 2x+1
-        num1 = random.choice(list(range(1, 10)))
-        num2 = random.choice(list(range(1, 10)))
-        symbol = Symbol(random.choice(['x', 'y', 'z', 'a', 'b', 'c']))
-        add_flag = random.choice([True, False])
-        if add_flag:
-            expr = num1 * symbol + num2
-        else:
-            expr = num1 * symbol - num2
-        res_string = str(expr)
+    if flag == 0: # x
+        res_string = random.choice(['x', 'y', 'z', 'a', 'b', 'c'])
     elif flag == 1: # 2
         num = get_angle_measure(p_cross, p1, p2)
         res_string = str(num)

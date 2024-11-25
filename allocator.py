@@ -3,6 +3,7 @@ import math
 import random
 import re
 import numpy as np
+import string
 import sympy
 from sympy import (Eq, Expr, Float, I, Symbol, cos, im, nsimplify, pi,
                    simplify, solve, symbols, And, Or, StrictLessThan, StrictGreaterThan, oo)
@@ -12,7 +13,7 @@ from generator import ClauseGenerator
 from utils import (PREDICATES_ENT, PREDICATES_REL, extract_sqrt_terms,
                    find_target_for_construct, get_content, get_points,
                    get_predicate_name, get_symbol, max_letter_index,
-                   parse_clause, replace_points, setup_seed, simplify_and_trim, remove_duplicates, append_lst, random_generate_line_length, random_generate_angle_measure)
+                   parse_clause, replace_points, setup_seed, simplify_and_trim, remove_duplicates, append_lst, random_generate_line_length, random_generate_angle_measure, replace_for_clause)
 
 # ClauseGenerator 
 # Allocator
@@ -35,7 +36,8 @@ class Allocator():
                  geo_states, 
                  construct_cdls, 
                  text_cdls,
-                 allocate_value=False):
+                 allocate_value=False,
+                 replace_chars=False):
         self.points = geo_states['points']                     
         self.lines = geo_states['lines']
         self.circles = geo_states['circles']
@@ -72,8 +74,9 @@ class Allocator():
         self._formulated_cdls = None
         
         # whether to allocate line length or angle measre
-        # True when generating pretrain data, False when generating SFT data
         self.allocate_value = allocate_value
+        # whether to replace template abc -> upper chars
+        self.replace_chars = replace_chars
         
     @property
     def states(self):
@@ -197,6 +200,7 @@ class Allocator():
                 max_y = np.max([pos[1] for pos in positions])
             except Exception as e:
                 print(e)
+                raise e
             max_val = max([abs(i) for i in [min_x, max_x, min_y, max_y]])
             if max_val > 80:
                 continue
@@ -216,9 +220,38 @@ class Allocator():
             # allocate value of line or angle, random choose
             if self.allocate_value:
                 self.allocate_for_value()
+            if self.replace_chars:
+                self.replace_characters()
             return
         
         print('Fail to allocate positions.')
+        
+    def replace_characters(self):
+        start_char = random.choice(['A', 'E', 'I', 'M', 'R'])
+        start_idx = string.ascii_uppercase.index(start_char)
+        chars = string.ascii_uppercase[start_idx: start_idx + len(self.p_pos)]
+        mapping = {}
+        for point_i, char in zip(self.p_pos, chars):
+            mapping[point_i] = char
+            
+        # points
+        self.points = [mapping[p] for p in self.points]
+        self.p_pos = {mapping[k]: self.p_pos[k] for k in self.p_pos}
+        # lines / circles / polygons
+        self.lines = [tuple([mapping[p] for p in l]) for l in self.lines]
+        self.circles = [mapping[p] for p in self.circles]
+        self.points_on_circle = {
+            mapping[k]: [mapping[x] for x in v] 
+            for k, v in self.points_on_circle.items()
+        }
+        self.polygons = [tuple([mapping[c] for c in p]) for p in self.polygons]
+        
+        # clauses
+        self.clauses = [replace_for_clause(c, mapping) for c in self.clauses]
+        self.text_cdls = [replace_for_clause(c, mapping) for c in self.text_cdls]
+        self.construct_cdls = [replace_for_clause(c, mapping) for c in self.construct_cdls]
+        self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
+        return
     
     def find_mini_clauses_subset(self):
         # find min clauses subset to construct each point 
@@ -701,12 +734,13 @@ class Allocator():
                 top_angle = - math.radians(random.uniform(45, 75)) 
             elif mode == 1:
                 top_angle = - math.radians(30) 
-                new_cdl = f"Equal(MeasureOfAngle({''.join([B,A,C])}),30)"
+                # must be counter clockwise, ABC -> CAB
+                new_cdl = f"Equal(MeasureOfAngle({''.join([C,A,B])}),30)"
                 self.image_cdls.append(new_cdl)
                 self.text_cdls.append(new_cdl)
             elif mode == 2:
                 top_angle = - math.radians(60) 
-                new_cdl = f"Equal(MeasureOfAngle({''.join([B,A,C])}),60)"
+                new_cdl = f"Equal(MeasureOfAngle({''.join([C,A,B])}),60)"
                 self.image_cdls.append(new_cdl)
                 self.text_cdls.append(new_cdl)
             interval = random.choice([(0.7, 0.9), (1.1, 1.5)])

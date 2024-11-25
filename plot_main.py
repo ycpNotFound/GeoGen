@@ -36,16 +36,27 @@ def generate_one_sample(predicate_GDL,
             n_more_lines=n_more_lines
         )
         allocator = Allocator(cg.states, c_cdls, t_cdls, allocate_value=True)
-        allocator.allocate()
-        plotter = Plotter(allocator.states,
-                            allocator.formulated_cdls['text_cdls'],
-                            allocator.formulated_cdls['construct_cdls'],
-                            allocator.formulated_cdls['image_cdls'],
-                            replace_characters=True,
-                            color_config=color_config)
+        allocator.allocate() 
+        plotter = Plotter(
+            allocator.states,
+            allocator.formulated_cdls['text_cdls'],
+            allocator.formulated_cdls['construct_cdls'],
+            allocator.formulated_cdls['image_cdls'],
+            replace_characters=True,
+            color_config=color_config,
+            min_side=300,
+            max_side=350
+        )
         plotter.plot()
         fig_name = f"{fig_idx}.png"
-        plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
+        resize_ratio = np.random.choice(
+            [0.4, 0.6, 0.8, 1], p=[0.2, 0.3, 0.3, 0.2]
+        )
+        plotter.save_fig(
+            fig_dir=fig_dir, 
+            fig_name=fig_name, 
+            resize_ratio=resize_ratio
+        )
         task_info = {
             "key": fig_idx,
             "pred_base": predicate_base,
@@ -325,8 +336,8 @@ def task_pretrain():
     return seed, task_name, input_args_list, num_process
     
 def main():
-    # run_task(*task_1())
-    run_task(*task_pretrain())
+    run_task(*task_1())
+    # run_task(*task_pretrain())
 
 
 if __name__ == '__main__':

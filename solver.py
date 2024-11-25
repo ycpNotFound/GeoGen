@@ -1,17 +1,20 @@
-import time
 import random
-from formalgeo.problem import Problem
-from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
+import time
+from copy import copy, deepcopy
+
+from sympy import Eq, solve
+
 from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
-from formalgeo.tools import get_used_pid_and_theorem, debug_print
-from copy import deepcopy
+from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
+from formalgeo.parse import (parse_predicate_gdl, parse_problem_cdl,
+                             parse_theorem_gdl)
+from formalgeo.problem import Problem
+from formalgeo.tools import debug_print, get_used_pid_and_theorem
 from inter_gps_solver.extended_definition import ExtendedDefinition
 from inter_gps_solver.logic_parser import LogicParser
 from inter_gps_solver.logic_solver import LogicSolver
-from utils import parse_clause, formalgeo_to_intergps
-from sympy import Eq, solve
-from copy import copy
+from utils import formalgeo_to_intergps, parse_clause
+
 
 def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     """
@@ -109,6 +112,26 @@ class FormalGeoSolver:
         self.add_selections([], selections)
         debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                     format(time.time() - timing, len(selections)))
+        
+    def solve_special_angles(self):
+        right_triangles = self.problem.condition.get_items_by_predicate('RightTriangle')
+        for tri in right_triangles:
+            angle_chars = [tri, 
+                           (tri[1], tri[2], tri[0]), 
+                           (tri[2], tri[0], tri[1])]
+            angle_syms = [self.problem.get_sym_of_attr('MeasureOfAngle', angle) for angle in angle_chars]
+            angle_values = [self.problem.condition.value_of_sym[sym] for sym in angle_syms]
+            if 60 in angle_values and 90 in angle_values:
+                angle_60 = angle_chars[angle_values.index(60)]
+                angle_90 = angle_chars[angle_values.index(90)]
+                l1 = (angle_60[0], angle_60[1])
+                l2 = (angle_60[1], angle_60[2])
+                perp_p = 
+                
+            if 45 in angle_values and 90 in angle_values:
+                pass
+            
+        
     
     def solve_equations(self):
         # solve equation through subs value of solved symbols
@@ -141,7 +164,7 @@ class FormalGeoSolver:
                 eq = Eq(expr_new, 0)
                 results = solve(eq, sym)
 
-                if self.problem.condition.value_of_sym[sym] is None:
+                if self.problem.condition.value_of_sym[sym] is None and len(results) != 0:
                     solved = True
                     solved_results = results[0]
                     self.problem.set_value_of_sym(sym, solved_results, premise)
@@ -240,6 +263,7 @@ class FormalGeoSolver:
                                 format(time.time() - timing, len(selections)))
             
             self.solve_equations()
+            self.solve_special_angles()
             self.problem.check_goal()
             solved = self.problem.goal.solved
             if solved:  # solved, return result
@@ -250,45 +274,6 @@ class FormalGeoSolver:
             
         return False, None
     
-    def bfs_search(self):
-        self.leveled_condition = {}
-        cur_depth = 0
-        
-        while len(self.stack) > 0:
-            cur_stack_len = len(self.stack)
-            for i in range(cur_stack_len):
-                pos, selection = self.stack.pop(0)
-                self.step_size += 1
-                debug_print(self.debug, "\n(pos={}, node_count={}) Current node.".format(pos, self.node_count))
-                timing = time.time()
-                
-                # save leveled condition, new added
-                last_step = len(self.problem.condition.items)
-                solved = self.apply_and_check_goal(selection)
-                if len(self.problem.condition.items) - last_step > 0:
-                    new_condition = deepcopy(self.problem.condition.items[last_step:])
-                    self.leveled_condition[pos] = {}
-                    for i in range(len(new_condition)):
-                        self.leveled_condition[pos][last_step+i] = new_condition[i]
-                        
-                debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
-                solved, time.time() - timing))
-                if solved is None:  # not update, close search branch
-                    continue
-                if solved:  # solved, return result
-                    _, seqs = get_used_pid_and_theorem(self.problem)
-                    return True, seqs
-                else:  # continue search
-                    if len(pos) == self.max_depth:
-                        continue
-                    timing = time.time()
-                    selections = self.get_theorem_selection()
-                    self.add_selections(pos, selections)
-                    debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".format(time.time() - timing, len(selections)))
-                    
-            cur_depth += 1
-            
-        return False, None    
 
     def get_theorem_selection(self, sample_num_per_th=None):
         """

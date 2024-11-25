@@ -50,8 +50,8 @@ class TargetFinder():
         self.text_cdls = text_cdls
         self.constr_cdls = constr_cdls
         self.image_cdls = image_cdls
-        self.predicate_GDL = dl.predicate_GDL
-        self.theorem_GDL = dl.theorem_GDL
+        self.predicate_GDL = predicate_GDL
+        self.theorem_GDL = theorem_GDL
         self.problem_id = problem_id
         self.t_info = t_info
         self.debug = debug
@@ -69,7 +69,7 @@ class TargetFinder():
                 beam_size=6,
                 t_info=t_info,
                 t_freq_info=t_freq_info,
-                debug=debug
+                # debug=debug
             )
         elif solver_type == 'intergps':
             self.solver = InterGPSSolver(
@@ -246,6 +246,8 @@ class TargetFinder():
             ), 
             reverse=True
         )[:5]
+        if len(chosen_targets) == 0:
+            return None, None, None, None
         chosen_target = random.choice(chosen_targets)
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
@@ -367,7 +369,8 @@ class TargetFinder():
         ])
 
         conditions = clause_to_nature_language(
-            self.problem_CDL['text_cdl'] + self.problem_CDL['image_cdl'],
+            # self.problem_CDL['text_cdl'] + self.problem_CDL['image_cdl'],
+            self.problem_CDL['text_cdl'] + self.problem_CDL['construction_cdl'],
             self.natural_template
         )
 
@@ -437,7 +440,7 @@ class TargetFinder():
                         add_cdls = [
                             f"Equal(MeasureOfAngle({angle_1}),{str(expr_1)})",
                             f"Equal(MeasureOfAngle({angle_2}),{str(expr_2)})",
-                        ],
+                        ]
                         add_conditions = [
                             f"\\angle {angle_1} = {str(expr_1)}",
                             f"\\angle {angle_2} = {str(expr_2)}",
@@ -455,9 +458,7 @@ class TargetFinder():
                 else:
                     target_str = f"Find measure of angle {str(sym).split('ma_')[-1].upper()}"
                     target_cdl = f"Value(MeasureOfAngle({str(sym)}))"
-            for k, v in SYMBOL_MAPPING_2.items():
-                conclusion = conclusion.replace(k, v)
-                target_str = target_str.replace(k, v)
+            
                   
         else: # other predicates
             target_value = str(target[1])
@@ -473,9 +474,10 @@ class TargetFinder():
             target_str = f'Prove that {conclusion}'
             target_cdl = f"Relation({clause})"
             
-            for k, v in SYMBOL_MAPPING_2.items():
-                conclusion = conclusion.replace(k, v)
-                target_str = target_str.replace(k, v)
+        for k, v in SYMBOL_MAPPING_2.items():
+            conclusion = conclusion.replace(k, v)
+            target_str = target_str.replace(k, v)
+            add_conditions = [c.replace(k, v) for c in add_conditions]
             
         conditions += add_conditions
         text += ', '.join(conditions)
@@ -535,6 +537,8 @@ class TargetFinder():
             theorems
         ) = self.find_target_and_solution(condition_graph)
 
+        if target is None:
+            return None, None
         # create question and solution for this geo relation
         (
             target_value, 
@@ -567,8 +571,6 @@ class TargetFinder():
             print(solution_str)
         
         info_dict_for_symbolic = {
-            "problem_id": "",
-            "problem_img": "",
             "problem_level": problem_level,
             "problem_text_en": text,
             "construction_cdl": self.constr_cdls,
@@ -576,13 +578,10 @@ class TargetFinder():
             "image_cdl": self.image_cdls,
             "goal_cdl": target_cdl,
             "problem_answer": target_value,
-        },
+        }
         info_dict_for_llm = {
-            "problem_id": "",
-            "problem_img": "",
             "problem_level": problem_level,
-            "problem_text_en": text,
-            "problem_descrition": "",
+            "problem_text": text,
             "problem_answer": target_value,
             "solution_str": solution_str,
         }
@@ -598,24 +597,24 @@ if __name__ == '__main__':
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
         clauses_base = random.choices(PREDICATES_ENT, k=1)
         clauses_rel = random.choices(PREDICATES_REL, k=1)
-        # clauses_base = [
-        #     "RightTrapezoid",
-        # ]
-        # clauses_rel = [
-        #     'IsBisectorOfAngle', 
-        #     # 'IsMidsegmentOfTriangle',
-        #     # 'IsAltitudeOfQuadrilateral',
-        #     # 'IsIncenterOfTriangle',
-        #     # "IsAltitudeOfTriangle",
-        #     # "IsCircumcenterOfQuadrilateral",
-        #     # "IsMidpointOfArc"
-        #     ]
+        clauses_base = [
+            "Triangle",
+        ]
+        clauses_rel = [
+            'IsPerpendicularBisectorOfLine', 
+            # 'IsMidsegmentOfTriangle',
+            # 'IsAltitudeOfQuadrilateral',
+            # 'IsIncenterOfTriangle',
+            # "IsAltitudeOfTriangle",
+            # "IsCircumcenterOfQuadrilateral",
+            # "IsMidpointOfArc"
+            ]
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
             clauses_base, 
             clauses_rel, 
-            n_more_lines=0
+            n_more_lines=1
         )
         states = cg.states
         
@@ -628,7 +627,7 @@ if __name__ == '__main__':
         print('c_cdls: ', c_cdls)
         print('t_cdls: ', t_cdls)
 
-        allocator = Allocator(states, c_cdls, t_cdls)
+        allocator = Allocator(states, c_cdls, t_cdls, replace_chars=True)
         allocator.allocate()
         print("---------- Location ----------")
         for p, pos in allocator.p_pos.items():
@@ -671,8 +670,5 @@ if __name__ == '__main__':
             debug=True
         )
         info_dict_for_symbolic, info_dict_for_llm = goal_finder.formulate()
-        print('---------- Target and Solution ----------')
-        print(info_dict_for_llm['problem_text_en'])
-        print(info_dict_for_llm['solution_str'])
 
         print('==============================================')

@@ -31,7 +31,8 @@ class Plotter():
                  max_side=350, 
                  color_config=PRESET_COLORS[0],
                  replace_characters=False,
-                 debug=False):
+                 debug=False,
+                 stage_2=False):
         self.p_pos = geo_states['p_pos']
         self.lines = geo_states['lines']
         self.circles = geo_states['circles']
@@ -41,6 +42,7 @@ class Plotter():
         self.construct_cdls = construct_cdls
         self.image_cdls = image_cdls
         self.debug = debug
+        self.stage_2 = stage_2
         
         self.min_side = min_side
         self.max_side = max_side
@@ -67,7 +69,8 @@ class Plotter():
         
         # draw annotations: perp, equal, fill_in_color entity ..
         self.annotation_targets = self.find_annotation_clauses()
-        font_size = int(min(27, min(self.fig_size) / 15))
+        # font_size = int(min(28, min(self.fig_size) / 14))
+        font_size = int(min(self.fig_size) / 14)
         self.FT = ImageFont.truetype("font/arial.ttf", font_size)
         if self.debug:
             print("Font Size: ", font_size)
@@ -497,6 +500,8 @@ class Plotter():
     def plot_measure_of_angle(self, measure_of_angle):
         for angle, measure in measure_of_angle:
             if '+' in measure or '-' in measure:
+                if self.stage_2:
+                    continue # do not draw angle measure
                 measure = f"({measure})°"
             else:
                 measure = f"{measure}°"
@@ -511,8 +516,9 @@ class Plotter():
             BD_vec = (BA_unit[0] + BC_unit[0], BA_unit[1] + BC_unit[1])
             
             # base position at angle bisector
-            xd = xb + BD_vec[0] * 40
-            yd = yb + BD_vec[1] * 40
+            dist = min(min(self.fig_size) / 15, 40)
+            xd = xb + BD_vec[0] * dist
+            yd = yb + BD_vec[1] * dist
             
             # cv2.circle(self.fig, (int(xd), int(yd)), 4, color=(0, 0, 0), thickness=-1, lineType=cv2.LINE_AA)
             # draw arc for angle ABC
@@ -633,7 +639,7 @@ class Plotter():
         for point_i in self.p_pos:
             # char, font, size, width
             text_width = 2
-            text_size = 1
+            text_size = 1.2
             text_bbox_size, _ = cv2.getTextSize(point_i, self.font, text_size, text_width)
             # text_pos is the top left (in image) position
             text_pos = self.get_best_chars_position(text_bbox_size, self.p_pos[point_i])
@@ -643,7 +649,13 @@ class Plotter():
         self.formulate_caption()
 
 
-    def save_fig(self, fig_name, fig_dir):
+    def save_fig(self, fig_name, fig_dir, resize_ratio=1):
+        if resize_ratio != 1:
+            ori_height, ori_width = self.fig.shape[:2]
+            new_height = int(ori_height * resize_ratio)
+            new_width = int(ori_width * resize_ratio)
+            self.fig = cv2.resize(self.fig, (new_width, new_height), interpolation=cv2.INTER_AREA)
+            
         if '.png' in fig_name or '.jpg' in fig_name:
             cv2.imwrite(f"{fig_dir}/{fig_name}", self.fig)
         else:
