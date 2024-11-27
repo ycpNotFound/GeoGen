@@ -2,8 +2,7 @@ import random
 import time
 from copy import copy, deepcopy
 
-from sympy import Eq, solve
-
+from sympy import Eq, solve, sqrt, sin, cos, tan, rad
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
 from formalgeo.parse import (parse_predicate_gdl, parse_problem_cdl,
@@ -121,16 +120,76 @@ class FormalGeoSolver:
                            (tri[2], tri[0], tri[1])]
             angle_syms = [self.problem.get_sym_of_attr('MeasureOfAngle', angle) for angle in angle_chars]
             angle_values = [self.problem.condition.value_of_sym[sym] for sym in angle_syms]
-            if 60 in angle_values and 90 in angle_values:
-                angle_60 = angle_chars[angle_values.index(60)]
-                angle_90 = angle_chars[angle_values.index(90)]
-                l1 = (angle_60[0], angle_60[1])
-                l2 = (angle_60[1], angle_60[2])
-                perp_p = 
-                
-            if 45 in angle_values and 90 in angle_values:
-                pass
             
+            special_angle = None
+            if 60 in angle_values and 90 in angle_values:
+                special_angle = 60
+            elif 30 in angle_values and 90 in angle_values:
+                special_angle = 30
+            elif 45 in angle_values and 90 in angle_values:
+                special_angle = 45
+            
+            if special_angle is not None:
+                angle_sp = angle_chars[angle_values.index(special_angle)]
+                angle_90 = angle_chars[angle_values.index(90)]
+                angle_sp_sym = angle_syms[angle_values.index(special_angle)]
+                angle_90_sym = angle_syms[angle_values.index(90)]
+                # l2 = cos(a) * l1
+                # l3 = sin(a) * l1
+                # l3 = tan(a) * l2
+                l1 = (angle_sp[0], angle_sp[1])
+                l2 = (angle_sp[1], angle_sp[2])
+                l3 = (angle_sp[2], angle_sp[0])
+                if angle_sp[0] == angle_90[1]:
+                    l1, l2 = l2, l1
+                l1_sym = self.problem.get_sym_of_attr('LengthOfLine', l1)
+                l2_sym = self.problem.get_sym_of_attr('LengthOfLine', l2)
+                l3_sym = self.problem.get_sym_of_attr('LengthOfLine', l3)
+                
+                expr_1 = l2_sym - cos(rad(special_angle)) * l1_sym
+                expr_2 = l3_sym - sin(rad(special_angle)) * l1_sym
+                expr_3 = l3_sym - tan(rad(special_angle)) * l2_sym
+                premise_expr_1 = angle_sp_sym - special_angle
+                premise_expr_2 = angle_90_sym - 90
+                premise = []
+                for i, c in enumerate(self.problem.condition.items):
+                    if c[0] == 'Equation':
+                        if c[1] == premise_expr_1 or c[1] == premise_expr_2:
+                            premise.append(i)
+                assert len(premise) == 2
+                
+                last_step = len(self.problem.condition.items)
+                self.problem.add('Equation', expr_1, premise, ('cos_of_angle', None, None))
+                self.problem.add('Equation', expr_2, premise, ('sin_of_angle', None, None))
+                self.problem.add('Equation', expr_3, premise, ('tan_of_angle', None, None))
+                
+                # add
+                if len(self.problem.condition.items) - last_step > 0:
+                    new_condition = deepcopy(self.problem.condition.items[last_step:])
+                    # find position in search tree
+                    pos = None
+                    for k, v in self.leveled_condition.items():
+                        ids = list(v.keys())
+                        if premise[0] in ids or premise[1] in ids:
+                            pos = k
+                            break
+                    if pos is None:
+                        pos = list(self.leveled_condition.keys())[-1]
+                        depth = len(pos)
+                        new_pos = pos[:-1] + (pos[-1] + 1,)
+                    else:
+                        # copy from `add_selections`
+                        depth = len(pos) + 1
+                        if depth not in self.node_count:
+                            self.node_count[depth] = 1
+                        new_pos = tuple(list(pos) + [self.node_count[depth]])
+                    self.node_count[depth] += 1
+                    self.leveled_condition[new_pos] = {}
+                    for i in range(len(new_condition)):
+                        self.leveled_condition[new_pos][last_step+i] = new_condition[i]
+                
+
+        return
         
     
     def solve_equations(self):
@@ -199,7 +258,7 @@ class FormalGeoSolver:
                 self.leveled_condition[new_pos] = {}
                 for i in range(len(new_condition)):
                     self.leveled_condition[new_pos][last_step+i] = new_condition[i]
-                    
+
         return 
     
     def search(self):
@@ -256,14 +315,15 @@ class FormalGeoSolver:
                         continue
                     timing = time.time()
                     selections = self.get_theorem_selection(
-                        sample_num_per_th=3
+                        # sample_num_per_th=3
                     )
                     self.add_selections(pos, selections)
                     debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                                 format(time.time() - timing, len(selections)))
             
-            self.solve_equations()
             self.solve_special_angles()
+            self.solve_equations()
+            
             self.problem.check_goal()
             solved = self.problem.goal.solved
             if solved:  # solved, return result
@@ -417,6 +477,8 @@ class FormalGeoSolver:
         for t_name, t_branch, t_letters in related_pres:
             if 'angle_addition' in t_name:
                 a = 1
+            if 'similar_arc' in t_name:
+                continue
             gpl = self.parsed_theorem_GDL[t_name]["body"][t_branch]
             results = GPLExecutor.run(gpl, self.problem, t_letters)  # get gpl reasoned result
             for letters, premise, conclusion in results:

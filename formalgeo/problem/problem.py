@@ -278,6 +278,33 @@ class Problem:
         # for angle in self.condition.get_items_by_predicate("Angle"):
         #     premise = (self.condition.get_id_by_predicate_and_item("Angle", angle),)
         #     self.add("Angle", (angle[2], angle[1], angle[0]), premise, ("extended", None, None))
+        
+        # 6.Cocircular radius equal (new added).
+        for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
+            if predicate != "Cocircular":
+                continue
+            if not self.fv_check("Cocircular", item):  # FV check
+                w_msg = "FV check not passed: [{}, {}]".format(predicate, item)
+                warnings.warn(w_msg)
+                continue
+            radius = []
+            for p in item[1:]:
+                line = (item[0], p)
+                if line in self.condition.items_group['Line']:
+                    radius.append(line)
+            
+            for i in range(len(radius)-1):
+                l1, l2 = radius[i], radius[i+1]
+                l1_sym = self.get_sym_of_attr('LengthOfLine', l1)
+                l2_sym = self.get_sym_of_attr('LengthOfLine', l2)
+                premise = [
+                    self.condition.get_id_by_predicate_and_item(predicate, tuple(item)),
+                    self.condition.get_id_by_predicate_and_item("Line", l1),
+                    self.condition.get_id_by_predicate_and_item("Line", l2),
+                ]
+                self.add("Equation", l1_sym - l2_sym, premise, ("extended", None, None))
+        return 
+
 
     def _add_shape(self, shape, premise, theorem):
         """pass"""

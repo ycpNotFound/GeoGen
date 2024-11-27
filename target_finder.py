@@ -154,6 +154,7 @@ class TargetFinder():
         # 2. only has linear term, degree <= 1
         # 3. if has 2 vars, can not be both solved value
         # 4. only has symbols begin with 'll_' or 'ma_'
+        # 5. remove angle measure that >= 180
         for condition in conditions_to_smaple:
             if condition[0] == 'Equation':
                 f1 = len(condition[1].free_symbols) <= 2
@@ -169,7 +170,10 @@ class TargetFinder():
                         f3 = False
                         
                 f4 = all(['ll_' in sym or 'ma_' in sym for sym in syms])
-                if all([f1, f2, f3, f4]):
+                f5 = True
+                if all(['ma_' in sym for sym in syms]):
+                    f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
+                if all([f1, f2, f3, f4, f5]):
                     new_targets_cal.append(condition)
             else:
                 if condition[0] in PREDICATES_REL + PREDICATES_ENT:
@@ -180,8 +184,7 @@ class TargetFinder():
         # so that the distribution of type won't be too sharp
         angle_targets = [t for t in new_targets_cal if 'ma_' in str(t[1])]
         line_targets = [t for t in new_targets_cal if 'll_' in str(t[1])]
-        new_targets_cal = angle_targets[:5] + line_targets[:5]
-        new_targets = new_targets_cal + new_targets_prv[:5]
+        new_targets = angle_targets[:5] + line_targets[:5] + new_targets_prv[:5]
         
         # find solution / theorems for each target
         theorems_for_targets = {}
@@ -226,8 +229,6 @@ class TargetFinder():
             score_2 = 0
             if target[0] == 'Equation':
                 score_2 = - len(target[1].free_symbols)
-                if abs(target[1].as_coefficients_dict().get(1, 0)) > 180: # delete some angle > 180 to be target
-                    score_2 = -100
                 
             token_set = set()
             for item in theorem_list:
@@ -245,7 +246,7 @@ class TargetFinder():
                 level_for_targets[k]
             ), 
             reverse=True
-        )[:5]
+        )[:3]
         if len(chosen_targets) == 0:
             return None, None, None, None
         chosen_target = random.choice(chosen_targets)
@@ -278,7 +279,7 @@ class TargetFinder():
             upper=False,
             symbol2nature=False
         )
-        pred_ignore = ['Angle', 'Line', 'Point', 'Shape', 'Polygon', 'Triangle']
+        pred_ignore = ['Angle', 'Line', 'Point', 'Shape', 'Polygon', 'Triangle', 'Arc', 'Circle', 'Free']
         extend_nodes = [n for n in sub_nodes if n.value[3][0] == 'extended' and n.value[0] not in pred_ignore]
 
         theorems_formal = []
@@ -292,6 +293,7 @@ class TargetFinder():
         
         for i, node in enumerate(sub_nodes):
             theorem = node.value[3][0]
+            predicate = node.value[0]
             statement = sub_nodes_statements[i]
             
             if theorem not in ['prerequisite', 'extended', 'solve_eq']:
@@ -307,6 +309,9 @@ class TargetFinder():
                     extend_node = queue.popleft()
                     extend_idx = sub_nodes.index(extend_node)
                     extend_statement = sub_nodes_statements[extend_idx]
+                    extend_predicate = extend_node.value[0]
+                    if predicate == extend_predicate and predicate in ['Collinear', 'Cocircular']:
+                        continue
                     extend_conditions.append(extend_statement)
                     
                     for n in extend_nodes:
@@ -592,23 +597,27 @@ class TargetFinder():
         
 if __name__ == '__main__':
     setup_seed(1234)
+    import itertools
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    for i in range(10):
+    # for i in range(10):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
-        clauses_base = random.choices(PREDICATES_ENT, k=1)
-        clauses_rel = random.choices(PREDICATES_REL, k=1)
-        clauses_base = [
-            "Triangle",
-        ]
-        clauses_rel = [
-            'IsPerpendicularBisectorOfLine', 
-            # 'IsMidsegmentOfTriangle',
-            # 'IsAltitudeOfQuadrilateral',
-            # 'IsIncenterOfTriangle',
-            # "IsAltitudeOfTriangle",
-            # "IsCircumcenterOfQuadrilateral",
-            # "IsMidpointOfArc"
-            ]
+    for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
+        clauses_base = [clauses_base]
+        clauses_rel = [clauses_rel]
+        # clauses_base = random.choices(PREDICATES_ENT, k=1)
+        # clauses_rel = random.choices(PREDICATES_REL, k=1)
+        # clauses_base = [
+        #     "Triangle",
+        # ]
+        # clauses_rel = [
+        #     'IsPerpendicularBisectorOfLine', 
+        #     # 'IsMidsegmentOfTriangle',
+        #     # 'IsAltitudeOfQuadrilateral',
+        #     # 'IsIncenterOfTriangle',
+        #     # "IsAltitudeOfTriangle",
+        #     # "IsCircumcenterOfQuadrilateral",
+        #     # "IsMidpointOfArc"
+        # ]
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
@@ -618,9 +627,9 @@ if __name__ == '__main__':
         )
         states = cg.states
         
-        # states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('d', 'e'), ('a', 'c')], 'circles': [], 'polygons': [('a', 'b', 'c', 'd'), ('a', 'b', 'c'), ('a', 'c', 'd')], 'constraints': ['ParallelBetweenLine(ad,bc)', 'Equal(MeasureOfAngle(dab),90)', 'Equal(MeasureOfAngle(abc),90)', 'Equal(MeasureOfAngle(ade),MeasureOfAngle(edc))'], 'constraints_base': ['ParallelBetweenLine(ad,bc)', 'Equal(MeasureOfAngle(dab),90)', 'Equal(MeasureOfAngle(abc),90)'], 'points_on_circle': {}}
-        # c_cdls = ['Shape(ab,bc,cd,da)', 'Shape(de)']
-        # t_cdls = ['RightTrapezoid(abcd)', 'IsBisectorOfAngle(de,adc)']  
+        states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('a', 'c'), ('c', 'e'), ('c', 'd'), ('b', 'd')], 'circles': ['d'], 'polygons': [('a', 'b', 'c'), ('b', 'c', 'd')], 'constraints': ['Triangle(abc)', 'Equal(MeasureOfAngle(ecd),90)', 'Cocircular(d,abc)', 'Cocircular(d,c)'], 'constraints_base': ['Triangle(abc)'], 'points_on_circle': {'d': ['a', 'b', 'c']}}
+        c_cdls = ['Shape(ab,bc,ca)', 'Cocircular(d,abc)', 'Shape(ce)', 'Cocircular(d,c)']
+        t_cdls = ['Triangle(abc)', 'IsTangentOfCircle(ec,d)']
         
         print('---------- Allocator Inputs ----------')
         print(states)

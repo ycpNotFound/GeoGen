@@ -233,6 +233,17 @@ def clause_to_nature_language(clauses, natural_template, upper=True, symbol2natu
                 condition_i = f"{items[0]} = {items[1]}"
             elif pred == 'LengthOfArc':
                 condition_i = f"\\arc {items[0]} = \\arc {items[1]}"
+            elif pred == 'MeasureOfArc':
+                # OAB -> BOA
+                angle_1 = ''.join([items[0][2], items[0][0], items[0][1]])
+                if items[1].isalpha():
+                    angle_2 = ''.join([items[1][2], items[1][0], items[1][1]])
+                    condition_i = f"\\angle {angle_1} = \\angle {angle_2}"
+                else:
+                    if '+' in items[1] or '-' in items[1]:
+                        condition_i = f"\\angle {angle_1} = ({items[1]})°"
+                    else:
+                        condition_i = f"\\angle {angle_1} = {items[1]}°"
             elif pred == 'RatioOfSimilarTriangle':
                 tri_1, tri_2 = items[0][:3], items[0][3:]
                 condition_i = f"ratio of similar \\triangle {tri_1} and \\triangle {tri_2} = {items[1]}"
@@ -277,6 +288,8 @@ def clause_to_nature_language(clauses, natural_template, upper=True, symbol2natu
             condition_i = f"line {items[0]}"
         elif 'Angle' == pred:
             condition_i = f"\\angle {items[0]}"
+        elif 'Arc' == pred:
+            condition_i = f"\\arc {items[0]}"
         else:
             raise KeyError(clause)
         if upper:

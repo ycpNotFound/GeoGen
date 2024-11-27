@@ -1,40 +1,38 @@
 {
-    "('Equation', ma_fgi + ma_hfg - 120, (77, 78), ('solve_eq', None, None), 26)": [
+    "('Equation', ma_abc + ma_bca - 150, (100, 102), ('solve_eq', None, None), 57)": [
         "Solution: ",
-        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_fgi+ma_gef+ma_hfg-180 = 0. ",
-        "Step 2: <by> solve_eq, <because> ∠ IEH = 60°, ma_fgi+ma_gef+ma_hfg-180 = 0, <therefore> ma_fgi+ma_hfg-120 = 0. "
+        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_abc+ma_bca+ma_cab-180 = 0. ",
+        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_abc+ma_bca+ma_cab-180 = 0, <therefore> ma_abc+ma_bca-150 = 0. "
     ],
-    "('Equation', ma_hie - 30, (71, 77, 79), ('solve_eq', None, None), 26)": [
+    "('Equation', ma_bec + ma_cdb - 90, (99, 105), ('solve_eq', None, None), 57)": [
         "Solution: ",
-        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_ehi+ma_gef+ma_hie-180 = 0. ",
-        "Step 2: <because> IH besects EF and IH ⊥ EF, <therefore> EH ⊥ IH, ∠ EHI = 90°. ",
-        "Step 3: <by> solve_eq, <because> ∠ EHI = 90°, ∠ IEH = 60°, ma_ehi+ma_gef+ma_hie-180 = 0, <therefore> ∠ HIE = 30°. "
+        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_bec+ma_cdb+ma_ecd-180 = 0. ",
+        "Step 2: <because> EC is the tangent of ⊙ D, <therefore> EC ⊥ DC, ∠ ECD = 90°. ",
+        "Step 3: <by> solve_eq, <because> ∠ ECD = 90°, ma_bec+ma_cdb+ma_ecd-180 = 0, <therefore> ma_bec+ma_cdb-90 = 0. "
     ],
-    "('Equation', ma_fhi - 270, (71, 86, 94), ('solve_eq', None, None), 26)": [
+    "('Equation', ma_ecb - 30, (155, 164), ('solve_eq', None, None), 61)": [
         "Solution: ",
-        "Step 1: <because> the point H is on the line segment EF, <therefore> points F, H, E lie on the same line. ",
-        "Step 2: <by> flat_angle, <because> points F, H, E lie on the same line, <therefore> ∠ FHE = 180°. ",
-        "Step 3: <by> angle_addition, <therefore> -ma_ehi-ma_fhe+ma_fhi = 0. ",
-        "Step 4: <because> IH besects EF and IH ⊥ EF, <therefore> EH ⊥ IH, ∠ EHI = 90°. ",
-        "Step 5: <by> solve_eq, <because> ∠ EHI = 90°, -ma_ehi-ma_fhe+ma_fhi = 0, ∠ FHE = 180°, <therefore> ∠ FHI = 270°. "
+        "Step 1: <by> arc_property_circumference_angle_external, <because> points B, C, A lie on the same circle centered at point D, <therefore> ma_cab-mar_dbc/2 = 0. ",
+        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_cab-mar_dbc/2 = 0, <therefore> ∠ CDB = 60°. ",
+        "Step 3: <by> circle_property_angle_of_osculation, <because> EC is the tangent of ⊙ D, <therefore> ma_ecb-mar_dbc/2 = 0. ",
+        "Step 4: <by> solve_eq, <because> ma_ecb-mar_dbc/2 = 0, ∠ CDB = 60°, <therefore> ∠ ECB = 30°. "
     ],
-    "('Equation', ma_gih - 150, (83, 105), ('solve_eq', None, None), 27)": [
+    "('Equation', ma_bec + ma_cbe - 150, (104, 181), ('solve_eq', None, None), 61)": [
         "Solution: ",
-        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_ehi+ma_gef+ma_hie-180 = 0. ",
-        "Step 2: <because> IH besects EF and IH ⊥ EF, <therefore> EH ⊥ IH, ∠ EHI = 90°. ",
-        "Step 3: <by> solve_eq, <because> ∠ EHI = 90°, ∠ IEH = 60°, ma_ehi+ma_gef+ma_hie-180 = 0, <therefore> ∠ HIE = 30°. ",
-        "Step 4: <because> the point I lies on line segment EG, <therefore> points G, I, E lie on the same line. ",
-        "Step 5: <by> adjacent_complementary_angle, <because> points G, I, E lie on the same line, <therefore> ma_gih+ma_hie-180 = 0. ",
-        "Step 6: <by> solve_eq, <because> ma_gih+ma_hie-180 = 0, ∠ HIE = 30°, <therefore> ∠ GIH = 150°. "
+        "Step 1: <by> arc_property_circumference_angle_external, <because> points B, C, A lie on the circle D, <therefore> ma_cab-mar_dbc/2 = 0. ",
+        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_cab-mar_dbc/2 = 0, <therefore> ∠ CDB = 60°. ",
+        "Step 3: <by> circle_property_angle_of_osculation, <because> EC is the tangent of ⊙ D, <therefore> ma_ecb-mar_dbc/2 = 0. ",
+        "Step 4: <by> solve_eq, <because> ma_ecb-mar_dbc/2 = 0, ∠ CDB = 60°, <therefore> ∠ ECB = 30°. ",
+        "Step 5: <by> triangle_property_angle_sum, <therefore> ma_bec+ma_cbe+ma_ecb-180 = 0. ",
+        "Step 6: <by> solve_eq, <because> ma_bec+ma_cbe+ma_ecb-180 = 0, ∠ ECB = 30°, <therefore> ma_bec+ma_cbe-150 = 0. "
     ],
-    "('Equation', ma_hig - 210, (105, 107), ('solve_eq', None, None), 27)": [
+    "('Equation', -ma_bca + ma_eca - 30, (116, 181), ('solve_eq', None, None), 61)": [
         "Solution: ",
-        "Step 1: <by> flat_angle, <because> points E, I, G are aligned in a straight line, <therefore> ∠ EIG = 180°. ",
-        "Step 2: <by> angle_addition, <therefore> -ma_eig-ma_hie+ma_hig = 0. ",
-        "Step 3: <by> solve_eq, <because> -ma_eig-ma_hie+ma_hig = 0, ∠ EIG = 180°, <therefore> -ma_hie+ma_hig-180 = 0. ",
-        "Step 4: <by> triangle_property_angle_sum, <therefore> ma_ehi+ma_gef+ma_hie-180 = 0. ",
-        "Step 5: <because> IH is perpendicular bisector of EF, <therefore> EH ⊥ IH, ∠ EHI = 90°. ",
-        "Step 6: <by> solve_eq, <because> ∠ EHI = 90°, ∠ IEH = 60°, ma_ehi+ma_gef+ma_hie-180 = 0, <therefore> ∠ HIE = 30°. ",
-        "Step 7: <by> solve_eq, <because> ∠ HIE = 30°, -ma_hie+ma_hig-180 = 0, <therefore> ∠ HIG = 210°. "
+        "Step 1: <by> arc_property_circumference_angle_external, <because> points B, C, A lie on the same circle centered at point D, <therefore> ma_cab-mar_dbc/2 = 0. ",
+        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_cab-mar_dbc/2 = 0, <therefore> ∠ CDB = 60°. ",
+        "Step 3: <by> circle_property_angle_of_osculation, <because> EC is the tangent of ⊙ D, <therefore> ma_ecb-mar_dbc/2 = 0. ",
+        "Step 4: <by> solve_eq, <because> ma_ecb-mar_dbc/2 = 0, ∠ CDB = 60°, <therefore> ∠ ECB = 30°. ",
+        "Step 5: <by> angle_addition, <therefore> -ma_bca+ma_eca-ma_ecb = 0. ",
+        "Step 6: <by> solve_eq, <because> -ma_bca+ma_eca-ma_ecb = 0, ∠ ECB = 30°, <therefore> -ma_bca+ma_eca-30 = 0. "
     ]
 }
