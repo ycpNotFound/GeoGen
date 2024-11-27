@@ -651,8 +651,10 @@ if __name__ == '__main__':
             print('\t', c_cdl)
             
         
-        t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-        t_freq_info = json.load(open("json/theorem_freq.json", 'r', encoding='utf-8'))
+        # t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+        t_info = json.load(open("json/t_info_new.json"))
+        t_freq_info = {k: v[1] for k, v in t_info.items()}
+        t_freq_info = sorted(t_freq_info, reverse=True, key=lambda k: t_freq_info[k])
         
         plotter = Plotter(allocator.states,
                             allocator.formulated_cdls['text_cdls'],
@@ -662,11 +664,11 @@ if __name__ == '__main__':
         plotter.plot()
         plotter.save_fig('test', 'imgs_test')
         
-        predicate_GDL = json.load(open('json/predicate_GDL_for_search.json', 'r'))
-        theorem_GDL = json.load(open('json/theorem_GDL.json', 'r'))
+        predicate_GDL_search = json.load(open('json/predicate_GDL_for_search.json', 'r'))
+        theorem_GDL_search = json.load(open('json/theorem_GDL_for_search.json', 'r'))
         goal_finder = TargetFinder(
-            predicate_GDL,
-            theorem_GDL,
+            predicate_GDL_search,
+            theorem_GDL_search,
             t_info,
             t_freq_info,
             allocator.states, 
