@@ -1,38 +1,13 @@
 {
-    "('Equation', ma_abc + ma_bca - 150, (100, 102), ('solve_eq', None, None), 57)": [
+    "('Equation', ma_ghf - 105, (88, 89, 90, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101), ('solve_eq', None, None), 4)": [
         "Solution: ",
-        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_abc+ma_bca+ma_cab-180 = 0. ",
-        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_abc+ma_bca+ma_cab-180 = 0, <therefore> ma_abc+ma_bca-150 = 0. "
-    ],
-    "('Equation', ma_bec + ma_cdb - 90, (99, 105), ('solve_eq', None, None), 57)": [
-        "Solution: ",
-        "Step 1: <by> triangle_property_angle_sum, <therefore> ma_bec+ma_cdb+ma_ecd-180 = 0. ",
-        "Step 2: <because> EC is the tangent of ⊙ D, <therefore> EC ⊥ DC, ∠ ECD = 90°. ",
-        "Step 3: <by> solve_eq, <because> ∠ ECD = 90°, ma_bec+ma_cdb+ma_ecd-180 = 0, <therefore> ma_bec+ma_cdb-90 = 0. "
-    ],
-    "('Equation', ma_ecb - 30, (155, 164), ('solve_eq', None, None), 61)": [
-        "Solution: ",
-        "Step 1: <by> arc_property_circumference_angle_external, <because> points B, C, A lie on the same circle centered at point D, <therefore> ma_cab-mar_dbc/2 = 0. ",
-        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_cab-mar_dbc/2 = 0, <therefore> ∠ CDB = 60°. ",
-        "Step 3: <by> circle_property_angle_of_osculation, <because> EC is the tangent of ⊙ D, <therefore> ma_ecb-mar_dbc/2 = 0. ",
-        "Step 4: <by> solve_eq, <because> ma_ecb-mar_dbc/2 = 0, ∠ CDB = 60°, <therefore> ∠ ECB = 30°. "
-    ],
-    "('Equation', ma_bec + ma_cbe - 150, (104, 181), ('solve_eq', None, None), 61)": [
-        "Solution: ",
-        "Step 1: <by> arc_property_circumference_angle_external, <because> points B, C, A lie on the circle D, <therefore> ma_cab-mar_dbc/2 = 0. ",
-        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_cab-mar_dbc/2 = 0, <therefore> ∠ CDB = 60°. ",
-        "Step 3: <by> circle_property_angle_of_osculation, <because> EC is the tangent of ⊙ D, <therefore> ma_ecb-mar_dbc/2 = 0. ",
-        "Step 4: <by> solve_eq, <because> ma_ecb-mar_dbc/2 = 0, ∠ CDB = 60°, <therefore> ∠ ECB = 30°. ",
-        "Step 5: <by> triangle_property_angle_sum, <therefore> ma_bec+ma_cbe+ma_ecb-180 = 0. ",
-        "Step 6: <by> solve_eq, <because> ma_bec+ma_cbe+ma_ecb-180 = 0, ∠ ECB = 30°, <therefore> ma_bec+ma_cbe-150 = 0. "
-    ],
-    "('Equation', -ma_bca + ma_eca - 30, (116, 181), ('solve_eq', None, None), 61)": [
-        "Solution: ",
-        "Step 1: <by> arc_property_circumference_angle_external, <because> points B, C, A lie on the same circle centered at point D, <therefore> ma_cab-mar_dbc/2 = 0. ",
-        "Step 2: <by> solve_eq, <because> ∠ CAB = 30°, ma_cab-mar_dbc/2 = 0, <therefore> ∠ CDB = 60°. ",
-        "Step 3: <by> circle_property_angle_of_osculation, <because> EC is the tangent of ⊙ D, <therefore> ma_ecb-mar_dbc/2 = 0. ",
-        "Step 4: <by> solve_eq, <because> ma_ecb-mar_dbc/2 = 0, ∠ CDB = 60°, <therefore> ∠ ECB = 30°. ",
-        "Step 5: <by> angle_addition, <therefore> -ma_bca+ma_eca-ma_ecb = 0. ",
-        "Step 6: <by> solve_eq, <because> -ma_bca+ma_eca-ma_ecb = 0, ∠ ECB = 30°, <therefore> -ma_bca+ma_eca-30 = 0. "
+        "Step 1: <by> triangle_property_angle_sum, <therefore> $ ∠ FGH + ∠ GHF + ∠ HFG = 180 $. ",
+        "Step 2: <by> triangle_property_angle_sum, <therefore> $ ∠ EHG + ∠ GEH + ∠ HGE = 180 $. ",
+        "Step 3: <by> triangle_property_angle_sum, <therefore> $ ∠ EFH + ∠ FHE + ∠ HEF = 180 $. ",
+        "Step 4: <by> triangle_property_angle_sum, <therefore> $ ∠ EFG + ∠ FGE + ∠ GEF = 180 $. ",
+        "Step 5: <because> the incenter of △ EFG is H, <therefore> EH is the besector line of ∠ GEF, GH besects ∠ FGE, FH is the besector line of ∠ EFG, $ ∠ GEF = 2*∠ HEF $, $ ∠ GEF = 2*∠ GEH $, $ ∠ FGE = 2*∠ HGE $, $ ∠ FGE = 2*∠ FGH $, ∠ FGH = ∠ HGE, $ ∠ EFG = 2*∠ HFG $, $ ∠ EFG = 2*∠ EFH $, ∠ EFH = ∠ HFG. ",
+        "Step 6: <by> solve_eq, <because> $ ∠ GEF = 2*∠ HEF $ from step 5, ∠ GEF = 30°, <therefore> ∠ HEF = 15°. ",
+        "Step 7: <by> solve_eq, <because> $ ∠ GEF = 2*∠ GEH $ from step 5, ∠ GEF = 30°, <therefore> ∠ GEH = 15°. ",
+        "Step 8: <by> solve_eq, <because> ∠ EFH = ∠ HFG from step 5, $ ∠ EFG = 2*∠ EFH $ from step 5, $ ∠ EFG = 2*∠ HFG $ from step 5, ∠ FGH = ∠ HGE from step 5, $ ∠ FGE = 2*∠ FGH $ from step 5, $ ∠ FGE = 2*∠ HGE $ from step 5, ∠ GEF = 30°, ∠ GEH = 15° from step 7, ∠ HEF = 15° from step 6, $ ∠ EFG + ∠ FGE + ∠ GEF = 180 $ from step 4, $ ∠ EFH + ∠ FHE + ∠ HEF = 180 $ from step 3, $ ∠ EHG + ∠ GEH + ∠ HGE = 180 $ from step 2, $ ∠ FGH + ∠ GHF + ∠ HFG = 180 $ from step 1, <therefore> ∠ GHF = 105°. "
     ]
 }

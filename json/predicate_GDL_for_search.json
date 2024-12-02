@@ -90,6 +90,9 @@
         "CAB"
       ],
       "extend": [
+        "IsoscelesTriangle(ABC)",
+        "IsoscelesTriangle(BCA)",
+        "IsoscelesTriangle(CAB)",
         "Equal(LengthOfLine(AB),LengthOfLine(BC))",
         "Equal(LengthOfLine(BC),LengthOfLine(AC))",
         "Equal(LengthOfLine(AB),LengthOfLine(AC))",
@@ -193,7 +196,8 @@
       "extend": [
         "Trapezoid(ABCD)",
         "Equal(LengthOfLine(AB),LengthOfLine(CD))",
-        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(BCD))"
+        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(BCD))",
+        "Equal(MeasureOfAngle(DAB),MeasureOfAngle(CDA))"
       ]
     },
     "RightTrapezoid(ABCD)": {
@@ -222,7 +226,9 @@
         "M,BA"
       ],
       "extend": [
-        "Equal(LengthOfLine(AM),LengthOfLine(MB))"
+        "Equal(LengthOfLine(AM),LengthOfLine(MB))",
+        "Equal(LengthOfLine(AB),Mul(LengthOfLine(AM),2))",
+        "Equal(LengthOfLine(AB),Mul(LengthOfLine(MB),2))"
       ],
       "find": ["Line(AB)"],
       "construct": ["M"],
@@ -239,7 +245,9 @@
       ],
       "multi": [],
       "extend": [
-        "Equal(LengthOfArc(OAM),LengthOfArc(OMB))"
+        "Equal(LengthOfArc(OAM),LengthOfArc(OMB))",
+        "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OAM),2))",
+        "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OMB),2))"
       ],
       "find": ["Circle(O)", "Cocircular(O,AB)", "Arc(OAB)"], 
       "construct": ["M"],
@@ -306,7 +314,9 @@
       ],
       "multi": [],
       "extend": [
-        "Equal(MeasureOfAngle(ABD),MeasureOfAngle(DBC))"
+        "Equal(MeasureOfAngle(ABD),MeasureOfAngle(DBC))",
+        "Equal(MeasureOfAngle(ABC),Mul(MeasureOfAngle(ABD),2))",
+        "Equal(MeasureOfAngle(ABC),Mul(MeasureOfAngle(DBC),2))"
       ],
       "find": ["Angle(ABC)"], 
       "construct": ["D"],
@@ -706,7 +716,8 @@
       ],
       "multi": [],
       "extend": [
-        "PerpendicularBetweenLine(PA,OA)"
+        "PerpendicularBetweenLine(PA,OA)",
+        "PerpendicularBetweenLine(OA,PA)"
       ],
       "find": ["Circle(O)", "Cocircular(O,A)"],
       "construct": ["P"],

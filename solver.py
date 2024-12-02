@@ -2,7 +2,7 @@ import random
 import time
 from copy import copy, deepcopy
 
-from sympy import Eq, solve, sqrt, sin, cos, tan, rad
+from sympy import Eq, solve, sqrt, sin, cos, tan, rad, simplify
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
 from formalgeo.parse import (parse_predicate_gdl, parse_problem_cdl,
@@ -188,12 +188,12 @@ class FormalGeoSolver:
                     for i in range(len(new_condition)):
                         self.leveled_condition[new_pos][last_step+i] = new_condition[i]
                 
-
+                    self.problem.step(('solve_eq', None, None), 0)
         return
         
     
     def solve_equations(self):
-        # solve equation through subs value of solved symbols
+        # solve equation, substitute value of syms first
         eq_exprs = deepcopy(self.problem.condition.simplified_equation)
         value_of_sym = {
             k: v for k, v in 
@@ -217,8 +217,8 @@ class FormalGeoSolver:
             
             last_step = len(self.problem.condition.items)
             
-            # can solve to value 
-            if len(expr_new.free_symbols) == 1:
+            # can solve to value directly
+            if len(expr_new.free_symbols) == 1 and len(expr.free_symbols) > 1:
                 sym = list(expr_new.free_symbols)[0]
                 eq = Eq(expr_new, 0)
                 results = solve(eq, sym)
@@ -226,9 +226,9 @@ class FormalGeoSolver:
                 if self.problem.condition.value_of_sym[sym] is None and len(results) != 0:
                     solved = True
                     solved_results = results[0]
-                    self.problem.set_value_of_sym(sym, solved_results, premise)
+                    self.problem.set_value_of_sym(sym, solved_results, premise)     
 
-            # can get new numerical relation
+            # can get new numerical relation though substitute
             elif len(expr_new.free_symbols) == 2 and len(expr.free_symbols) > 2:
                 solved = True
                 self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
@@ -246,10 +246,9 @@ class FormalGeoSolver:
                 # find position in search tree
                 pos = list(self.leveled_condition.keys())[-1]
                 for k, v in self.leveled_condition.items():
-                    ids = list(v.keys())
-                    if eq_idx in ids:
+                    if eq_idx in list(v.keys()):
                         pos = k
-                # copy from `add_selections`
+                # get new depth and pos
                 depth = len(pos) + 1
                 if depth not in self.node_count:
                     self.node_count[depth] = 1
@@ -258,7 +257,59 @@ class FormalGeoSolver:
                 self.leveled_condition[new_pos] = {}
                 for i in range(len(new_condition)):
                     self.leveled_condition[new_pos][last_step+i] = new_condition[i]
+                    
+                self.problem.step(('solve_eq', None, None), 0)
 
+        return 
+    
+    def solve_equation_groups(self):
+        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
+        eqs = [simplify(Eq(e, 0)) for e in eq_exprs]
+        update = False
+        
+        for i, expr_i in enumerate(eq_exprs):
+            if len(expr_i.free_symbols) == 2:
+                for expr_j in list(eq_exprs.keys())[i+1:]:
+                    last_step = len(self.problem.condition.items)
+                    
+                    if len(expr_i.free_symbols & expr_j.free_symbols) == 2:
+                        premise = eq_exprs[expr_i] + eq_exprs[expr_j]
+                        results = solve((expr_i, expr_j), expr_i.free_symbols, dict=True)
+                        if len(results) == 0:
+                            continue
+                        if isinstance(results, list):
+                            results = results[0]
+                            
+                        # add conditions
+                        for k, v in results.items():
+                            expr_new = k - v
+                            # check if already in equations
+                            if simplify(Eq(expr_new, 0)) in eqs:
+                                continue
+                            self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
+                            self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
+                            
+                    
+                    # add condition
+                    if len(self.problem.condition.items) - last_step > 0:
+                        new_condition = deepcopy(self.problem.condition.items[last_step:])
+                        # find position in search tree
+                        pos = list(self.leveled_condition.keys())[-1]
+                        for k, v in self.leveled_condition.items():
+                            if max(premise) in list(v.keys()):
+                                pos = k
+                        # get new depth and pos
+                        depth = len(pos) + 1
+                        if depth not in self.node_count:
+                            self.node_count[depth] = 1
+                        new_pos = tuple(list(pos) + [self.node_count[depth]])
+                        self.node_count[depth] += 1
+                        self.leveled_condition[new_pos] = {}
+                        for i in range(len(new_condition)):
+                            self.leveled_condition[new_pos][last_step+i] = new_condition[i]
+                        update = True
+        if update:
+            self.problem.step(('solve_eq', None, None), 0)
         return 
     
     def search(self):
@@ -295,14 +346,17 @@ class FormalGeoSolver:
                 timing = time.time()
                 
                 # save leveled condition, new added
-                last_step = len(self.problem.condition.items)
-                solved = self.apply_and_check_goal(selection)
-                if len(self.problem.condition.items) - last_step > 0:
-                    new_condition = deepcopy(self.problem.condition.items[last_step:])
-                    self.leveled_condition[pos] = {}
-                    for i in range(len(new_condition)):
-                        self.leveled_condition[pos][last_step+i] = new_condition[i]
-                    
+                # last_step = len(self.problem.condition.items)
+                solved = self.apply_and_check_goal(selection, pos)
+                
+                
+                # if len(self.problem.condition.items) - last_step > 0:
+                #     new_condition = deepcopy(self.problem.condition.items[last_step:])
+                #     self.leveled_condition[pos] = {}
+                #     for i in range(len(new_condition)):
+                #         self.leveled_condition[pos][last_step+i] = new_condition[i]
+                
+                
                 debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(
                     solved, time.time() - timing))
                 if solved is None:  # not update, close search branch
@@ -321,17 +375,21 @@ class FormalGeoSolver:
                     debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
                                 format(time.time() - timing, len(selections)))
             
-            self.solve_special_angles()
-            self.solve_equations()
             
             self.problem.check_goal()
             solved = self.problem.goal.solved
             if solved:  # solved, return result
                 _, seqs = get_used_pid_and_theorem(self.problem)
                 return True, seqs
-                
-            cur_depth += 1
             
+            self.solve_special_angles()
+            self.solve_equations()
+            self.solve_equation_groups()
+            selections = self.get_theorem_selection()
+            self.add_selections(pos, selections)
+            cur_depth += 1
+        
+        # EqKiller.solve_equations(self.problem)
         return False, None
     
 
@@ -556,7 +614,7 @@ class FormalGeoSolver:
                             #     return selections
         return selections
 
-    def apply_and_check_goal(self, selection):
+    def apply_and_check_goal(self, selection, pos):
         """
         Apply selection and check goal.
         :param selection: ((t_name, t_branch, t_para), ((predicate, item, premise))).
@@ -565,14 +623,29 @@ class FormalGeoSolver:
         self.last_step = self.problem.condition.step_count
         update = False
         t_msg, conclusions = selection
-
+        
+        last_idx = len(self.problem.condition.items)    
         for predicate, item, premise in conclusions:
             update = self.problem.add(predicate, item, premise, t_msg, skip_check=True) or update
 
         if not update:  # close current branch if applied theorem no new condition
             return None
+        
+        
 
         EqKiller.solve_equations(self.problem)  # solve eq & check_goal
+        # use self-implemented methods to transfer into nature language more easily
+        # self.solve_special_angles()
+        # self.solve_equations()
+        # self.solve_equation_groups()
+        
+        # add conditions in `leveled_condition`
+        if len(self.problem.condition.items) - last_idx > 0:
+            new_condition = deepcopy(self.problem.condition.items[last_idx:])
+            self.leveled_condition[pos] = {}
+            for i in range(len(new_condition)):
+                self.leveled_condition[pos][last_idx+i] = new_condition[i]
+        
         self.problem.check_goal()
         self.problem.step(t_msg, 0)
 

@@ -39,6 +39,7 @@ class TargetFinder():
                  problem_id=0,
                  replace_characters=False,
                  solver_type='formalgeo',
+                 predicate_num=2,
                  debug=False):
         self.p_pos = allocater_states['p_pos']
         self.lines = allocater_states['lines']
@@ -58,14 +59,23 @@ class TargetFinder():
         
         if replace_characters:
             self.replace_characters()
-
+        if predicate_num == 2:
+            self.max_depth = 5
+            self.min_depth = 2
+        elif predicate_num == 3:
+            self.max_depth = 7
+            self.min_depth = 3
+        elif predicate_num == 4:
+            self.max_depth = 9
+            self.min_depth = 4
+            
         assert solver_type in ['formalgeo', 'intergps']
         if solver_type == 'formalgeo':
             self.solver = FormalGeoSolver(
                 predicate_GDL,
                 theorem_GDL,
                 strategy="beam_search",
-                max_depth=5, 
+                max_depth=self.max_depth, 
                 beam_size=6,
                 t_info=t_info,
                 t_freq_info=t_freq_info,
@@ -146,7 +156,7 @@ class TargetFinder():
             for k, v in self.solver.leveled_condition.items():
                 if len(k) == max_depth-1:
                     conditions_to_smaple += list(v.values())
-        new_targets_cal, new_targets_prv = [], []
+        new_targets = []
 
         # the first filter: 
         # for potential calculation target: 
@@ -174,17 +184,11 @@ class TargetFinder():
                 if all(['ma_' in sym for sym in syms]):
                     f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
                 if all([f1, f2, f3, f4, f5]):
-                    new_targets_cal.append(condition)
+                    new_targets.append(condition)
             else:
                 if condition[0] in PREDICATES_REL + PREDICATES_ENT:
-                    new_targets_prv.append(condition)
+                    new_targets.append(condition)
                     
-        # the second filter: 
-        # control the number angle target, line target and prove target
-        # so that the distribution of type won't be too sharp
-        angle_targets = [t for t in new_targets_cal if 'ma_' in str(t[1])]
-        line_targets = [t for t in new_targets_cal if 'll_' in str(t[1])]
-        new_targets = angle_targets[:5] + line_targets[:5] + new_targets_prv[:5]
         
         # find solution / theorems for each target
         theorems_for_targets = {}
@@ -217,7 +221,7 @@ class TargetFinder():
             with open('json/solution_test.json', 'w', encoding='utf-8') as f:
                 json.dump(solution_for_targets_, f, indent=4, ensure_ascii=False)
         
-        # the third filter: 
+        # the second filter: 
         # 1. sort by len of theorems (more but not too large)
         # 2. sort by num of unsolved symbols (less)
         # 3. sort by token diversity of theorems (more)
@@ -226,7 +230,7 @@ class TargetFinder():
             if len(theorem_list) >= level + 2:
                 score_1 = 0
                 
-            score_2 = 0
+            score_2 = -1
             if target[0] == 'Equation':
                 score_2 = - len(target[1].free_symbols)
                 
@@ -237,8 +241,7 @@ class TargetFinder():
             score_3 = len(token_set)
             return (score_1, score_2, score_3)
         
-        # reserve top-5 targets and random choice
-        chosen_targets = sorted(
+        new_targets = sorted(
             theorems_for_targets, 
             key=lambda k: filter_idx(
                 k, 
@@ -246,14 +249,39 @@ class TargetFinder():
                 level_for_targets[k]
             ), 
             reverse=True
-        )[:3]
+        )
+        idx_for_targets = [filter_idx(k, theorems_for_targets[k], level_for_targets[k]) for k in new_targets]
+        
+        # the third filter: 
+        # control the distribution of angle, line and prove target
+        targets_angle = [t for t in new_targets 
+                         if 'Equation'==t[0] and 'ma_' in str(t[1])]
+        targets_line = [t for t in new_targets 
+                        if 'Equation'==t[0] and 'll_' in str(t[1])]
+        targets_prove = [t for t in new_targets
+                         if 'Equation' != t[0]]
+        targets_dict = {
+            "angle": targets_angle,
+            "line": targets_line,
+            "prove": targets_prove
+        }
+        target_type = random.choice(['angle', 'line', 'prove'])
+        chosen_targets = targets_dict[target_type]
+        
         if len(chosen_targets) == 0:
-            return None, None, None, None
-        chosen_target = random.choice(chosen_targets)
+            for k, v in targets_dict.items():
+                if len(v) != 0:
+                    target_type, chosen_targets = k, v
+                    break
+        
+        if len(chosen_targets) == 0:
+            return None, None, None, None, None
+        chosen_target = random.choice(chosen_targets[:5])
+        
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
         problem_level = len(theorems_for_targets[chosen_target]) 
-        return chosen_target, problem_level, chosen_solution, chosen_thoerems
+        return target_type, chosen_target, problem_level, chosen_solution, chosen_thoerems
     
     def find_solution_for_target(
             self, 
@@ -285,7 +313,7 @@ class TargetFinder():
         theorems_formal = []
         solution_str = "Solution: "
         step_count = 0
-        
+        sub_nodes_by_step = {}
         # special token: 
         # <by> - theorem
         # <because> - parent condition
@@ -304,6 +332,8 @@ class TargetFinder():
             if theorem == 'prerequisite': 
                 # add all extended condition
                 extend_conditions = []
+                # add all nodes in current step
+                extend_nodes_i = []
                 queue = deque([n for n in extend_nodes if node.idx in n.value[2]])
                 while queue:
                     extend_node = queue.popleft()
@@ -313,12 +343,13 @@ class TargetFinder():
                     if predicate == extend_predicate and predicate in ['Collinear', 'Cocircular']:
                         continue
                     extend_conditions.append(extend_statement)
-                    
+                    extend_nodes_i.append(extend_node)
                     for n in extend_nodes:
                         if extend_node.idx in n.value[2]:
                             queue.append(n)
                 if len(extend_conditions) != 0:
                     step_count += 1
+                    sub_nodes_by_step[step_count] = extend_nodes_i
                     solution_str += f"\nStep {step_count}: <because> {statement}, <therefore> {', '.join(extend_conditions)}. "
 
                     
@@ -330,8 +361,8 @@ class TargetFinder():
                 step_count += 1
                 solution_str += f'\nStep {step_count}: <by> {theorem}, '
                 
-                # add all parent conditions
-                parent_conditions = []
+                # add all parent statements
+                parent_statements = []
                 for parent_idx in node.value[2]:
                     if parent_idx not in sub_nodes_idx:
                         continue
@@ -339,15 +370,19 @@ class TargetFinder():
                     parent_node = sub_nodes[sub_nodes_idx.index(parent_idx)]
                     if parent_node.value[0] in pred_ignore:
                         continue
-                    
+                    parent_step = next((k for k, v in sub_nodes_by_step.items() if parent_node in v), None)
                     parent_statement = sub_nodes_statements[sub_nodes_idx.index(parent_idx)]
-                    parent_conditions.append(parent_statement)
+                    if parent_step is not None:
+                        parent_statements.append(f"{parent_statement} from step {parent_step}")
+                    else:
+                        parent_statements.append(parent_statement)
 
-                if len(parent_conditions) != 0:
+                if len(parent_statements) != 0:
                     solution_str += '<because> '
-                    solution_str += ', '.join(parent_conditions) + ', '
+                    solution_str += ', '.join(parent_statements) + ', '
 
                 extend_conditions = [statement]
+                extend_nodes_i = [node]
                 # add all extended conditions
                 queue = deque([n for n in extend_nodes if node.idx in n.value[2]])
                 while queue:
@@ -355,11 +390,12 @@ class TargetFinder():
                     extend_idx = sub_nodes.index(extend_node)
                     extend_statement = sub_nodes_statements[extend_idx]
                     extend_conditions.append(extend_statement)
-                    
+                    extend_nodes_i.append(extend_node)
                     for n in extend_nodes:
                         if extend_node.idx in n.value[2]:
                             queue.append(n)
                 solution_str += f"<therefore> {', '.join(extend_conditions)}. "
+                sub_nodes_by_step[step_count] = extend_nodes_i
             
         return solution_str, theorems_formal, sub_nodes
     
@@ -376,7 +412,8 @@ class TargetFinder():
         conditions = clause_to_nature_language(
             # self.problem_CDL['text_cdl'] + self.problem_CDL['image_cdl'],
             self.problem_CDL['text_cdl'] + self.problem_CDL['construction_cdl'],
-            self.natural_template
+            self.natural_template,
+            upper=False
         )
 
         # information to return
@@ -415,14 +452,14 @@ class TargetFinder():
                     
                     if flag_2:
                         target_value = angle_2_val
-                        target_str = f"Find measure of \\angle {angle_2}"
+                        target_str = f"Find the measure of \\angle {angle_2}"
                         target_cdl = f"Value(MeasureOfAngle({angle_2}))"
                         add_conditions = []
                         add_cdls = []
                         conclusion = f"\\angle {angle_2} = {target_value}"
                     elif flag_1:
                         target_value = angle_1_val
-                        target_str = f"Find measure of \\angle {angle_1}"
+                        target_str = f"Find the measure of \\angle {angle_1}"
                         target_cdl = f"Value(MeasureOfAngle({angle_1}))"
                         add_conditions = []
                         add_cdls = []
@@ -440,7 +477,7 @@ class TargetFinder():
                                             syms[1]: expr_2})
                         
                         target_value = solve(Eq(expr, 0))[0]
-                        target_str = f"Find value of {str(new_sym)}"
+                        target_str = f"Find the value of {str(new_sym)}"
                         target_cdl = f"Value({str(new_sym)})"
                         add_cdls = [
                             f"Equal(MeasureOfAngle({angle_1}),{str(expr_1)})",
@@ -458,10 +495,10 @@ class TargetFinder():
                 target_value = solve(Eq(target[1], 0))[0]
                 conclusion = f"\\angle {angle} = {target_value}"
                 if 'll' in str(sym):
-                    target_str = f"Find length of {str(sym).split('ll_')[-1].upper()}"
+                    target_str = f"Find the length of {str(sym).split('ll_')[-1].upper()}"
                     target_cdl = f"Value(LengthOfLine({str(sym)}))"
                 else:
-                    target_str = f"Find measure of angle {str(sym).split('ma_')[-1].upper()}"
+                    target_str = f"Find the measure of \\angle {str(sym).split('ma_')[-1].upper()}"
                     target_cdl = f"Value(MeasureOfAngle({str(sym)}))"
             
                   
@@ -536,6 +573,7 @@ class TargetFinder():
         
         # find potential geo relation ()
         (
+            target_type,
             target, 
             problem_level, 
             solution_str, 
@@ -627,9 +665,9 @@ if __name__ == '__main__':
         )
         states = cg.states
         
-        states = {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('a', 'c'), ('c', 'e'), ('c', 'd'), ('b', 'd')], 'circles': ['d'], 'polygons': [('a', 'b', 'c'), ('b', 'c', 'd')], 'constraints': ['Triangle(abc)', 'Equal(MeasureOfAngle(ecd),90)', 'Cocircular(d,abc)', 'Cocircular(d,c)'], 'constraints_base': ['Triangle(abc)'], 'points_on_circle': {'d': ['a', 'b', 'c']}}
-        c_cdls = ['Shape(ab,bc,ca)', 'Cocircular(d,abc)', 'Shape(ce)', 'Cocircular(d,c)']
-        t_cdls = ['Triangle(abc)', 'IsTangentOfCircle(ec,d)']
+        states = {'points': ['a', 'b', 'c', 'd'], 'lines': [('a', 'b'), ('b', 'c'), ('a', 'c'), ('a', 'd'), ('b', 'd'), ('c', 'd')], 'circles': [], 'polygons': [('a', 'b', 'c'), ('a', 'b', 'd'), ('a', 'c', 'd'), ('b', 'c', 'd')], 'constraints': ['Triangle(abc)', 'Equal(MeasureOfAngle(cad),MeasureOfAngle(dab))', 'Equal(MeasureOfAngle(abd),MeasureOfAngle(dbc))', 'Equal(MeasureOfAngle(bcd),MeasureOfAngle(dca))'], 'constraints_base': ['Triangle(abc)'], 'points_on_circle': {}}
+        c_cdls = ['Shape(ab,bc,ca)', 'Shape(ab,bc,ca)']
+        t_cdls = ['Triangle(abc)', 'IsIncenterOfTriangle(d,abc)']
         
         print('---------- Allocator Inputs ----------')
         print(states)
@@ -653,8 +691,8 @@ if __name__ == '__main__':
         
         # t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
         t_info = json.load(open("json/t_info_new.json"))
-        t_freq_info = {k: v[1] for k, v in t_info.items()}
-        t_freq_info = sorted(t_freq_info, reverse=True, key=lambda k: t_freq_info[k])
+        t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
+        t_freq_info = {k: t_info[k][-1] for k in t_names}
         
         plotter = Plotter(allocator.states,
                             allocator.formulated_cdls['text_cdls'],
@@ -678,6 +716,7 @@ if __name__ == '__main__':
             replace_characters=False,
             # solver_type='intergps',
             solver_type='formalgeo',
+            predicate_num=len(clauses_base) + len(clauses_rel),
             debug=True
         )
         info_dict_for_symbolic, info_dict_for_llm = goal_finder.formulate()

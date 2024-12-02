@@ -1,24 +1,14 @@
-from formalgeo.solver import ForwardSearcher
-from formalgeo.data import DatasetLoader
-import json
+from sympy import *
 
-dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-problem_idx = 1
-problem_CDL = dl.get_problem(pid=problem_idx)
+x, y, z = symbols('x y z')
+eq1 = Eq(x + 3*y - z, 1)
+eq2 = Eq(x - y + 2*z, -2)
+eq3 = Eq(3*x - 2*y + z, 0)
 
-solver = ForwardSearcher(
-    dl.predicate_GDL,
-    dl.theorem_GDL,
-    strategy="beam_search",
-    max_depth=12, 
-    beam_size=6,
-    t_info=t_info,
-    debug=True
-)
+solution = solve((eq1, eq2, eq3), (x, y, z))  # 解方程
+print("解为:", solution)
 
-solver.init_search(problem_CDL)
-solver.search()
-
-
-print(solver.problem.condition.items()) # 包含了搜索中生成的所有条件
+# 显示逐步求解
+steps = solve((eq1, eq2, eq3), (x, y, z))
+for step in steps:
+    print(step)

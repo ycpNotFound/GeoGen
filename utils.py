@@ -1,13 +1,13 @@
 import json
+import math
+import random
 import re
 from collections import Counter
-from sympy import Symbol
-import random
+
 import numpy as np
 import sympy
-from sympy import Float, Add, Mul, simplify
 from matplotlib import pyplot as plt
-import math
+from sympy import Add, Eq, Float, Integer, Mul, Symbol, simplify, symbols, nsimplify
 
 PREDICATES_PRE = [
     # Preset
@@ -208,6 +208,67 @@ SYMBOL_MAPPING_2 = {
 }
 
 
+def sympy_to_latex(expr):
+    lhs, rhs = expr.split('=') if '=' in expr else (expr, '0')
+    expr = simplify(lhs + '-(' + rhs + ')')
+
+    lhs_terms, rhs_terms = [], []
+    terms = expr.as_ordered_terms()
+    for term in terms:
+        if term.as_coeff_Mul()[0] > 0:
+            lhs_terms.append(term)
+        else: 
+            rhs_terms.append(-term)
+
+    lhs_expr = nsimplify(sum(lhs_terms))
+    rhs_expr = nsimplify(sum(rhs_terms))
+
+    def process_expr(expr):
+        if isinstance(expr, (Integer, Float)):
+            return expr
+        expr = expr.xreplace(
+            {s: symbols(str(s).upper()) for s in expr.free_symbols}
+        )
+        expr = str(expr)
+        expr = expr.replace('MA_', '\\angle ').replace('LL_', '')
+        pattern = r'sqrt\((.*?)\)'
+        expr = re.sub(pattern, r'\\sqrt{\1}', expr)
+        return expr
+
+    lhs_expr = process_expr(lhs_expr)
+    rhs_expr = process_expr(rhs_expr)
+
+    # test_expr = latex_to_sympy(f"{lhs_expr} = {rhs_expr}")
+    natural = f"$ {lhs_expr} = {rhs_expr} $"
+    return natural
+
+def latex_to_sympy(latex_str):
+    # replace \\sqrt{} -> sqrt()
+    def replace_sqrt(match):
+        inside = match.group(1)
+        # 只把字母部分转小写
+        inside_lower = re.sub(r'[A-Za-z]+', lambda m: m.group(0).lower(), inside)
+        return f'sqrt({inside_lower})'
+    
+    # replace \\angle ABC -> ma_abc
+    def replace_three_letters(match):
+        s = match.group(0).lower()
+        s = s.split(' ')[-1]
+        return f'ma_{s}'
+    
+    # replace AB -> ll_ab
+    def replace_two_letters(match):
+        s = match.group(0).lower()
+        return f'll_{s}'
+    
+    latex_str = re.sub(r'\\sqrt{([^}]*)}', replace_sqrt, latex_str)
+    latex_str = re.sub(r'\\angle [A-Z]{3}', replace_three_letters, latex_str)
+    latex_str = re.sub(r'[A-Z]{2}', replace_two_letters, latex_str)
+    
+    lhs, rhs = latex_str.split('=') if '=' in latex_str else (latex_str, '0')
+    expr = simplify(f"{lhs}-{rhs}")
+    return expr
+
 def clause_to_nature_language(clauses, natural_template, upper=True, symbol2nature=None):
     conditions = []
 
@@ -283,7 +344,7 @@ def clause_to_nature_language(clauses, natural_template, upper=True, symbol2natu
         elif 'Polygon' == pred:
             condition_i = f"{items[0]} is a polygon"
         elif 'Equation' == pred:
-            condition_i = f"{items[0]} = 0"
+            condition_i = sympy_to_latex(items[0])
         elif 'Line' == pred:
             condition_i = f"line {items[0]}"
         elif 'Angle' == pred:
@@ -871,8 +932,8 @@ def formalgeo_to_intergps(clause):
     
     
 if __name__ == '__main__':
-    from inter_gps_solver.logic_parser import LogicParser
     from inter_gps_solver.extended_definition import ExtendedDefinition
+    from inter_gps_solver.logic_parser import LogicParser
     data = json.load(open('json/predicate_GDL.json', 'r'))
     for clause in data['Entity']:
         name, _ = parse_clause(clause)

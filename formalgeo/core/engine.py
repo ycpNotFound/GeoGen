@@ -210,8 +210,8 @@ class EquationKiller:
             for eq in problem.condition.simplified_equation:  # value replace
                 if eq in remove_lists:
                     continue
-                if len(eq.free_symbols) != 1:
-                    continue
+                # if len(eq.free_symbols) != 1:
+                #     continue
                 raw_eq = eq
                 simplified = False
                 added_premise = []

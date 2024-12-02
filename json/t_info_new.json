@@ -711,13 +711,9 @@
     2,
     22
   ],
-  "circle_property_circular_power_tangent_and_segment_angle": [
-    1,
-    18
-  ],
-  "circle_property_circular_power_segment_and_segment_angle": [
-    1,
-    20
+  "circle_property_angle_of_alternate_segment": [
+    2, 
+    22
   ],
   "circle_property_chord_perpendicular_bisect_chord": [
     1,

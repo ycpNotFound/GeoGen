@@ -1493,6 +1493,12 @@
   },
   "arc_property_circumference_angle_external(OAB,C)": {
     "1": {
+      "premise": "Cocircular(O,ABC)&Angle(BCA)",
+      "conclusion": [
+        "Equal(MeasureOfAngle(BCA),Mul(MeasureOfArc(OAB),1/2))"
+      ]
+    },
+    "2": {
       "premise": "Cocircular(O,ABC)&Angle(BCA)&Angle(BOA)",
       "conclusion": [
         "Equal(MeasureOfAngle(BCA),Mul(MeasureOfAngle(BOA),1/2))"
@@ -1501,6 +1507,12 @@
   },
   "arc_property_circumference_angle_internal(OAB,D)": {
     "1": {
+      "premise": "Cocircular(O,ADB)&Angle(ADB)",
+      "conclusion": [
+        "Equal(MeasureOfAngle(ADB),Sub(180,Mul(MeasureOfArc(OAB),1/2)))"
+      ]
+    },
+    "2": {
       "premise": "Cocircular(O,ADB)&Angle(ADB)&Angle(BOA)",
       "conclusion": [
         "Equal(MeasureOfAngle(ADB),Sub(180,Mul(MeasureOfAngle(BOA),1/2)))"
@@ -1635,6 +1647,34 @@
       ]
     }
   },
+  "circle_property_circular_power_tangent_and_segment_angle(PA,PCD,O)": {
+    "1": {
+      "premise": "Cocircular(O,ACD)&Collinear(PCD)",
+      "conclusion": [
+        "Equal(Sub(MeasureOfArc(ODA),MeasureOfArc(OAC)),Mul(MeasureOfAngle(APC),2))"
+      ]
+    },
+    "2": {
+      "premise": "Cocircular(O,CAD)&Collinear(PCD)",
+      "conclusion": [
+        "Equal(Sub(MeasureOfArc(OAD),MeasureOfArc(OCA)),Mul(MeasureOfAngle(CPA),2))"
+      ]
+    }
+  },
+  "circle_property_circular_power_segment_and_segment_angle(PAB,PCD,O)": {
+    "1": {
+      "premise": "Cocircular(O,ACDB)&Collinear(PAB)&Collinear(PCD)",
+      "conclusion": [
+        "Equal(Sub(MeasureOfArc(ODB),MeasureOfArc(OAC)),Mul(MeasureOfAngle(APC),2))"
+      ]
+    },
+    "2": {
+      "premise": "Cocircular(O,CABD)&Collinear(PAB)&Collinear(PCD)",
+      "conclusion": [
+        "Equal(Sub(MeasureOfArc(OBD),MeasureOfArc(OCA)),Mul(MeasureOfAngle(CPA),2))"
+      ]
+    }
+  },
   "circle_property_chord_perpendicular_bisect_chord(O,PM,AB)": {
     "1": {
       "premise": "Cocircular(O,AB)&Collinear(AMB)&IsCentreOfCircle(P,O)&Equal(MeasureOfAngle(AMP),90)",
@@ -1665,29 +1705,15 @@
   },
   "circle_property_angle_of_osculation(OAB,P)": {
     "1": {
-      "premise": "Arc(OAB)&Angle(BAP)&Angle(BOA)&IsTangentOfCircle(PA,O)",
+      "premise": "Arc(OAB)&Angle(BAP)&IsTangentOfCircle(PA,O)",
       "conclusion": [
-        "Equal(MeasureOfAngle(BAP),Mul(MeasureOfAngle(BOA),1/2))"
+        "Equal(MeasureOfAngle(BAP),Mul(MeasureOfArc(OAB),1/2))"
       ]
     },
     "2": {
-      "premise": "Arc(OAB)&Angle(PBA)&Angle(BOA)&IsTangentOfCircle(PB,O)",
+      "premise": "Arc(OAB)&Angle(PBA)&IsTangentOfCircle(PB,O)",
       "conclusion": [
-        "Equal(MeasureOfAngle(PBA),Mul(MeasureOfAngle(BOA),1/2))"
-      ]
-    }
-  },
-  "circle_property_angle_of_alternate_segment(OABD,P)": {
-    "1": {
-      "premise": "Cocircular(O,ABD)&Arc(OAB)&Angle(BAP)&Angle(BDA)&IsTangentOfCircle(PA,O)",
-      "conclusion": [
-        "Equal(MeasureOfAngle(BAP),MeasureOfAngle(BDA))"
-      ]
-    },
-    "2": {
-      "premise": "Cocircular(O,ABD)&Arc(OAB)&Angle(PBA)&Angle(BOA)&IsTangentOfCircle(PB,O)",
-      "conclusion": [
-        "Equal(MeasureOfAngle(PBA),MeasureOfAngle(BDA))"
+        "Equal(MeasureOfAngle(PBA),Mul(MeasureOfArc(OAB),1/2))"
       ]
     }
   },
