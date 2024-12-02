@@ -277,67 +277,165 @@ def task_1():
     print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
     return seed, task_name, input_args_list, num_process
 
-def task_pretrain():
+def task_2():
     seed = 1234
-    task_name = "geo_gen_pretrain"
+    task_name = "geo_gen_ENT_1_REL_3"
+    input_args_list = []
+    num_process = 12
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 3))
+    input_args_1 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=0,
+                                    repeat_times=1)
+    print('Num: ', len(input_args_1))
+
+    
+    input_args_list = input_args_1
+    print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
+    return seed, task_name, input_args_list, num_process
+
+def task_stage_1():
+    # seed = 114
+    
     input_args_list = []
 
-    num_process = 12
+    num_process = 10
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT + PREDICATES_REL_2, 1))
     pred_rel_combs = [[]]
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=300)
-    print('Num: ', len(input_args_1))
+                                    repeat_times=400)
+    task_name_1 = "geo_gen_ENT_1_REL_0_L_0"
+    seed_1 = 114
+    print(f'Task: {task_name_1}', len(input_args_1))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = [[]]
     input_args_2 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=300)
-    print('Num: ', len(input_args_2))
+                                    repeat_times=400)
+    task_name_2 = "geo_gen_ENT_1_REL_0_L_1"
+    seed_2 = 115
+    print(f'Task: {task_name_2}', len(input_args_2))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
     input_args_3 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=100)
-    print('Num: ', len(input_args_3))
+                                    repeat_times=300)
+    task_name_3 = "geo_gen_ENT_1_REL_1_L_0"
+    seed_3 = 116
+    print(f'Task: {task_name_3}', len(input_args_3))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
     input_args_4 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=100)
-    print('Num: ', len(input_args_4))
+                                    repeat_times=300)
+    task_name_4 = "geo_gen_ENT_1_REL_1_L_1"
+    seed_4 = 117
+    print(f'Task: {task_name_4}', len(input_args_4))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
     input_args_5 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=10)
-    print('Num: ', len(input_args_5))
+                                    repeat_times=25)
+    task_name_5 = "geo_gen_ENT_1_REL_2_L_0_part_1"
+    seed_5 = 118
+    print(f'Task: {task_name_5}', len(input_args_5))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
     input_args_6 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
-                                    n_more_lines=1,
-                                    repeat_times=10)
-    print('Num: ', len(input_args_6))
+                                    n_more_lines=0,
+                                    repeat_times=25)
+    task_name_6 = "geo_gen_ENT_1_REL_2_L_0_part_2"
+    seed_6 = 119
+    print(f'Task: {task_name_6}', len(input_args_6))
     
-    input_args_list = input_args_1 + input_args_2 + input_args_3 + input_args_4 + input_args_5 + input_args_6
-    print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
-    return seed, task_name, input_args_list, num_process
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_7 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=25)
+    task_name_7 = "geo_gen_ENT_1_REL_2_L_1_part_1"
+    seed_7 = 120
+    print(f'Task: {task_name_7}', len(input_args_7))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_8 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=25)
+    task_name_8 = "geo_gen_ENT_1_REL_2_L_1_part_2"
+    seed_8 = 121
+    print(f'Task: {task_name_8}', len(input_args_8))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_9 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=2,
+                                    repeat_times=25)
+    task_name_9 = "geo_gen_ENT_1_REL_2_L_2_part_1"
+    seed_9 = 122
+    print(f'Task: {task_name_9}', len(input_args_9))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_10 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=25)
+    task_name_10 = "geo_gen_ENT_1_REL_2_L_2_part_2"
+    seed_10 = 123
+    print(f'Task: {task_name_10}', len(input_args_10))
+    
+    input_args_list = [
+        # input_args_1, input_args_2, 
+        # input_args_3, input_args_4,
+        # input_args_5, 
+        input_args_6,
+        input_args_7, input_args_8,
+        input_args_9, input_args_10,
+    ]
+    task_name_list = [
+        # task_name_1, task_name_2, 
+        # task_name_3, task_name_4,
+        # task_name_5, 
+        task_name_6,
+        task_name_7, task_name_8,
+        task_name_9, task_name_10
+    ]
+    seed_list = [
+        # seed_1, seed_2,
+        # seed_3, seed_4,
+        # seed_5, 
+        seed_6,
+        seed_7, seed_8,
+        seed_9, seed_10,
+    ]
+    print('Total Num: ', sum([len(args) for args in input_args_list]))
+    for input_args, task_name, seed in zip(input_args_list, task_name_list, seed_list):
+        print(f'======== Task: {task_name}, Num: {len(input_args)} ========')
+        run_task(seed, task_name, input_args, num_process)
+    # return seed, task_name, input_args_list, num_process
     
 def main():
-    run_task(*task_1())
+    # run_task(*task_2())
     # run_task(*task_pretrain())
+    task_stage_1()
 
 
 if __name__ == '__main__':
