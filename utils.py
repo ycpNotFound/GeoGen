@@ -7,7 +7,7 @@ from collections import Counter
 import numpy as np
 import sympy
 from matplotlib import pyplot as plt
-from sympy import Add, Eq, Float, Integer, Mul, Symbol, simplify, symbols, nsimplify
+from sympy import Add, Eq, Float, Integer, Mul, Symbol, simplify, symbols, nsimplify, UnevaluatedExpr
 
 PREDICATES_PRE = [
     # Preset
@@ -267,6 +267,18 @@ def latex_to_sympy(latex_str):
     
     lhs, rhs = latex_str.split('=') if '=' in latex_str else (latex_str, '0')
     expr = simplify(f"{lhs}-{rhs}")
+    return expr
+
+def formulate_eqs(eq_str_list, target_str):
+    if len(eq_str_list) > 2:
+        a = 1
+    else:
+        a = 1
+    return eq_str_list
+
+def subs_without_simplification(expr, substitutions):
+    for old, new in substitutions.items():
+        expr = expr.subs(old, UnevaluatedExpr(new))
     return expr
 
 def clause_to_nature_language(clauses, natural_template, upper=True, symbol2nature=None):

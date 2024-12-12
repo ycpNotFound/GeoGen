@@ -168,21 +168,23 @@ class ClauseGenerator():
             
     def generate_clauses_from_predicates(
         self, 
-        clauses_base, 
-        clauses_rel, 
+        predicates_base, 
+        predicates_rel, 
         n_more_lines
     ):
         # define base entity (Square, Rectangle / Similar, Congruent) 
+        self.predicates_base = predicates_base
+        self.predicates_rel = predicates_rel
         constr_cdls = [] 
         text_cdls = [] 
-        for name in clauses_base:
+        for name in predicates_base:
             pred_type = "Entity" if name in PREDICATES_ENT else "Relation"
             constr_cdl, text_cdl = self.define_base(name, pred_type=pred_type)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
             
         # define relation predicates (Midpoint, Parallel ..)
-        for name in clauses_rel:
+        for name in predicates_rel:
             constr_cdl, text_cdl = self.define_relation(name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
@@ -565,7 +567,26 @@ class ClauseGenerator():
                 self.points_on_circle[circle] += new_ps_on_circle
                 
             constr_cdls += [f"Cocircular({circle},{''.join(self.points_on_circle[circle])})"]
-            points = random.sample(self.points_on_circle[circle], num)
+
+            # can't choose arc that corresponds to diameter
+            points_combs = [
+                list(comb) for comb in 
+                itertools.combinations(self.points_on_circle[circle], num)
+            ]
+            if self.predicates_base[0] in ['Rectangle', 'Square']:
+                points_combs = [comb for comb in points_combs 
+                                if comb not in [['a','c'], ['b','d']]]
+            if self.predicates_base[0] == 'RightTrapezoid':
+                points_combs = [comb for comb in points_combs 
+                                if comb != ['b','d']]
+            if self.predicates_base[0] == 'RightTriangle':                 
+                points_combs = [comb for comb in points_combs 
+                                if comb != ['a','c']]
+            if self.predicates_base[0] == 'IsoscelesRightTriangle':
+                points_combs = [comb for comb in points_combs 
+                                if comb != ['b','c']]
+            # points = random.sample(self.points_on_circle[circle], num)
+            points = random.choice(points_combs)
             points = [circle] + points
          
         if 'Polygon' in clause:
@@ -868,21 +889,21 @@ def test():
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
 
     for i in range(100):
-        # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
-        # clauses_rel = random.choices(PREDICATES_REL, k=2)
+        # predicates_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
+        # predicates_rel = random.choices(PREDICATES_REL, k=2)
         
-        clauses_base = ['MirrorSimilarBetweenTriangle']
-        clauses_rel = ['IsMedianOfTriangle']
+        predicates_base = ['MirrorSimilarBetweenTriangle']
+        predicates_rel = ['IsMedianOfTriangle']
         
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
-            clauses_base, 
-            clauses_rel, 
+            predicates_base, 
+            predicates_rel, 
             n_new_lines=2
         )
         print('---------- Chosen Predicates ----------')
-        print('clauses_base: ', clauses_base)
-        print('clauses_rel: ', clauses_rel)
+        print('predicates_base: ', predicates_base)
+        print('predicates_rel: ', predicates_rel)
         
         
         print('---------- Construct CDLs ----------')

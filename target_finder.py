@@ -1,13 +1,14 @@
 import json
 import random
+import itertools
 import re
 import string
 from typing import Dict, Tuple
 from collections import deque
-
+import time
 import numpy as np
-from sympy import Eq, Symbol, solve, total_degree, Integer, Float, sqrt
-
+from sympy import Eq, Symbol, solve, total_degree, Integer, Float, sqrt, simplify
+from collections import defaultdict
 from allocator import Allocator
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.data import DatasetLoader
@@ -23,7 +24,7 @@ from solver import FormalGeoSolver, InterGPSSolver
 from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, 
                    PRESET_COLOR_PROBS, PRESET_COLORS,
                    clause_to_nature_language, parse_clause, replace_for_clause,
-                   setup_seed, SYMBOL_MAPPING_2)
+                   setup_seed, formulate_eqs, SYMBOL_MAPPING_2, get_angle_measure, subs_without_simplification)
 
 
 class TargetFinder(): 
@@ -60,13 +61,13 @@ class TargetFinder():
         if replace_characters:
             self.replace_characters()
         if predicate_num == 2:
+            self.max_depth = 4
+            self.min_depth = 1
+        elif predicate_num == 3:
             self.max_depth = 5
             self.min_depth = 2
-        elif predicate_num == 3:
-            self.max_depth = 7
-            self.min_depth = 3
         elif predicate_num == 4:
-            self.max_depth = 9
+            self.max_depth = 6
             self.min_depth = 4
             
         assert solver_type in ['formalgeo', 'intergps']
@@ -79,7 +80,8 @@ class TargetFinder():
                 beam_size=6,
                 t_info=t_info,
                 t_freq_info=t_freq_info,
-                # debug=debug
+                p_pos=self.p_pos,
+                debug=debug
             )
         elif solver_type == 'intergps':
             self.solver = InterGPSSolver(
@@ -141,38 +143,25 @@ class TargetFinder():
         self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
         return
     
-    def find_target_and_solution(self, condition_graph: ConditionGraph):
-        # find variable to solve, 
-        max_depth = max([len(k) for k in self.solver.leveled_condition])
-
-        conditions_to_smaple = []
-        for k, v in self.solver.leveled_condition.items():
-            if len(k) == max_depth:
-                conditions_to_smaple += list(v.values())
-            if max_depth > 1 and len(k) == max_depth - 1:
-                conditions_to_smaple += list(v.values())
-
-        if len(conditions_to_smaple) == 1:
-            for k, v in self.solver.leveled_condition.items():
-                if len(k) == max_depth-1:
-                    conditions_to_smaple += list(v.values())
-        new_targets = []
-
+    def targets_filter_1(self, conditions_to_sample):
         # the first filter: 
         # for potential calculation target: 
         # 1. only has <= 2 vars
-        # 2. only has linear term, degree <= 1
+        # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
         # 4. only has symbols begin with 'll_' or 'ma_'
         # 5. remove angle measure that >= 180
-        for condition in conditions_to_smaple:
+        new_targets = []
+        for condition in conditions_to_sample:
             if condition[0] == 'Equation':
                 f1 = len(condition[1].free_symbols) <= 2
-                f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() <= 1
+                try:
+                    f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() <= 2
+                except:
+                    f2 = False
                 syms = [str(x) for x in list(condition[1].free_symbols)]
                 f3 = True
                 if len(condition[1].free_symbols) == 2:
-                    a = 1
                     if all([
                         self.solver.problem.condition.value_of_sym[sym] is not None 
                         for sym in list(condition[1].free_symbols)
@@ -185,42 +174,13 @@ class TargetFinder():
                     f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
                 if all([f1, f2, f3, f4, f5]):
                     new_targets.append(condition)
-            else:
-                if condition[0] in PREDICATES_REL + PREDICATES_ENT:
-                    new_targets.append(condition)
                     
-        
-        # find solution / theorems for each target
-        theorems_for_targets = {}
-        solution_for_targets = {}
-        level_for_targets = {}
-        for target in new_targets:
-            (
-                solution_str, 
-                theorems, 
-                sub_nodes
-            ) = self.find_solution_for_target(
-                self.solver.problem,
-                condition_graph, 
-                target, 
-            )
-            level = max_depth
-            for key, value in self.solver.leveled_condition.items():
-                if target in list(value.values()):
-                    level = len(key)
-                    break
-            theorems_for_targets[target] = theorems
-            solution_for_targets[target] = solution_str
-            level_for_targets[target] = level
+            elif condition[0] in PREDICATES_REL + PREDICATES_REL_2 +  PREDICATES_ENT + ['Collinear', 'Cocircular']:
+                new_targets.append(condition)
 
-        if self.debug:
-            solution_for_targets_ = {
-                str(k): v.split('\n') for k, v in
-                solution_for_targets.items()
-            }
-            with open('json/solution_test.json', 'w', encoding='utf-8') as f:
-                json.dump(solution_for_targets_, f, indent=4, ensure_ascii=False)
-        
+        return new_targets
+    
+    def targets_filter_2(self, new_targets, theorems_for_targets, level_for_targets):
         # the second filter: 
         # 1. sort by len of theorems (more but not too large)
         # 2. sort by num of unsolved symbols (less)
@@ -251,23 +211,91 @@ class TargetFinder():
             reverse=True
         )
         idx_for_targets = [filter_idx(k, theorems_for_targets[k], level_for_targets[k]) for k in new_targets]
-        
+        return new_targets, idx_for_targets
+    
+    def targets_filter_3(self, new_targets):
         # the third filter: 
-        # control the distribution of angle, line and prove target
+        # classified into groups according to target type
+        # choose only 2 targets for each 'prove' predicate name
         targets_angle = [t for t in new_targets 
                          if 'Equation'==t[0] and 'ma_' in str(t[1])]
         targets_line = [t for t in new_targets 
                         if 'Equation'==t[0] and 'll_' in str(t[1])]
         targets_prove = [t for t in new_targets
                          if 'Equation' != t[0]]
+        prove_cnt_dict = defaultdict(int)
+        _targets_prove = []
+        for t in targets_prove:
+            prove_cnt_dict[t[0]] += 1
+            if prove_cnt_dict[t[0]] <= 2:
+                _targets_prove.append(t)
+        targets_prove = _targets_prove
+        # return grouped targets
         targets_dict = {
             "angle": targets_angle,
             "line": targets_line,
             "prove": targets_prove
         }
+        return targets_dict
+    
+    def find_target_and_solution(self, condition_graph: ConditionGraph):
+        max_depth = max([len(k) for k in self.solver.leveled_condition])
+        max_depth = min([max_depth, self.max_depth])
+        conditions_to_sample = []
+        for k, v in self.solver.leveled_condition.items():
+            if len(k) < self.min_depth or len(k) > self.max_depth:
+                continue
+            if len(k) == max_depth:
+                conditions_to_sample += list(v.values())
+            
+        if len(conditions_to_sample) < 8:
+            for k, v in self.solver.leveled_condition.items():
+                if max_depth > 1 and len(k) == max_depth - 1:
+                    conditions_to_sample += list(v.values())
+        # filter 1
+        new_targets = self.targets_filter_1(conditions_to_sample)
+        # find solution / theorems for each target
+        theorems_for_targets = {}
+        solution_for_targets = {}
+        level_for_targets = {}
+        for target in new_targets:
+            (
+                solution_str, 
+                theorems, 
+                sub_nodes,
+                too_complex_flag
+            ) = self.find_solution_for_target(
+                self.solver.problem,
+                condition_graph, 
+                target, 
+            )
+            if too_complex_flag:
+                continue
+            level = max_depth
+            for key, value in self.solver.leveled_condition.items():
+                if target in list(value.values()):
+                    level = len(key)
+                    break
+            theorems_for_targets[target] = theorems
+            solution_for_targets[target] = solution_str
+            level_for_targets[target] = level
+
+        if self.debug:
+            _solution_for_targets = {
+                str(k): v.split('\n') for k, v in
+                solution_for_targets.items()
+            }
+            with open('json/solution_test.json', 'w', encoding='utf-8') as f:
+                json.dump(_solution_for_targets, f, indent=4, ensure_ascii=False)
+        # filter 2
+        new_targets, _ = self.targets_filter_2(
+            new_targets, theorems_for_targets, level_for_targets
+        )
+        # filter 3
+        targets_dict = self.targets_filter_3(new_targets)
+        # random choose target type
         target_type = random.choice(['angle', 'line', 'prove'])
         chosen_targets = targets_dict[target_type]
-        
         if len(chosen_targets) == 0:
             for k, v in targets_dict.items():
                 if len(v) != 0:
@@ -276,11 +304,16 @@ class TargetFinder():
         
         if len(chosen_targets) == 0:
             return None, None, None, None, None
+        # random choose target (from top-5)
         chosen_target = random.choice(chosen_targets[:5])
-        
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
-        problem_level = len(theorems_for_targets[chosen_target]) 
+        problem_level = level_for_targets[chosen_target]
+        _ = self.find_solution_for_target(
+            self.solver.problem,
+            condition_graph,
+            chosen_target
+        )
         return target_type, chosen_target, problem_level, chosen_solution, chosen_thoerems
     
     def find_solution_for_target(
@@ -289,6 +322,7 @@ class TargetFinder():
             condition_graph: ConditionGraph, 
             target_condition: Tuple
         ):
+        too_complex = False
         sub_nodes, sub_nodes_adj_table = condition_graph.backward_construct_sub_graph([target_condition])
     
         # sort by index of applying theorem 
@@ -314,9 +348,11 @@ class TargetFinder():
         solution_str = "Solution: "
         step_count = 0
         sub_nodes_by_step = {}
+        last_theorem = None
+        last_premise_ids = None
         # special token: 
         # <by> - theorem
-        # <because> - parent condition
+        # <because> - premise condition
         # <therefore> - extend condition
         
         for i, node in enumerate(sub_nodes):
@@ -350,37 +386,63 @@ class TargetFinder():
                 if len(extend_conditions) != 0:
                     step_count += 1
                     sub_nodes_by_step[step_count] = extend_nodes_i
-                    solution_str += f"\nStep {step_count}: <because> {statement}, <therefore> {', '.join(extend_conditions)}. "
-
+                    solution_str += f"\n{step_count}. <because> {statement}, <therefore>"
+                    for c in extend_conditions:
+                        solution_str += f'\n- {c}.'
                     
             elif theorem == 'extended': 
                 # add extended condition in 'prerequisite' or other theorems
                 pass
                 
             else: # using theorem 
-                step_count += 1
-                solution_str += f'\nStep {step_count}: <by> {theorem}, '
-                
-                # add all parent statements
-                parent_statements = []
-                for parent_idx in node.value[2]:
-                    if parent_idx not in sub_nodes_idx:
+                # find all premise statements grouped by step
+                premise_statements = {}
+                for premise_idx in node.value[2]:
+                    if premise_idx not in sub_nodes_idx:
                         continue
-                    # pass condition like Line(AB)
-                    parent_node = sub_nodes[sub_nodes_idx.index(parent_idx)]
-                    if parent_node.value[0] in pred_ignore:
+                    # ignore condition like Line(AB)
+                    premise_node = sub_nodes[sub_nodes_idx.index(premise_idx)]
+                    if premise_node.value[0] in pred_ignore:
                         continue
-                    parent_step = next((k for k, v in sub_nodes_by_step.items() if parent_node in v), None)
-                    parent_statement = sub_nodes_statements[sub_nodes_idx.index(parent_idx)]
-                    if parent_step is not None:
-                        parent_statements.append(f"{parent_statement} from step {parent_step}")
+                    premise_step = next((k for k, v in sub_nodes_by_step.items() if premise_node in v), None)
+                    premise_statement = sub_nodes_statements[sub_nodes_idx.index(premise_idx)]
+                    if premise_step is None:
+                        if 'given condition' not in premise_statements:    
+                            premise_statements['given condition'] = [premise_statement]
+                        else:
+                            premise_statements['given condition'].append(premise_statement)
                     else:
-                        parent_statements.append(parent_statement)
+                        if f"step {premise_step}" not in premise_statements:
+                            premise_statements[f"step {premise_step}"] = [premise_statement]
+                        else:
+                            premise_statements[f"step {premise_step}"].append(premise_statement)
 
-                if len(parent_statements) != 0:
-                    solution_str += '<because> '
-                    solution_str += ', '.join(parent_statements) + ', '
-
+                # add theorem first
+                # if use the same theorem and same premise condition
+                # append conclusion in the previous step
+                f1 = theorem != last_theorem
+                f2 = node.value[2] != last_premise_ids
+                f3 = theorem == 'solve_eq'
+                
+                if (f1 and f2) or f3:
+                    step_count += 1
+                    solution_str += f'\n{step_count}. <by> {theorem}, '
+                    # add all premise statements
+                    if len(premise_statements) != 0:
+                        if theorem == 'solve_eq':
+                            premise_statements = formulate_eqs(premise_statements, statement)
+                        solution_str += '<because> '
+                        if len(premise_statements) == 1:
+                            k = list(premise_statements.keys())[0]
+                            v = premise_statements[k]
+                            solution_str += f"{', '.join(v)} from {k}, "
+                        else:
+                            for k, v in premise_statements.items():
+                                solution_str += f"{', '.join(v)} from {k}, "
+                    # check if solve too many eqs in one step
+                    if len(premise_statements)>3 and theorem=='solve_eq':
+                        too_complex = True
+                        
                 extend_conditions = [statement]
                 extend_nodes_i = [node]
                 # add all extended conditions
@@ -394,14 +456,210 @@ class TargetFinder():
                     for n in extend_nodes:
                         if extend_node.idx in n.value[2]:
                             queue.append(n)
-                solution_str += f"<therefore> {', '.join(extend_conditions)}. "
-                sub_nodes_by_step[step_count] = extend_nodes_i
+                
+                extend_str= '\n- '.join(extend_conditions)
+                if not ((f1 and f2) or f3):
+                    # same theorem and no premise statements
+                    solution_str += f'\n- {extend_str}. '
+                    sub_nodes_by_step[step_count].append(extend_nodes_i) 
+                else:
+                    solution_str += f"<therefore>\n- {extend_str}. "
+                    sub_nodes_by_step[step_count] = extend_nodes_i
+                
+                last_theorem = theorem
+                last_premise_ids = node.value[2]
             
-        return solution_str, theorems_formal, sub_nodes
+        return solution_str, theorems_formal, sub_nodes, too_complex
+    
+    def create_question_two_line_symbols(self, target):
+        target_sym = random.choice(list(target[1].free_symbols))
+        other_sym = list(target[1].free_symbols - set([target_sym]))[0]
+        target_line = str(target_sym).split('_')[-1].upper()
+        other_line = str(other_sym).split('_')[-1].upper()
+        # assign other_sym to value
+        flag_1 = random.choice([True, False])
+        if flag_1:
+            value = random.randint(1, 10)
+            expr = target[1].subs({other_sym: value})
+            target_value = solve(Eq(expr, 0))[0]
+            target_str = f"find the length of {target_line}"
+            target_cdl = f"Value(LengthOfLine({target_line}))"
+            add_cdls = [f"Equal(LengthOfLine({other_line}),{value})"]
+            add_conditions = [f"{other_line} = {value}"]
+            conclusion = f"{target_line} = {target_value}"
+        else:
+            v1 = random.randint(1, 10)
+            v2 = random.randint(1, 10)
+            v3 = random.randint(1, 10)
+            v4 = random.randint(1, 10)
+            if v1 == v3:
+                v3 = v3 + random.randint(1, 5)
+            new_sym = self.add_new_symbol()
+            expr_1 = v1*new_sym + v2
+            expr_2 = v3*new_sym + v4
+            expr_fixed = subs_without_simplification(
+                target[1], 
+                {target_sym: expr_1, other_sym: expr_2}
+            )
+            expr = target[1].subs({target_sym: expr_1, other_sym: expr_2})
+            target_value = solve(Eq(expr, 0))[0]
+            target_str = f"find the value of {str(new_sym)}"
+            target_cdl = f"Value({str(new_sym)})"
+            add_cdls = [
+                f"Equal(LengthOfLine({target_line}),{str(expr_1)})",
+                f"Equal(LengthOfLine({other_line}),{str(expr_2)})",
+            ]
+            add_conditions = [
+                f"{target_line} = {str(expr_1)}",
+                f"{other_line} = {str(expr_2)}",
+            ]
+            conclusion = f"\n- $ {expr_fixed} = 0 $.\n- $ {expr} = 0 $.\n- $ {new_sym} = {target_value} $"
+        
+        res_info = {
+            "conclusion": conclusion,
+            "add_cdls": add_cdls,
+            "add_conditions": add_conditions,
+            "target_value": target_value,
+            "target_str": target_str,
+            "target_cdl": target_cdl
+        }
+        return res_info
+    
+    def create_question_two_angle_symbols(self, target):
+        sym_1, sym_2 = list(target[1].free_symbols)
+        angle_1 = str(sym_1).split('_')[-1].upper()
+        angle_2 = str(sym_2).split('_')[-1].upper()
+        angle_1_val = self.solver.problem.condition.value_of_sym[sym_1]
+        angle_2_val = self.solver.problem.condition.value_of_sym[sym_2]
+        flag_1 = type(angle_1_val) in [Integer, Float]
+        flag_2 = type(angle_2_val) in [Integer, Float]
+        
+        if flag_1 and not flag_2: # angle_1 = n (solved by symbolic), solve angle_2
+            other_value = angle_1_val
+            expr = target[1].subs({sym_1: other_value})
+            target_value = solve(Eq(expr, 0))[0]
+            target_str = f"find the measure of \\angle {angle_2}"
+            target_cdl = f"Value(MeasureOfAngle({angle_2}))"
+            add_conditions = []
+            add_cdls = []
+            conclusion = f"\\angle {angle_2} = {target_value}°"
+        elif flag_2 and not flag_1: # angle_2 = n (solved by symbolic), solve angle_1
+            other_value = angle_2_val
+            expr = target[1].subs({sym_2: other_value})
+            target_value = solve(Eq(expr, 0))[0]
+            target_str = f"find the measure of \\angle {angle_1}"
+            target_cdl = f"Value(MeasureOfAngle({angle_1}))"
+            add_conditions = []
+            add_cdls = []
+            conclusion = f"\\angle {angle_1} = {target_value}°"
+        elif not flag_1 and not flag_2: # angle_1, angle_2 have no value
+            flag_3 = random.choice([True, False])
+            if flag_3: # angle_1 = ax+b, angle_2 = cx+d, solve x
+                v1 = random.randint(1, 10)
+                v2 = random.randint(1, 10)
+                v3 = random.randint(1, 10)
+                v4 = random.randint(1, 10)
+                if v1 == v3:
+                    v3 = v3 + random.randint(1, 5)
+                new_sym = self.add_new_symbol()
+                expr_1 = v1*new_sym + v2
+                expr_2 = v3*new_sym + v4
+                expr = target[1].subs({sym_1: expr_1, sym_2: expr_2})
+                expr_fixed = subs_without_simplification(
+                    target[1], 
+                    {sym_1: expr_1, sym_2: expr_2}
+                )
+                target_value = solve(Eq(expr, 0))[0]
+                target_str = f"find the value of {str(new_sym)}"
+                target_cdl = f"Value({str(new_sym)})"
+                add_cdls = [
+                    f"Equal(MeasureOfAngle({angle_1}),{str(expr_1)})",
+                    f"Equal(MeasureOfAngle({angle_2}),{str(expr_2)})",
+                ]
+                add_conditions = [
+                    f"\\angle {angle_1} = {str(expr_1)}",
+                    f"\\angle {angle_2} = {str(expr_2)}",
+                ]
+                conclusion = f"\n- $ {expr_fixed} = 0 $.\n- $ {expr} = 0 $.\n- $ {new_sym} = {target_value} $"
+            else: # calculate value of one angle from coordinate, solve the other
+                target_angle = random.choice([angle_1, angle_2])
+                other_angle = list(set([angle_1, angle_2]) - set([target_angle]))[0]
+                other_pos = [self.p_pos[p] for p in other_angle]
+                other_value = get_angle_measure(other_pos[1], other_pos[2], other_pos[0])
+                
+                other_sym = sym_1 if other_angle == angle_1 else sym_2
+                expr = target[1].subs({other_sym: other_value})
+                target_value = solve(Eq(expr, 0))[0]
+                target_str = f"find the measure of \\angle {target_angle}"
+                target_cdl = f"Value(MeasureOfAngle({target_angle}))"
+                add_conditions = [f"\\angle {other_angle} = {other_value}°"]
+                add_cdls = [f"Equal(MeasureOfAngle({other_angle}),{other_value})"]
+                conclusion = f"\\angle {target_angle} = {target_value}°"
+                
+        res_info = {
+            "conclusion": conclusion,
+            "add_cdls": add_cdls,
+            "add_conditions": add_conditions,
+            "target_value": target_value,
+            "target_str": target_str,
+            "target_cdl": target_cdl
+        }
+        return res_info
+    
+    def create_question_one_symbol(self, target):
+        sym = list(target[1].free_symbols)[0]
+        
+        target_value = solve(Eq(target[1], 0))[0]
+        
+        if 'll' in str(sym):
+            line = str(sym).split('_')[-1].upper()
+            conclusion = f"{line} = {target_value}"
+            target_str = f"find the length of {str(sym).split('ll_')[-1].upper()}"
+            target_cdl = f"Value(LengthOfLine({str(sym)}))"
+        else:
+            angle = str(sym).split('_')[-1].upper()
+            conclusion = f"\\angle {angle} = {target_value}°"
+            target_str = f"find the measure of \\angle {str(sym).split('ma_')[-1].upper()}"
+            target_cdl = f"Value(MeasureOfAngle({''.join(angle)}))"
+            
+        res_info = {
+            "conclusion": conclusion,
+            "add_cdls": [],
+            "add_conditions": [],
+            "target_value": target_value,
+            "target_str": target_str,
+            "target_cdl": target_cdl
+        }
+        return res_info
+    
+    def create_question_prove(self, target):
+        target_value = str(target[1])
+        if target[0] in PREDICATES_ENT:
+            conclusion = self.natural_template[target[0]][0].format(
+                points=''.join(target[1]))
+            clause = f"{target[0]}({''.join(target[1])})"
+        else:
+            clause = self.target_tuple_to_clause(target)
+            _, items = parse_clause(clause)
+            conclusion = self.natural_template[target[0]][0].format(
+                p1=items[0], p2=items[1])
+        
+        target_str = f'prove that {conclusion}'
+        target_cdl = f"Relation({clause})"
+        
+        res_info = {
+            "conclusion": conclusion,
+            "add_cdls": [],
+            "add_conditions": [],
+            "target_value": target_value,
+            "target_str": target_str,
+            "target_cdl": target_cdl
+        }
+        return res_info
     
     def create_question(self, target: Tuple):
         # create target and added conditions
-        text = random.choice([
+        problem_text = random.choice([
             "In this figure, ",
             "As shown in the figure, ",
             "In the given diagram, ",
@@ -417,114 +675,49 @@ class TargetFinder():
         )
 
         # information to return
-        conclusion = None
-        add_cdls, add_conditions = [], []
-        target_value, target_str, target_cdl = None, None, None
-        
-        # - ll_cd + ll_ed, ma_abc + ma_edf - 180
+        # conclusion, add_cdls, add_conditions 
+        # target_value, target_str, target_cdl
+        # target[1] like: - ll_cd + ll_ed, ma_abc + ma_edf - 180
         if target[0] == 'Equation': 
             if len(target[1].free_symbols) == 2:
-                # assign value to one, and solve the other
-                target_sym = random.choice(list(target[1].free_symbols))
-                another_sym = list(target[1].free_symbols - set([target_sym]))[0]
-                if 'll' in str(target_sym):
-                    target_line = str(target_sym).split('_')[-1].upper()
-                    other_line = str(another_sym).split('_')[-1].upper()
-                    value = random.randint(1, 10)
-                    expr = target[1].subs({another_sym: value})
+                sym_str = str(list(target[1].free_symbols)[0])
+                if 'll' in sym_str:
+                    res_info = self.create_question_two_line_symbols(target)
                     
-                    target_value = solve(Eq(expr, 0))[0]
-                    target_str = f"Find the length of {target_line}"
-                    target_cdl = f"Value(LengthOfLine({target_line}))"
-                    add_cdls = [f"Equal(LengthOfLine({other_line}),{value})"]
-                    add_conditions = [f"{other_line} = {value}"]
-                    conclusion = f"{target_line} = {target_value}"
+                elif 'ma' in sym_str:
+                    res_info = self.create_question_two_angle_symbols(target)
                     
-                elif 'ma' in str(target_sym):
-                    syms = list(target[1].free_symbols)
-                    angle_1 = str(syms[0]).split('_')[-1].upper()
-                    angle_2 = str(syms[1]).split('_')[-1].upper()
-                    # find angle measure first
-                    angle_1_val = self.solver.problem.condition.value_of_sym[syms[0]]
-                    angle_2_val = self.solver.problem.condition.value_of_sym[syms[1]]
-                    flag_1 = type(angle_1_val) in [Integer, Float]
-                    flag_2 = type(angle_2_val) in [Integer, Float]
-                    
-                    if flag_2:
-                        target_value = angle_2_val
-                        target_str = f"Find the measure of \\angle {angle_2}"
-                        target_cdl = f"Value(MeasureOfAngle({angle_2}))"
-                        add_conditions = []
-                        add_cdls = []
-                        conclusion = f"\\angle {angle_2} = {target_value}"
-                    elif flag_1:
-                        target_value = angle_1_val
-                        target_str = f"Find the measure of \\angle {angle_1}"
-                        target_cdl = f"Value(MeasureOfAngle({angle_1}))"
-                        add_conditions = []
-                        add_cdls = []
-                        conclusion = f"\\angle {angle_1} = {target_value}"
-                    else:
-                        # avoid to directly assign value to angle
-                        v1 = random.randint(1, 10)
-                        v2 = random.randint(1, 10)
-                        v3 = random.randint(1, 10)
-                        v4 = random.randint(1, 10)
-                        new_sym = self.add_new_symbol()
-                        expr_1 = v1*new_sym + v2
-                        expr_2 = v3*new_sym + v4
-                        expr = target[1].subs({syms[0]: expr_1,
-                                            syms[1]: expr_2})
-                        
-                        target_value = solve(Eq(expr, 0))[0]
-                        target_str = f"Find the value of {str(new_sym)}"
-                        target_cdl = f"Value({str(new_sym)})"
-                        add_cdls = [
-                            f"Equal(MeasureOfAngle({angle_1}),{str(expr_1)})",
-                            f"Equal(MeasureOfAngle({angle_2}),{str(expr_2)})",
-                        ]
-                        add_conditions = [
-                            f"\\angle {angle_1} = {str(expr_1)}",
-                            f"\\angle {angle_2} = {str(expr_2)}",
-                        ]
-                        conclusion = f"{new_sym} = {target_value}"
-                    
-            else: # len(free_symbols) == 1
-                sym = list(target[1].free_symbols)[0]
-                angle = str(sym).split('_')[-1].upper()
-                target_value = solve(Eq(target[1], 0))[0]
-                conclusion = f"\\angle {angle} = {target_value}"
-                if 'll' in str(sym):
-                    target_str = f"Find the length of {str(sym).split('ll_')[-1].upper()}"
-                    target_cdl = f"Value(LengthOfLine({str(sym)}))"
-                else:
-                    target_str = f"Find the measure of \\angle {str(sym).split('ma_')[-1].upper()}"
-                    target_cdl = f"Value(MeasureOfAngle({str(sym)}))"
+            elif len(target[1].free_symbols) == 1:
+                res_info = self.create_question_one_symbol(target)
+            else:
+                raise ValueError(len(target[1].free_symbols))
             
                   
         else: # other predicates
-            target_value = str(target[1])
-            if target[0] in PREDICATES_ENT:
-                conclusion = self.natural_template[target[0]][0].format(points=''.join(target[1]))
-                clause = f"{target[0]}({''.join(target[1])})"
-            else:
-                clause = self.target_tuple_to_clause(target)
-                _, items = parse_clause(clause)
-                conclusion = self.natural_template[target[0]][0].format(
-                    p1=items[0], p2=items[1])
-            
-            target_str = f'Prove that {conclusion}'
-            target_cdl = f"Relation({clause})"
-            
+            res_info = self.create_question_prove(target)
+        
+        (
+            conclusion,
+            add_cdls,
+            add_conditions,
+            target_value, 
+            target_str,
+            target_cdl
+        ) = tuple([res_info[k] for k in res_info])
+        
         for k, v in SYMBOL_MAPPING_2.items():
             conclusion = conclusion.replace(k, v)
             target_str = target_str.replace(k, v)
             add_conditions = [c.replace(k, v) for c in add_conditions]
             
-        conditions += add_conditions
-        text += ', '.join(conditions)
-        text += f". {target_str}."
-        return target_value, target_cdl, text, add_conditions, add_cdls, conclusion
+        # conditions += add_conditions
+        problem_text += ', '.join(conditions)
+        if len(add_conditions) > 0:
+            problem_text += f". Given {', '.join(add_conditions)}, {target_str}."
+        else:
+            problem_text += f". {target_str[0].upper() + target_str[1:]}."
+
+        return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text
     
     def target_tuple_to_clause(self, target):
         keys = list(self.predicate_GDL['Relation'].keys())
@@ -563,10 +756,13 @@ class TargetFinder():
         return solution
         
     def formulate(self):
+        start_time = time.time()
         self.solver.init_search(self.problem_CDL)
         self.solver.search()
         # self.solver.bfs_search()
-        
+        cost_time = time.time() - start_time
+        if self.debug:
+            print(f"Search took {cost_time:.5f} seconds. ")
         # construct condition graph
         condition_graph = ConditionGraph(self.solver.problem.condition.items)
         condition_graph.construct_graph()
@@ -584,12 +780,12 @@ class TargetFinder():
             return None, None
         # create question and solution for this geo relation
         (
+            conclusion,
+            add_cdls,
+            add_conditions,
             target_value, 
             target_cdl, 
-            text, 
-            add_conditions, 
-            add_cdls, 
-            conclusion
+            problem_text
         ) = self.create_question(target)
         self.text_cdls += add_cdls
         self.image_cdls += add_cdls
@@ -598,33 +794,21 @@ class TargetFinder():
             solution_str += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
         else:
             solution_str += f"\n<therefore> {conclusion}."
-        
-        # if self.debug:
-        #     draw_graph(condition_graph, 
-        #         idx="test", 
-        #         target_condition=target,
-        #         img_dir="imgs_test")
-            
-        
-        
-        if self.debug:
-            print('-------------- Problem Text --------------')
-            print(text)
-            print('------------- Forward Search -------------')
-            print(solution_str)
-        
+
         info_dict_for_symbolic = {
             "problem_level": problem_level,
-            "problem_text_en": text,
+            "problem_text_en": problem_text,
             "construction_cdl": self.constr_cdls,
             "text_cdl": self.text_cdls,
             "image_cdl": self.image_cdls,
             "goal_cdl": target_cdl,
             "problem_answer": target_value,
+            "theorems": theorems
         }
         info_dict_for_llm = {
+            "problem_type": target_type,
             "problem_level": problem_level,
-            "problem_text": text,
+            "problem_text": problem_text,
             "problem_answer": target_value,
             "solution_str": solution_str,
         }
@@ -635,11 +819,16 @@ class TargetFinder():
         
 if __name__ == '__main__':
     setup_seed(1234)
-    import itertools
+    
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     # for i in range(10):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
+    cnt = 0
+    total_len = len(list(itertools.product(PREDICATES_ENT, PREDICATES_REL)))
     for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
+        cnt += 1
+        if cnt < 47:
+            continue
         clauses_base = [clauses_base]
         clauses_rel = [clauses_rel]
         # clauses_base = random.choices(PREDICATES_ENT, k=1)
@@ -648,13 +837,7 @@ if __name__ == '__main__':
         #     "Triangle",
         # ]
         # clauses_rel = [
-        #     'IsPerpendicularBisectorOfLine', 
-        #     # 'IsMidsegmentOfTriangle',
-        #     # 'IsAltitudeOfQuadrilateral',
-        #     # 'IsIncenterOfTriangle',
-        #     # "IsAltitudeOfTriangle",
-        #     # "IsCircumcenterOfQuadrilateral",
-        #     # "IsMidpointOfArc"
+        #     'IsMidpointOfArc', 
         # ]
         cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
         cg.empty_states()
@@ -665,22 +848,19 @@ if __name__ == '__main__':
         )
         states = cg.states
         
-        states = {'points': ['a', 'b', 'c', 'd'], 'lines': [('a', 'b'), ('b', 'c'), ('a', 'c'), ('a', 'd'), ('b', 'd'), ('c', 'd')], 'circles': [], 'polygons': [('a', 'b', 'c'), ('a', 'b', 'd'), ('a', 'c', 'd'), ('b', 'c', 'd')], 'constraints': ['Triangle(abc)', 'Equal(MeasureOfAngle(cad),MeasureOfAngle(dab))', 'Equal(MeasureOfAngle(abd),MeasureOfAngle(dbc))', 'Equal(MeasureOfAngle(bcd),MeasureOfAngle(dca))'], 'constraints_base': ['Triangle(abc)'], 'points_on_circle': {}}
-        c_cdls = ['Shape(ab,bc,ca)', 'Shape(ab,bc,ca)']
-        t_cdls = ['Triangle(abc)', 'IsIncenterOfTriangle(d,abc)']
+        # states = {'points': ['a', 'b', 'c', 'd', 'e', 'f'], 'lines': [('b', 'c'), ('a', 'c'), ('d', 'e', 'f'), ('a', 'b', 'f'), ('b', 'e')], 'circles': ['d'], 'polygons': [('a', 'b', 'c'), ('b', 'e', 'f')], 'constraints': ['Triangle(abc)', 'Equal(LengthOfArc(dae),LengthOfArc(deb))', 'Cocircular(d,abc)', 'Cocircular(d,aeb)'], 'constraints_base': ['Triangle(abc)'], 'points_on_circle': {'d': ['a', 'b', 'c', 'e']}}
+        # c_cdls = ['Shape(ab,bc,ca)', 'Cocircular(d,abc)', 'Cocircular(d,aeb)', 'Collinear(dfe)', 'Collinear(afb)']
+        # t_cdls = ['Triangle(abc)', 'IsMidpointOfArc(e,dab)']
         
-        print('---------- Allocator Inputs ----------')
+        print(f'------- {cnt} / {total_len} Allocator Inputs -------')
         print(states)
         print('c_cdls: ', c_cdls)
         print('t_cdls: ', t_cdls)
 
-        allocator = Allocator(states, c_cdls, t_cdls, replace_chars=True)
+        allocator = Allocator(states, c_cdls, t_cdls, replace_chars=False)
         allocator.allocate()
-        print("---------- Location ----------")
-        for p, pos in allocator.p_pos.items():
-            print(f"{p}: [{pos[0]:.3f}, {pos[1]:.3f}]")
             
-        print('---------- Formulated CDLs ----------')
+        print(f'------- {cnt} / {total_len} Formulated CDLs -------')
         print('Text CDLs: ')
         for t_cdl in allocator.formulated_cdls['text_cdls']:
             print('\t', t_cdl)
@@ -721,4 +901,10 @@ if __name__ == '__main__':
         )
         info_dict_for_symbolic, info_dict_for_llm = goal_finder.formulate()
 
+        print(f'---------- {cnt} / {total_len} Problem Text ----------')
+        if info_dict_for_llm is not None:
+            print(info_dict_for_llm['problem_text'])
+        print(f'--------- {cnt} / {total_len} Forward Search ---------')
+        if info_dict_for_llm is not None:
+            print(info_dict_for_llm['solution_str'])
         print('==============================================')

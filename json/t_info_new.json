@@ -1,4 +1,8 @@
 {
+  "cocircular_judgement": [
+    1,
+    100
+  ],
   "line_addition": [
     1,
     2221
@@ -28,6 +32,10 @@
     40
   ],
   "parallel_property_collinear_extend": [
+    1,
+    738
+  ],
+  "parallel_property_collinear_extend_2": [
     1,
     738
   ],
@@ -421,7 +429,7 @@
   ],
   "midsegment_of_quadrilateral_property_parallel": [
     1,
-    0
+    20
   ],
   "circumcenter_of_quadrilateral_property_intersection": [
     1,
@@ -579,6 +587,10 @@
     1,
     39
   ],
+  "rectangle_property_cocircular": [
+    1,
+    20
+  ],
   "rhombus_judgment_parallelogram_and_kite": [
     1,
     5
@@ -695,6 +707,10 @@
     2,
     0
   ],
+  "circle_property_length_of_radius_equal": [
+    1,
+    100
+  ],
   "circle_property_length_of_radius_and_diameter": [
     1,
     134
@@ -715,11 +731,11 @@
     2, 
     22
   ],
-  "circle_property_chord_perpendicular_bisect_chord": [
+  "circle_property_vertical_radius": [
     1,
     162
   ],
-  "circle_property_chord_perpendicular_bisect_arc": [
+  "circle_property_vertical_radius_mini": [
     1,
     58
   ],

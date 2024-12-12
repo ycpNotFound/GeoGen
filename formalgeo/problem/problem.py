@@ -1,4 +1,5 @@
 import time
+import math
 import copy
 import warnings
 from itertools import combinations
@@ -7,10 +8,10 @@ from formalgeo.problem.condition import Condition, Goal
 from formalgeo.parse import parse_expr, get_equation_from_tree
 from formalgeo.tools import rough_equal
 from formalgeo.core import EquationKiller as EqKiller
-
+from copy import deepcopy
 
 class Problem:
-    def __init__(self):
+    def __init__(self, p_pos=None):
         """Problem conditions, goal, and solving message."""
         self.parsed_predicate_GDL = None
         self.parsed_theorem_GDL = None
@@ -18,6 +19,35 @@ class Problem:
         self.condition = None  # <Condition>, all conditions of current problem.
         self.goal = None  # <Goal>, problem goal.
         self.timing = {}  # <dict>, {step: (theorem, timing)}, such as {0: ('init_problem', 0.00325)}.
+        self.p_pos = p_pos
+        
+    def counter_clocksiwe_for_angle(self, points):
+        if self.p_pos is None:
+            return points
+        (A, B, C) = [self.p_pos[p] for p in points]
+        AB = (B[0] - A[0], B[1] - A[1])
+        BC = (C[0] - B[0], C[1] - B[1])
+        cross_product_z = AB[0]*BC[1] - AB[1]*BC[0]
+        if cross_product_z > 0:
+            return tuple([points[2], points[1], points[0]])
+        else:
+            return points
+        
+    def counter_clockwise_for_cocircular(self, centre, points):
+        if self.p_pos is None:
+            return points
+        O = self.p_pos[centre]
+
+        def angle_from_origin(point):
+            dx = point[0] - O[0]
+            dy = point[1] - O[1]
+            return math.atan2(dy, dx)
+        angles = [(key, angle_from_origin(self.p_pos[key])) for key in points]
+        sorted_angles = sorted(angles, key=lambda x: x[1], reverse=True)
+        sorted_points = [item[0] for item in sorted_angles]
+        start_idx = sorted_points.index(min(points))
+        sorted_points = sorted_points[start_idx:] + sorted_points[:start_idx]
+        return tuple(sorted_points)
 
     def load_problem_by_fl(self, parsed_predicate_GDL, parsed_theorem_GDL, parsed_problem_CDL):
         """Load problem through problem CDL."""
@@ -68,7 +98,17 @@ class Problem:
         5.Angle expand (collinear).
         6.Angle expand (vertical angle).
         """
-
+        # 0. Add all point and line instances.
+        for line in self.parsed_problem_CDL['lines']:
+            for i in range(len(line)-1):
+                line_unit = (line[i], line[i+1])
+                line_unit_rev = (line[i+1], line[i])
+                self.condition.add('Line', line_unit, (-1,), ("prerequisite", None, None))
+                self.condition.add('Line', line_unit_rev, (-1,), ("prerequisite", None, None))
+        for point in self.parsed_problem_CDL['points']:
+            self.condition.add('Point', (point, ), (-1, ), ("prerequisite", None, None)) 
+            
+                    
         # 1.Collinear expand.
         for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Collinear
             if predicate != "Collinear":
@@ -250,6 +290,7 @@ class Problem:
                         continue
 
                     new_angle = (unit[0], unit[1], comb[2])
+                    new_angle = self.counter_clocksiwe_for_angle(new_angle)
 
                     if not len(new_angle) == len(set(new_angle)):  # ensure same points
                         continue
@@ -456,8 +497,33 @@ class Problem:
 
             if predicate in self.parsed_predicate_GDL["Entity"]:  # user defined Entity
                 item_GDL = self.parsed_predicate_GDL["Entity"][predicate]
-            else:  # user defined Relation
+            elif predicate in self.parsed_predicate_GDL["Relation"]:  # user defined Relation
                 item_GDL = self.parsed_predicate_GDL["Relation"][predicate]
+                
+            else: # other cases
+                if predicate == 'Collinear':
+                    item_rev = tuple(list(item)[::-1])
+                    self.condition.add('Collinear', item_rev, (_id, ), ("extended", None, None))
+                    for i in range(len(item)-1):
+                        new_line = (item[i], item[i+1])
+                        new_line_rev = (item[i+1], item[i])
+                        self.condition.add('Line', new_line, (_id, ), ("extended", None, None))
+                        self.condition.add('Line', new_line_rev, (_id, ), ("extended", None, None))
+
+                elif predicate == 'Cocircular':
+                    ori_ps = self.condition.items_group['Cocircular'][0]
+                    new_ps = [p for p in item if p not in ori_ps]
+                    for p in new_ps:
+                        self.condition.add('Cocircular', (ori_ps[0], p), (_id, ), ("extended", None, None))
+                        for ori_ps_i in deepcopy(self.condition.items_group['Cocircular']):
+                            c, ps_on_c = ori_ps_i[0], ori_ps_i[1:]
+                            added_ps = tuple(set(ps_on_c + (p, )))
+                            added_ps = self.counter_clockwise_for_cocircular(c, added_ps)
+                            added_ps = (c, ) + added_ps
+                            self.condition.add('Cocircular', added_ps, (_id, ), ("extended", None, None))
+                else:
+                    pass
+                return True
 
             predicate_vars = item_GDL["vars"]
             letters = {}  # used for vars-letters replacement
@@ -470,6 +536,13 @@ class Problem:
             for extended_predicate, para in item_GDL["extend"]:  # extended
                 if extended_predicate == "Equal":
                     self.add("Equation", get_equation_from_tree(self, para, True, letters),
+                             (_id,), ("extended", None, None))
+                elif extended_predicate == 'PerpendicularBetweenLine':
+                    # check counter clockwise (ccw)
+                    points = tuple(letters[i] for i in para)[:3]
+                    points_ccw = self.counter_clocksiwe_for_angle(points)
+                    points_input = points_ccw + (points[1], )
+                    self.add(extended_predicate, points_input,
                              (_id,), ("extended", None, None))
                 else:
                     self.add(extended_predicate, tuple(letters[i] for i in para),

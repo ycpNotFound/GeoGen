@@ -7,7 +7,7 @@ import string
 import sympy
 from sympy import (Eq, Expr, Float, I, Symbol, cos, im, nsimplify, pi,
                    simplify, solve, symbols, And, Or, StrictLessThan, StrictGreaterThan, oo)
-
+from copy import deepcopy
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from utils import (PREDICATES_ENT, PREDICATES_REL, extract_sqrt_terms,
@@ -38,6 +38,11 @@ class Allocator():
                  text_cdls,
                  allocate_value=False,
                  replace_chars=False):
+        self.ori_states = {
+            "geo_states": deepcopy(geo_states),
+            "construct_cdls": deepcopy(construct_cdls),
+            "text_cdls": deepcopy(text_cdls)
+        }
         self.points = geo_states['points']                     
         self.lines = geo_states['lines']
         self.circles = geo_states['circles']
@@ -117,7 +122,9 @@ class Allocator():
                         points_on_circle[circle] = set()
                     points_on_circle[circle].update(ps)
                 for circle, ps in points_on_circle.items():
-                    cocircular_cdl = f"Cocircular({circle},{''.join(sorted(list(ps)))})"
+                    # sort by counter clockwise
+                    sorted_ps = self.sort_points_counter_clockwise(list(ps))
+                    cocircular_cdl = f"Cocircular({circle},{''.join(sorted_ps)})"
                     construct_cdls.append(cocircular_cdl)
             
             text_cdls = remove_duplicates(self.text_cdls)
@@ -132,10 +139,35 @@ class Allocator():
         return self._formulated_cdls
         
     def empty_states(self):
-        self.p_pos = {k: None for k in self.points}
+        geo_states = self.ori_states['geo_states']
+
+        self.points = geo_states['points']                     
+        self.lines = geo_states['lines']
+        self.circles = geo_states['circles']
+        self.polygons = geo_states['polygons']
+        
+        self.constraints = [c for c in geo_states['constraints'] 
+                            if c not in geo_states['constraints_base']]
+        self.constraints_base = geo_states['constraints_base']
+        self.points_on_circle = geo_states['points_on_circle']
+        self.construct_cdls = self.ori_states['construct_cdls']
+        self.text_cdls = self.ori_states['text_cdls']
+        self.image_cdls = []
+        
+        self.clauses = self.construct_cdls + self.constraints
+        # merge all cocircular clauses
+        self.clauses = self.merge_cocircular_clauses()
+        # sort by idx of points
+        # [max_letter_index(x) for x in self.clauses]
+        self.clauses = sorted(list(set(self.clauses)), key=max_letter_index)
+        # filter by IGNORE_NAMES
+        self.clauses = [c for c in self.clauses if c.split('(')[0] not in IGNORE_NAMES]
+
+        self.p_pos = {p: None for p in self.points}
         self.p_pos['a'] = [0, 0]
         self.p_pos_range = {}
         self.clause_subset = self.find_mini_clauses_subset()
+        self._formulated_cdls = None
         
     @staticmethod
     def distance_2(point1, point2):
@@ -220,14 +252,17 @@ class Allocator():
             # allocate value of line or angle, random choose
             if self.allocate_value:
                 self.allocate_for_value()
-            if self.replace_chars:
-                self.replace_characters()
+
+            self.replace_characters()
             return
         
         print('Fail to allocate positions.')
         
     def replace_characters(self):
-        start_char = random.choice(['A', 'E', 'I', 'M', 'R'])
+        if self.replace_chars:
+            start_char = random.choice(['A', 'E', 'I', 'M', 'R'])
+        else:
+            start_char = 'A'
         start_idx = string.ascii_uppercase.index(start_char)
         chars = string.ascii_uppercase[start_idx: start_idx + len(self.p_pos)]
         mapping = {}
@@ -383,35 +418,30 @@ class Allocator():
         return None
 
     def sort_points_counter_clockwise(self, points):
-        n = len(points)
-        if n < 3:
-            raise ValueError("至少需要三个点来定义多边形")
+        if len(points) < 3:
+            return points
         
-        # 找到最左下角的点作为起始点
-        start_index = 0
-        coords = [self.p_pos[p] for p in points]
-        for i in range(1, n):
-            if coords[i][1] < coords[start_index][1] or \
-            (coords[i][1] == coords[start_index][1] and coords[i][0] < coords[start_index][0]):
-                start_index = i
-        
-        # 将起始点移到列表的开头
-        points = points[start_index:] + points[:start_index]
-        coords = coords[start_index:] + coords[:start_index]
-        
-        # 排序其余点
-        sorted_indices = [0]  # 起始点总是第一个
-        for i in range(1, n):
-            j = 0
-            l1 = (sorted_indices[j], sorted_indices[-1])
-            l2 = (sorted_indices[j], coords[i])
-            cross_prod = self.get_cross_product(l1, l2)
-            while j < len(sorted_indices) and cross_prod < 0:
-                j += 1
-            sorted_indices.insert(j, i)
-        
-        # 根据排序后的索引重排点和坐标
-        sorted_points = [points[i] for i in sorted_indices]
+        start_point = points[0]
+        # calcualte center coordinate
+        x_coords = [self.p_pos[p][0] for p in points]
+        y_coords = [self.p_pos[p][1] for p in points]
+        center_x = sum(x_coords) / len(x_coords)
+        center_y = sum(y_coords) / len(y_coords)
+
+        def calculate_angle(p):
+            dx = self.p_pos[p][0] - center_x
+            dy = self.p_pos[p][1] - center_y
+            return math.atan2(dy, dx)
+
+        # sort by calculated angle, reverse=True to reverse for cv2
+        sorted_points = sorted(points, 
+                               key=lambda x: calculate_angle(x), 
+                               reverse=True)
+
+        # adjust to start with initial point
+        start_index = sorted_points.index(start_point)
+        sorted_points = sorted_points[start_index:] + sorted_points[:start_index]
+
         return sorted_points
 
     

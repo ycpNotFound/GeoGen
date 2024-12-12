@@ -285,6 +285,8 @@ class EquationKiller:
     @staticmethod
     @func_set_timeout(2)
     def solve(equations, target_sym=None, keep_sym=False):
+        if type(equations) == tuple and len(equations) > 6: 
+            return {}
         try:
             if target_sym is not None:
                 solved = solve(equations, target_sym, dict=True)
@@ -372,9 +374,19 @@ class EquationKiller:
         except FunctionTimedOut:
             msg = "Timeout when simplify equations by value replace."
             warnings.warn(msg)
+        
+        # only solve symbols for line len or angle measure
+        eq_filtered = [
+            eq for eq in list(problem.condition.simplified_equation)
+            if all([
+                'll_' in str(sym) or 'ma_' in str(sym) 
+                for sym in list(eq.free_symbols)
+            ])
+        ]
 
         mini_eqs_lists, n_m = EquationKiller.get_minimum_group_equations(  # get mini equations
-            list(problem.condition.simplified_equation)
+            # list(problem.condition.simplified_equation)
+            eq_filtered
         )
 
         for i in range(len(mini_eqs_lists)):

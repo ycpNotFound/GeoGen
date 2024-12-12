@@ -126,7 +126,11 @@
         "ParallelBetweenLine(AD,BC)",
         "ParallelBetweenLine(BA,CD)",
         "Equal(LengthOfLine(AB),LengthOfLine(CD))",
-        "Equal(LengthOfLine(BC),LengthOfLine(AD))"
+        "Equal(LengthOfLine(AB),LengthOfLine(DC))",
+        "Equal(LengthOfLine(BC),LengthOfLine(AD))",
+        "Equal(LengthOfLine(BC),LengthOfLine(DA))",
+        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(CDA))",
+        "Equal(MeasureOfAngle(DAB),MeasureOfAngle(BCD))"
       ]
     },
     "Rhombus(ABCD)": {
@@ -216,8 +220,7 @@
     "IsMidpointOfLine(M,AB)": {
       "ee_check": [
         "Point(M)",
-        "Line(AB)",
-        "Collinear(AMB)"
+        "Line(AB)"
       ],
       "fv_check": [
         "M,AB"
@@ -246,6 +249,7 @@
       "multi": [],
       "extend": [
         "Equal(LengthOfArc(OAM),LengthOfArc(OMB))",
+        "Equal(MeasureOfArc(OAM),MeasureOfArc(OMB))",
         "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OAM),2))",
         "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OMB),2))"
       ],
@@ -298,6 +302,8 @@
       "extend": [
         "PerpendicularBetweenLine(AO,CO)",
         "PerpendicularBetweenLine(CO,BO)",
+        "PerpendicularBetweenLine(CO,AO)",
+        "PerpendicularBetweenLine(BO,CO)",
         "IsMidpointOfLine(O,AB)"
       ],
       "find": ["Line(AB)"], 
