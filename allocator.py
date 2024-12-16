@@ -99,6 +99,7 @@ class Allocator():
     def formulated_cdls(self):
         if self._formulated_cdls is None:
             construct_cdls = []
+            collinear_cdls = []
             cocircular_cdls = []
             for poly in self.polygons:
                 lines = []
@@ -109,9 +110,17 @@ class Allocator():
                 
             for const_cdl in self.construct_cdls:
                 if 'Collinear' in const_cdl:
-                    construct_cdls.append(const_cdl)
+                    collinear_cdls.append(const_cdl)
                 if 'Cocircular' in const_cdl:
                     cocircular_cdls.append(const_cdl)
+                    
+            if len(collinear_cdls) > 0:
+                for cdl in collinear_cdls:
+                    _, items = parse_clause(cdl)
+                    # sort by coords x
+                    points = sorted(items[0], key=lambda x: self.p_pos[x][0])
+                    collinear_cdl = f"Collinear({''.join(points)})"
+                    construct_cdls.append(collinear_cdl)
             
             if len(cocircular_cdls) > 0:
                 points_on_circle = {}
@@ -126,6 +135,7 @@ class Allocator():
                     sorted_ps = self.sort_points_counter_clockwise(list(ps))
                     cocircular_cdl = f"Cocircular({circle},{''.join(sorted_ps)})"
                     construct_cdls.append(cocircular_cdl)
+            
             
             text_cdls = remove_duplicates(self.text_cdls)
             construct_cdls = remove_duplicates(construct_cdls)
@@ -444,7 +454,7 @@ class Allocator():
 
         return sorted_points
 
-    
+
     def find_triangles(self):
         # delete all triangles first
         polygons_ = []

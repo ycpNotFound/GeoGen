@@ -145,7 +145,11 @@
       "extend": [
         "Parallelogram(ABCD)",
         "Kite(ABCD)",
-        "Kite(BCDA)"
+        "Kite(BCDA)",
+        "Equal(LengthOfLine(AB),LengthOfLine(BC))",
+        "Equal(LengthOfLine(BC),LengthOfLine(CD))",
+        "Equal(LengthOfLine(CD),LengthOfLine(DA))",
+        "Equal(LengthOfLine(DA),LengthOfLine(AB))"
       ]
     },
     "Rectangle(ABCD)": {
@@ -568,7 +572,7 @@
     "IsCircumcenterOfQuadrilateral(O,ABCD)": {
       "ee_check": [
         "Point(O)",
-        "'Polygon'(ABCD)",
+        "Polygon(ABCD)",
         "Cocircular(O,ABCD)"
       ],
       "fv_check": [

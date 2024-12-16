@@ -827,7 +827,7 @@ if __name__ == '__main__':
     total_len = len(list(itertools.product(PREDICATES_ENT, PREDICATES_REL)))
     for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
         cnt += 1
-        if cnt < 47:
+        if cnt < 59:
             continue
         clauses_base = [clauses_base]
         clauses_rel = [clauses_rel]
