@@ -4,7 +4,7 @@ import re
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-import pygraphviz
+
 import sympy
 from sympy import Eq
 from tqdm import tqdm

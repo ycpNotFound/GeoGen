@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Union
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import pygraphviz
+
 from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
 from sympy import Eq
 from tqdm import tqdm
