@@ -45,7 +45,9 @@ def generate_one_sample(predicate_GDL,
         allocator.formulated_cdls['text_cdls'],
         allocator.formulated_cdls['construct_cdls'],
         allocator.formulated_cdls['image_cdls'],
-        replace_characters=False
+        replace_characters=False,
+        color_config=color_config,
+        stage_2=True
     )
     plotter.plot()
     fig_name = f"{fig_idx}.png"
@@ -78,25 +80,15 @@ def generate_one_sample(predicate_GDL,
         task_info['error_message'] = 'no target'
         return (False, task_info, None)
     
-    plotter = Plotter(
-        allocator.states,
-        info_dict_symbolic['text_cdl'],
-        info_dict_symbolic['construction_cdl'],
-        info_dict_symbolic['image_cdl'],
-        replace_characters=False,
-        color_config=color_config,
-        stage_2=True
-    )
-    plotter.plot()
-    
-    
     data_info = {
         "key": fig_idx,
         "construction_cdl": plotter.construct_cdls,
-        "text_cdl": plotter.text_cdls, 
-        "image_cdl": plotter.image_cdls,
-        "caption_str": plotter.caption_str,
-        "positions": plotter.p_pos
+        "text_cdl": info_dict_symbolic['text_cdl'],
+        "image_cdl": info_dict_symbolic['image_cdl'],
+        "positions": plotter.p_pos,
+        "goal_cdl": info_dict_symbolic['goal_cdl'],
+        "search_time": info_dict_symbolic['time'],
+        "theorems": info_dict_symbolic['theorems'],
     }
     llm_info = {
         "key": fig_idx,
@@ -122,7 +114,7 @@ def generate_one_sample_with_timeout(
     try:
         result = func_timeout(
             # 200, 
-            2000,
+            300,
             generate_one_sample, 
             args=(predicate_GDL, theorem_GDL, predicate_base, 
                   predicate_rel, n_more_lines, color_config, 
@@ -304,12 +296,12 @@ def task_0():
 
 def task_1():
     seed = 1234
-    task_name = "geo_gen_ENT_1_REL_2"
+    task_name = "geo_gen_ENT_1_REL_1"
     input_args_list = []
-    num_process = 12
+    num_process = 1
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
-    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
@@ -385,11 +377,11 @@ def debug_run_task():
     print(f"Failure Count: {len(failure_cases)} / {cnt}")
     
 def main():
-    # run_task(*task_1())
-    run_task()
+    run_task(*task_1())
+    # run_task()
 
 
 if __name__ == '__main__':
-    # main()
-    debug_run_task()
+    main()
+    # debug_run_task()
     

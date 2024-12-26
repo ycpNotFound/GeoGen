@@ -578,8 +578,8 @@ class FormalGeoSolver:
         )
         # algebra_selections = []
         # debug_print(self.debug, "(timing={:.4f}s) Get {} algebra-related selections: {}.".format(time.time() - timing, len(algebra_selections), algebra_selections))
-        print(f'logic: {len(logic_selections)}')
-        print(f'algeb: {len(algebra_selections)}')
+        # debug_print(f'logic: {len(logic_selections)}')
+        # debug_print(f'algeb: {len(algebra_selections)}')
         
         timing = time.time()
         added_selections = []
