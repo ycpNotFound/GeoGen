@@ -3,12 +3,22 @@ import random
 import re
 
 import sympy
-from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols
+from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer
 
 from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
                      SYMBOL_MAPPING_1, SYMBOL_MAPPING_2)
 from .symbolic import parse_clause
 
+def json_formatter(input_dict):
+    for k, v in input_dict.items():
+        if isinstance(v, dict):
+            v = json_formatter(v)
+        elif isinstance(v, list):
+            v = [json_formatter(item) for item in v]
+        elif isinstance(v, Integer):
+            v = int(v)
+        elif isinstance(v, Float):
+            v = float(v)
 
 def sympy_to_latex(expr):
     lhs, rhs = expr.split('=') if '=' in expr else (expr, '0')

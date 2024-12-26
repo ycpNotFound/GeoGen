@@ -848,7 +848,7 @@ class TargetFinder():
             "text_cdl": self.text_cdls,
             "image_cdl": self.image_cdls,
             "goal_cdl": target_cdl,
-            "problem_answer": target_value,
+            "problem_answer": str(target_value),
             "theorems": theorems,
             "time": round(cost_time, 3)
         }
@@ -856,7 +856,7 @@ class TargetFinder():
             "problem_type": target_type,
             "problem_level": problem_level,
             "problem_text": problem_text,
-            "problem_answer": target_value,
+            "problem_answer": str(target_value),
             "solution_str": solution_str,
         }
             
