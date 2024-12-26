@@ -15,7 +15,7 @@ from formalgeo.parse import parse_theorem_seqs
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import Interactor
 from graph import ConditionGraph, ConditionNode, display_solution, draw_graph
-from utils import move_subtractions_to_rhs
+from utils.symbolic import move_subtractions_to_rhs
 
 
 def construct_goal_from_condition(condition: Tuple):

@@ -1,12 +1,7 @@
 
-import concurrent.futures
 import itertools
 import json
-import logging
 import os
-import random
-import traceback
-from logging.handlers import RotatingFileHandler
 from multiprocessing import Pool
 
 import numpy as np
@@ -14,12 +9,12 @@ from func_timeout import FunctionTimedOut, func_timeout
 from tqdm import tqdm
 
 from allocator import Allocator
-from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from plotter import Plotter
 from target_finder import TargetFinder
-from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
-                   PRESET_COLOR_PROBS, PRESET_COLORS, parse_clause, setup_seed)
+from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
+                          PRESET_COLOR_PROBS, PRESET_COLORS)
+from utils.tools import setup_seed
 
 
 def generate_one_sample(predicate_GDL, 
@@ -45,6 +40,17 @@ def generate_one_sample(predicate_GDL,
     )
     allocator.allocate()
     
+    plotter = Plotter(
+        allocator.states,
+        allocator.formulated_cdls['text_cdls'],
+        allocator.formulated_cdls['construct_cdls'],
+        allocator.formulated_cdls['image_cdls'],
+        replace_characters=False
+    )
+    plotter.plot()
+    fig_name = f"{fig_idx}.png"
+    plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
+    
     goal_finder = TargetFinder(
         search_cfg['predicate_GDL'],
         search_cfg['theorem_GDL'],
@@ -56,7 +62,7 @@ def generate_one_sample(predicate_GDL,
         allocator.image_cdls,
         replace_characters=False,
         solver_type='formalgeo',
-        debug=True
+        debug=False
     )
     info_dict_symbolic, info_dict_llm = goal_finder.formulate()
     
@@ -82,8 +88,7 @@ def generate_one_sample(predicate_GDL,
         stage_2=True
     )
     plotter.plot()
-    fig_name = f"{fig_idx}.png"
-    plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
+    
     
     data_info = {
         "key": fig_idx,

@@ -1,11 +1,13 @@
-from sympy import simplify, nsimplify, Integer, Float, symbols, linear_eq_to_matrix, solve, Eq
+from sympy import simplify, nsimplify, Integer, Float, symbols, linear_eq_to_matrix, solve, Eq, Matrix
 import re
 import numpy as np
 from formalgeo.core.engine import EquationKiller as EqKiller
 import requests
 import json
+import itertools
 
 def sympy_to_latex(expr):
+    # equation: expr = 0
     lhs, rhs = expr.split('=') if '=' in expr else (expr, '0')
     expr = simplify(lhs + '-(' + rhs + ')')
 
@@ -64,7 +66,7 @@ def latex_to_sympy(latex_str):
     latex_str = re.sub(r'[A-Z]{2}', replace_two_letters, latex_str)
     
     lhs, rhs = latex_str.split('=') if '=' in latex_str else (latex_str, '0')
-    expr = simplify(f"{lhs}-{rhs}")
+    expr = simplify(f"({lhs})-({rhs})")
     return expr
 
 def simplification_value_replace(eqs):
@@ -126,53 +128,92 @@ def simplification_value_replace(eqs):
     return eqs
 
 def formulate_eqs(eq_str_list, target_str):
-    eq_list = []
+    expr_list = []
     for eq in eq_str_list + [target_str]:
         eq = eq.replace('∠', '\\angle').replace('°', '')
         if '$' in eq:
             eq = re.findall(r'\$(.*?)\$', eq)[0]
         elif 'from' in eq:
             eq = eq.split('from')[0]
-        eq = latex_to_sympy(eq)
-        eq_list.append(eq)
+        expr = latex_to_sympy(eq)
+        expr_list.append(expr)
     
-    target_sym = eq_list[-1].free_symbols.pop()
-    eq_list = eq_list[:-1]
+    target_sym = expr_list[-1].free_symbols.pop()
+    expr_list = expr_list[:-1]
     
     # substitute value in eq_list
-    sym2value = {}
-    for eq in eq_list:
-        if len(eq.free_symbols) == 1:
-            sym = eq.free_symbols.pop()
-            res = solve(Eq(eq, 0), sym, dict=True)[0]
-            sym2value[sym] = res[sym]
-    print(sym2value)
+    sym_value_premise_list = []
+    for idx, expr in enumerate(expr_list):
+        if len(expr.free_symbols) == 1:
+            sym = expr.free_symbols.pop()
+            res = solve(Eq(expr, 0), sym, dict=True)[0]
+            sym_value_premise_list.append([sym, res[sym], idx])
 
-    eq_list = [
-        eq.subs(sym2value) for eq in eq_list
-        if len(eq.subs(sym2value).free_symbols) > 0
-    ]
-    # build sym -> eqs map
-    sym2eqs = {}
-    for eq in eq_list:
-        for sym in list(eq.free_symbols):
-            if sym not in sym2eqs:
-                sym2eqs[sym] = [eq]
-            else:
-                sym2eqs[sym].append(eq)
-    sym2eqs_char = {}
-    sym2char = {original: symbols(chr(97 + idx)) for idx, original in enumerate(sym2eqs)}
-    for k, v in sym2eqs.items():
-        sym2eqs_char[sym2char[k]] = [expr.subs(sym2char) for expr in v]
-    eqs_char = [expr.subs(sym2char) for expr in eq_list]
-    print(sym2eqs)
-    print(sym2eqs_char)
+    expr_subs_list, expr_subs_ids = [], []
+    expr_id2premise = {}
+    for i, expr in enumerate(expr_list):
+        if i in [item[2] for item in sym_value_premise_list]:
+            continue
+        premise_ids = []
+
+        for sym, value, j in sym_value_premise_list:
+            if sym in expr.free_symbols:
+                expr = expr.subs({sym: value})
+                premise_ids.append(j)
+
+        if len(expr.free_symbols) > 0:
+            expr_subs_list.append(expr)
+            expr_subs_ids.append(i)
+            expr_id2premise[i] = premise_ids
     
-    res_1 = EqKiller.simplification_sym_replace(eqs_char, sym2char[target_sym])
-    EqKiller.get_minimum_target_equations(sym2char[target_sym], eqs_char)
-    print(eqs_char)
-    return
-    
+    # find miniset of eqs
+    eqs = [ Eq(expr, 0) for expr in expr_subs_list]
+    subset_ids = find_minimal_equation_subset(eqs, expr_subs_ids, target_sym)
+
+    if len(subset_ids) == 0 or len(subset_ids) > 3:
+        return None
+
+    formulated_str = ''
+    for idx_ori in subset_ids:
+        idx_subs = expr_subs_ids.index(idx_ori)
+        premise_ids = expr_id2premise[idx_ori]
+        if len(premise_ids) > 0:
+            # has changed by substitute value
+            premise_str = ', '.join([eq_str_list[i] for i in premise_ids])
+            extend_eq = eqs[idx_subs]
+            extend_str = sympy_to_latex(str(extend_eq.lhs))
+            formulated_str += f"- Substitute {premise_str} in {eq_str_list[idx_ori]}, <therefore> {extend_str}.\n"
+
+        else:
+            extend_str = eq_str_list[idx_ori]
+            if 'from' in extend_str:
+                items = [s.strip() for s in extend_str.split('from')]
+                statement, step = items[0], items[-1]
+                extend_str = f"From {step}: {statement}"
+            formulated_str += f"- {extend_str}.\n"
+        
+    formulated_str += '- Solving equation groups: \n'
+    for idx_ori in subset_ids:
+        idx_subs = expr_subs_ids.index(idx_ori)
+        premise_ids = expr_id2premise[idx_ori]
+        extend_eq = eqs[idx_subs]
+        extend_str = sympy_to_latex(str(extend_eq.lhs))
+        formulated_str += f'\t- {extend_str}.\n'
+
+
+    return formulated_str
+
+def find_minimal_equation_subset(eq_list, idx_list, target_symbol):
+    for subset_size in range(1, len(eq_list) + 1):
+        for subset in itertools.combinations(eq_list, subset_size):
+            # Try solving the target_symbol using the subset
+            solution = solve(subset)
+            if target_symbol in solution:
+                target_value = solution.get(target_symbol)
+                if isinstance(target_value, (int, float, Float, Integer)):
+                    idx_subset = [idx_list[eq_list.index(eq)] for eq in subset]
+                    return idx_subset
+    return []
     
 def test_wolframe_alpha():
     app_id = "GUL4RH-486H6ERPR3"
@@ -214,10 +255,24 @@ def test_sympy_subs():
     new_expr_symp = expr.subs({a:(2*x-1), b: (x+1)})
 
     print(new_expr)
+    
+
 
 if __name__ == '__main__':
-    eq_str_list = ['∠ EFH = ∠ HFG from step 5', '$ ∠ EFG = 2*∠ EFH $ from step 5', '$ ∠ EFG = 2*∠ HFG $ from step 5', '∠ FGH = ∠ HGE from step 5', '$ ∠ FGE = 2*∠ FGH $ from step 5', '$ ∠ FGE = 2*∠ HGE $ from step 5', '∠ GEF = 30°', '∠ GEH = 15° from step 7', '∠ HEF = 15° from step 6', '$ ∠ EFG + ∠ FGE + ∠ GEF = 180 $ from step 4', '$ ∠ EFH + ∠ FHE + ∠ HEF = 180 $ from step 3', '$ ∠ EHG + ∠ GEH + ∠ HGE = 180 $ from step 2', '$ ∠ FGH + ∠ GHF + ∠ HFG = 180 $ from step 1']
-    target_str = '∠ GHF = 105°'
+
+    eq_str_list = [
+        '∠ ABC = 90°', 
+        '∠ BCD = 90°', 
+        '∠ CDA = 90°', 
+        '∠ DAB = 90° from step 3', 
+        '$ ∠ ABC + ∠ BCA + ∠ CAB = 180 $', 
+        '$ ∠ BCD = ∠ ACD + ∠ BCA $ from given condition', 
+        '$ ∠ ACD + ∠ CDA + ∠ DAC = 180 $ from step 2', 
+        '$ ∠ DAB = ∠ CAB + ∠ DAC $ from step 1', 
+        '∠ BCA = ∠ CAB from step 4'
+    ]
+    target_str = '∠ BCA = 45°'
     # formulate_eqs(eq_str_list, target_str)
     # test_wolframe_alpha()
-    test_sympy_subs()
+    # test_sympy_subs()
+    filter_no_sqrt()

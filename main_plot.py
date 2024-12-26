@@ -1,23 +1,22 @@
 
-import random
-from multiprocessing import Pool
-import os
-import numpy as np
-import json
 import itertools
+import json
+import os
+import random
+import traceback
+from multiprocessing import Pool
+
+import numpy as np
+from func_timeout import FunctionTimedOut, func_timeout
+from tqdm import tqdm
+
 from allocator import Allocator
-from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
 from plotter import Plotter
-from utils import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, setup_seed, parse_clause
+from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
+                          PRESET_COLOR_PROBS, PRESET_COLORS)
+from utils.tools import setup_seed
 
-import logging
-from logging.handlers import RotatingFileHandler
-from tqdm import tqdm
-from func_timeout import func_timeout, FunctionTimedOut
-import concurrent.futures
-import traceback
-from utils import PRESET_COLORS, PRESET_COLOR_PROBS
 
 def generate_one_sample(predicate_GDL, 
                         theorem_GDL,

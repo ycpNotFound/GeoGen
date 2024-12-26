@@ -15,6 +15,8 @@ def parse_theorem_gdl(theorem_GDL, parsed_predicate_GDL):
         # debug
         if 'trapezoid_judgment_parallel' in theorem_name:
             a = 1
+        if 'square_property_cocircular' in theorem_name:
+            a = 1
             
         for branch in theorem_GDL[theorem_name]:
             raw_premise_GDL = [theorem_GDL[theorem_name][branch]["premise"]]

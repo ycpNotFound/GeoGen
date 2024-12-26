@@ -1,5 +1,6 @@
 {
     "Triangle": [
+        "{points} is a triangle",
         "{points} forms a triangle",
         "the shape {points} forms a triangle",
         "the shape {points} is a triangle"
@@ -15,6 +16,7 @@
         "quadrilateral {points} is a rectangle"
     ],
     "Rhombus": [
+        "{points} is a rhombus",
         "{points} forms a rhombus",
         "the shape {points} is a rhombus",
         "quadrilateral {points} is a rhombus"
@@ -25,6 +27,7 @@
         "\\triangle {points} has a right angle {points}"
     ],
     "Square": [
+        "{points} is a square",
         "{points} forms a square",
         "the shape {points} is a square",
         "quadrilateral {points} is a square"
@@ -45,6 +48,7 @@
         "quadrilateral {points} is a trapezoid"
     ],
     "Kite": [
+        "{points} is a kite",
         "{points} forms a kite",
         "the shape {points} is a kite",
         "quadrilateral {points} is a kite"

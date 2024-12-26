@@ -9,6 +9,7 @@ from formalgeo.parse import parse_expr, get_equation_from_tree
 from formalgeo.tools import rough_equal
 from formalgeo.core import EquationKiller as EqKiller
 from copy import deepcopy
+import itertools
 
 class Problem:
     def __init__(self, p_pos=None):
@@ -21,7 +22,7 @@ class Problem:
         self.timing = {}  # <dict>, {step: (theorem, timing)}, such as {0: ('init_problem', 0.00325)}.
         self.p_pos = p_pos
         
-    def counter_clocksiwe_for_angle(self, points):
+    def sort_counter_clocksiwe_angle(self, points):
         if self.p_pos is None:
             return points
         (A, B, C) = [self.p_pos[p] for p in points]
@@ -33,7 +34,7 @@ class Problem:
         else:
             return points
         
-    def counter_clockwise_for_cocircular(self, centre, points):
+    def sort_counter_clockwise_cocircular(self, centre, points):
         if self.p_pos is None:
             return points
         O = self.p_pos[centre]
@@ -47,6 +48,12 @@ class Problem:
         sorted_points = [item[0] for item in sorted_angles]
         start_idx = sorted_points.index(min(points))
         sorted_points = sorted_points[start_idx:] + sorted_points[:start_idx]
+        return tuple(sorted_points)
+    
+    def sort_by_x_collinear(self, points):
+        if self.p_pos is None:
+            return points
+        sorted_points = sorted(points, key=lambda x: self.p_pos[x][0])
         return tuple(sorted_points)
 
     def load_problem_by_fl(self, parsed_predicate_GDL, parsed_theorem_GDL, parsed_problem_CDL):
@@ -71,6 +78,13 @@ class Problem:
             elif predicate == "Equation":
                 self.add("Equation", parse_expr(self, item),
                          (-1,), ("prerequisite", None, None))
+            elif predicate == 'ParallelBetweenLine':
+                item_1, item_2 = self.same_side_for_parallel(item)
+                self.add(predicate, tuple(item_1), (-1,), ("prerequisite", None, None))
+                self.add(predicate, tuple(item_2), (-1,), ("prerequisite", None, None))
+            elif predicate == 'IsBisectorOfAngle':
+                item = item[:2] + self.sort_counter_clocksiwe_angle(item[2:])
+                self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
             else:
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
 
@@ -88,6 +102,18 @@ class Problem:
         self.goal = Goal()  # set goal
         self.goal.init_by_copy(problem.goal)
 
+    def same_side_for_parallel(self, item):
+        # AB // CD, AC in one side, BD in the other side
+        A, B, C, D = item
+        AB = [self.p_pos[B][0] - self.p_pos[A][0],
+                  self.p_pos[B][1] - self.p_pos[A][1]]
+        CD = [self.p_pos[D][0] - self.p_pos[C][0],
+                  self.p_pos[D][1] - self.p_pos[C][1]]
+        if AB[0] * CD[0] + AB[1] * CD[1] > 0:
+            return (A, B, C, D), (C, D, A, B)
+        else:
+            return (A, B, D, C), (D, C, A, B)
+    
     def _construction_init(self):
         """
         Constructive process.
@@ -290,7 +316,7 @@ class Problem:
                         continue
 
                     new_angle = (unit[0], unit[1], comb[2])
-                    new_angle = self.counter_clocksiwe_for_angle(new_angle)
+                    new_angle = self.sort_counter_clocksiwe_angle(new_angle)
 
                     if not len(new_angle) == len(set(new_angle)):  # ensure same points
                         continue
@@ -456,6 +482,82 @@ class Problem:
 
         return same_angles
 
+    def add_collinear_extend(self, item, _id):
+        item_rev = tuple(list(item)[::-1])
+        self.condition.add('Collinear', item_rev, (_id, ), ("extended", None, None))
+        # add sub lines
+        for i in range(len(item)-1):
+            new_line = (item[i], item[i+1])
+            new_line_rev = (item[i+1], item[i])
+            self.condition.add('Line', new_line, (_id, ), ("extended", None, None))
+            self.condition.add('Line', new_line_rev, (_id, ), ("extended", None, None))
+        # add flat angles
+        for extended_item in combinations(item, 3):  # l=3 is enough
+            self.condition.add("Collinear", extended_item, (_id,), ("extended", None, None))
+            self.condition.add("Collinear", extended_item[::-1], (_id,), ("extended", None, None))
+            self.condition.add("Angle", extended_item, (_id,), ("extended", None, None))
+            self.condition.add("Angle", extended_item[::-1], (_id,), ("extended", None, None))
+            angle_sym = self.get_sym_of_attr('MeasureOfAngle', extended_item)
+            self.condition.add("Equation", angle_sym - 180, (_id, ), ("extended", None, None))
+
+        # add potential collinear
+        for ps in self.condition.get_items_by_predicate('Collinear'):
+            if len(set(item) & set(ps)) == 2:
+                ps_co = tuple(set(item) & set(ps))
+                p1 = tuple(set(item) - set(ps_co))[0]
+                p2 = tuple(set(ps) - set(ps_co))[0]
+                for p in ps_co:
+                    new_item = self.sort_by_x_collinear((p1, p, p2))
+                    new_item_rev = tuple(list(new_item)[::-1])
+                    _pre = self.condition.get_id_by_predicate_and_item('Collinear', ps)
+                    self.condition.add('Collinear', new_item, (_id, _pre), ("extended", None, None))
+                    self.condition.add('Collinear', new_item_rev, (_id, _pre), ("extended", None, None))
+        
+        def rotations(t):
+            return [t[i:] + t[:i] for i in range(len(t))]
+        
+        # add potential shape 
+        # A M B collinear, find lines like with XM
+        lines_XM = [l for l in self.condition.get_items_by_predicate('Line') if item[1] == l[1]]
+        # find lines like MY
+        lines_MY = [l for l in self.condition.get_items_by_predicate('Line') if item[1] == l[0]]
+        # check whether shape XMY exists
+        for l1, l2 in itertools.product(lines_XM, lines_MY):
+            if len(set(l1) & set(l2)) == 2:
+                continue
+            if len(set(l1).union(l2) & set(item)) == 3:
+                continue
+            # check whether points of l1, l2 collinear
+            collinear_flag = False
+            for collinear_ps in self.condition.get_items_by_predicate('Collinear'):
+                if len(set(collinear_ps) & set([l1[0], l1[1], l2[1]])) == 3:
+                    collinear_flag = True
+                    break
+            if collinear_flag:
+                continue
+
+            l3 = (l1[0], l2[1])
+            if l3 in self.condition.get_items_by_predicate('Line'):
+                poly = (l1[0], l1[1], l2[1])
+                if poly in self.condition.get_items_by_predicate('Collinear'):
+                    continue
+                poly = self.sort_counter_clocksiwe_angle(poly)
+                self.add('Polygon', poly, (_id, ), ("extended", None, None))
+                for angle in rotations(poly):
+                    self.add("Angle", angle, (_id, ), ("extended", None, None))
+                
+    def add_cocircular_extend(self, item, _id):
+        ori_ps = self.condition.items_group['Cocircular'][0]
+        new_ps = [p for p in item if p not in ori_ps]
+        for p in new_ps:
+            self.condition.add('Cocircular', (ori_ps[0], p), (_id, ), ("extended", None, None))
+            for ori_ps_i in deepcopy(self.condition.items_group['Cocircular']):
+                c, ps_on_c = ori_ps_i[0], ori_ps_i[1:]
+                added_ps = tuple(set(ps_on_c + (p, )))
+                added_ps = self.sort_counter_clockwise_cocircular(c, added_ps)
+                added_ps = (c, ) + added_ps
+                self.condition.add('Cocircular', added_ps, (_id, ), ("extended", None, None))
+        
     def add(self, predicate, item, premise, theorem, skip_check=False):
         """
         Add item to condition of specific predicate category.
@@ -469,6 +571,15 @@ class Problem:
         """
         if not skip_check and not self.check(predicate, item, premise, theorem):
             return False
+        # special cases:
+        if predicate == 'ParallelBetweenLine':
+            for collinear_ps in self.condition.get_items_by_predicate('Collinear'):
+                if len(set(collinear_ps) & set([item[0], item[1], item[2]])) == 3:
+                    return False
+                if len(set(collinear_ps) & set([item[0], item[1], item[3]])) == 3:
+                    return False
+        elif predicate == 'Collinear':
+            item = self.sort_by_x_collinear(item)
 
         added, _id = self.condition.add(predicate, item, premise, theorem)
         if added:
@@ -502,25 +613,9 @@ class Problem:
                 
             else: # other cases
                 if predicate == 'Collinear':
-                    item_rev = tuple(list(item)[::-1])
-                    self.condition.add('Collinear', item_rev, (_id, ), ("extended", None, None))
-                    for i in range(len(item)-1):
-                        new_line = (item[i], item[i+1])
-                        new_line_rev = (item[i+1], item[i])
-                        self.condition.add('Line', new_line, (_id, ), ("extended", None, None))
-                        self.condition.add('Line', new_line_rev, (_id, ), ("extended", None, None))
-
+                    self.add_collinear_extend(item, _id)
                 elif predicate == 'Cocircular':
-                    ori_ps = self.condition.items_group['Cocircular'][0]
-                    new_ps = [p for p in item if p not in ori_ps]
-                    for p in new_ps:
-                        self.condition.add('Cocircular', (ori_ps[0], p), (_id, ), ("extended", None, None))
-                        for ori_ps_i in deepcopy(self.condition.items_group['Cocircular']):
-                            c, ps_on_c = ori_ps_i[0], ori_ps_i[1:]
-                            added_ps = tuple(set(ps_on_c + (p, )))
-                            added_ps = self.counter_clockwise_for_cocircular(c, added_ps)
-                            added_ps = (c, ) + added_ps
-                            self.condition.add('Cocircular', added_ps, (_id, ), ("extended", None, None))
+                    self.add_cocircular_extend(item, _id)
                 else:
                     pass
                 return True
@@ -540,7 +635,7 @@ class Problem:
                 elif extended_predicate == 'PerpendicularBetweenLine':
                     # check counter clockwise (ccw)
                     points = tuple(letters[i] for i in para)[:3]
-                    points_ccw = self.counter_clocksiwe_for_angle(points)
+                    points_ccw = self.sort_counter_clocksiwe_angle(points)
                     points_input = points_ccw + (points[1], )
                     self.add(extended_predicate, points_input,
                              (_id,), ("extended", None, None))

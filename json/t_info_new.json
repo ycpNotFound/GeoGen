@@ -3,6 +3,10 @@
     1,
     100
   ],
+  "collinear_judgement_angle": [
+    1,
+    100
+  ],
   "line_addition": [
     1,
     2221
@@ -369,7 +373,11 @@
   ],
   "isosceles_triangle_property_line_coincidence": [
     1,
-    60
+    100
+  ],
+  "isosceles_triangle_property_cicircular": [
+    1,
+    200
   ],
   "isosceles_right_triangle_judgment_isosceles_and_right": [
     1,
@@ -435,6 +443,7 @@
     1,
     0
   ],
+  
   "congruent_quadrilateral_property_line_equal": [
     1,
     3
@@ -567,6 +576,14 @@
     1,
     10
   ],
+  "kite_property_symmetry_congruent": [
+    1,
+    20
+  ],
+  "kite_property_symmetry_cocircular": [
+    1,
+    10
+  ],
   "kite_area_formula_diagonal": [
     4,
     41
@@ -597,7 +614,11 @@
   ],
   "square_judgment_rhombus_and_rectangle": [
     1,
-    0
+    1
+  ],
+  "square_property_cocircular": [
+    1,
+    10
   ],
   "trapezoid_judgment_parallel": [
     1,
@@ -635,17 +656,13 @@
     1,
     5
   ],
+  "isosceles_trapezoid_property_cocircular": [
+    1,
+    20
+  ],
   "round_arc": [
     1,
     25
-  ],
-  "arc_addition_length": [
-    1,
-    12
-  ],
-  "arc_addition_measure": [
-    1,
-    61
   ],
   "arc_property_center_angle": [
     1,
@@ -658,14 +675,6 @@
   "arc_property_circumference_angle_internal": [
     1,
     190
-  ],
-  "arc_length_formula": [
-    2,
-    27
-  ],
-  "congruent_arc_judgment_length_equal": [
-    1,
-    121
   ],
   "congruent_arc_judgment_measure_equal": [
     1,
@@ -743,6 +752,10 @@
     1,
     12
   ],
+  "circle_property_diagonal_of_quadrilateral_sum": [
+    1,
+    100
+  ],
   "circle_perimeter_formula": [
     4,
     33
@@ -784,6 +797,10 @@
     541
   ],
   "tangent_of_circle_property_length_equal": [
+    1,
+    131
+  ],
+  "tangent_of_circle_property_length_equal_2": [
     1,
     131
   ],

@@ -78,7 +78,9 @@
         "RightTriangle(CAB)",
         "IsoscelesTriangle(ABC)",
         "Equal(MeasureOfAngle(ABC),45)",
-        "Equal(MeasureOfAngle(BCA),45)"
+        "Equal(MeasureOfAngle(BCA),45)",
+        "Equal(LengthOfLine(AB),LengthOfLine(AC))",
+        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(BCA))"
       ]
     },
     "EquilateralTriangle(ABC)": {
@@ -179,8 +181,19 @@
         "DABC"
       ],
       "extend": [
+        "Equal(LengthOfLine(AB),LengthOfLine(BC))",
+        "Equal(LengthOfLine(BC),LengthOfLine(CD))",
+        "Equal(LengthOfLine(CD),LengthOfLine(DA))",
+        "Equal(LengthOfLine(DA),LengthOfLine(AB))",
+        "PerpendicularBetweenLine(AB,CB)",
+        "PerpendicularBetweenLine(BC,DC)",
+        "PerpendicularBetweenLine(CD,AD)",
+        "PerpendicularBetweenLine(DA,BA)",
+        "ParallelBetweenLine(AD,BC)",
+        "ParallelBetweenLine(BA,CD)",
+        "Rectangle(ABCD)",
         "Rhombus(ABCD)",
-        "Rectangle(ABCD)"
+        "Parallelogram(ABCD)"
       ]
     },
     "Trapezoid(ABCD)": {
@@ -702,8 +715,7 @@
     "IsDiameterOfCircle(AB,O)": {
       "ee_check": [
         "Line(AB)",
-        "Cocircular(O,AB)",
-        "Collinear(AOB)"
+        "Cocircular(O,AB)"
       ],
       "fv_check": [
         "AB,O"
@@ -711,7 +723,7 @@
       "multi": [
         "BA,O"
       ],
-      "extend": ["IsMidpointOfLine(O,AB)"],
+      "extend": ["IsMidpointOfLine(O,AB)", "Collinear(AOB)"],
       "find": ["Line(AB)"],
       "construct": ["O"],
       "fixed": [true] 

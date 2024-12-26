@@ -1,13 +1,17 @@
+import itertools
 import random
 import re
 import string
-import itertools
 from copy import deepcopy
-from formalgeo.data import DatasetLoader
-from utils import (PREDICATES_ATTR, PREDICATES_ENT, PREDICATES_PRE, 
-                   PREDICATES_REL, PREDICATES_REL_2, append_lst, get_content, get_points_num, get_symbol, get_predicate_name, get_points_mapping,
-                   replace_points, setup_seed, parse_clause, find_target_for_construct, get_points)
+
 import networkx as nx
+
+from formalgeo.data import DatasetLoader
+from utils.preset import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2
+from utils.symbolic import (find_target_for_construct, get_content,
+                            get_points_mapping, get_points_num,
+                            get_predicate_name, parse_clause, replace_points)
+from utils.tools import append_lst, setup_seed
 
 
 class ClauseGenerator():

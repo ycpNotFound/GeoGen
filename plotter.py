@@ -1,24 +1,24 @@
-import numpy as np
-
-from matplotlib import pyplot as plt
-import string
-from allocator import Allocator
+import json
+import math
 import random
 import re
-import math
-import json
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-import sympy
-from sympy import Eq, Expr, Float, cos, pi, simplify, solve, symbols
+import string
 
-from formalgeo.data import DatasetLoader
-from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,  PRESET_COLORS, PREDICATES_TO_NAMES, find_target_for_construct,
-                   get_content, get_points, get_predicate_name, get_symbol,
-                   max_letter_index, parse_clause, replace_points, setup_seed, replace_for_clause, clause_to_nature_language, convert_upper_to_lower)
 import cv2
 import networkx as nx
-from utils import hex_to_bgr
+import numpy as np
+import sympy
+from matplotlib import pyplot as plt
+from PIL import Image, ImageDraw, ImageFont
+
+from allocator import Allocator
+from formalgeo.data import DatasetLoader
+from generator import ClauseGenerator
+from utils.formulate import clause_to_nature_language, convert_upper_to_lower
+from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
+                          PREDICATES_TO_NAMES, PRESET_COLORS, hex_to_bgr)
+from utils.symbolic import parse_clause, replace_for_clause
+from utils.tools import setup_seed
 
 
 class Plotter():
@@ -606,7 +606,9 @@ class Plotter():
         caption_str += f"Geometry Relations:\n- "
         caption_list = clause_to_nature_language(
             self.text_cdls + self.construct_cdls,
-            self.natural_template
+            self.natural_template,
+            replace_sym=True,
+            replace_sym_mode='random'
         )
         caption_str += '.\n- '.join(caption_list) + '. '
         if self.debug:

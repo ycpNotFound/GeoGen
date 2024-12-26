@@ -1,17 +1,17 @@
 import json
 import random
 import re
+from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Dict, List, Tuple, Union
-from collections import deque, defaultdict
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-
 import pygraphviz
 from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
-from tqdm import tqdm
 from sympy import Eq
+from tqdm import tqdm
 
 from formalgeo.data import (DatasetLoader, download_dataset,
                             show_available_datasets)
@@ -19,7 +19,8 @@ from formalgeo.parse import parse_theorem_seqs
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import Interactor
 from formalgeo.tools import show_solution
-from utils import move_subtractions_to_rhs
+from utils.symbolic import move_subtractions_to_rhs
+
 # show_available_datasets()
 
 class ConditionNode():

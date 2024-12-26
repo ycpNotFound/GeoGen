@@ -7,6 +7,14 @@
       ]
     }
   },
+  "collinear_judgement_angle(ABCD)": {
+    "1": {
+      "premise": "Angle(ABC)&Angle(DBC)&Equal(MeasureOfAngle(ABC),MeasureOfAngle(DBC))",
+      "conclusion": [
+        "Collinear(ADB)"
+      ]
+    }
+  },
   "line_addition(AB,BC)": {
     "1": {
       "premise": "Collinear(ABC)",
@@ -892,6 +900,32 @@
       ]
     }
   },
+  "isosceles_triangle_property_cicircular(ABC,OM)": {
+    "1": {
+      "premise": "IsoscelesTriangle(ABC)&Cocircular(O,ABC)&IsAltitudeOfTriangle(AM,ABC)",
+      "conclusion": [
+        "Collinear(AOM)"
+      ]
+    },
+    "2": {
+      "premise": "IsoscelesTriangle(ABC)&Cocircular(O,ABC)&IsMedianOfTriangle(AM,ABC)",
+      "conclusion": [
+        "Collinear(AOM)"
+      ]
+    },
+    "3": {
+      "premise": "IsoscelesTriangle(ABC)&Cocircular(O,ABC)&IsBisectorOfAngle(AM,ABC)",
+      "conclusion": [
+        "Collinear(AOM)"
+      ]
+    },
+    "4": {
+      "premise": "IsoscelesTriangle(ABC)&Cocircular(O,ABC)&Line(AO)&Line(OM)&IsMidpointOfLine(M,BC)",
+      "conclusion": [
+        "Collinear(AOM)"
+      ]
+    }
+  },
   "isosceles_right_triangle_judgment_isosceles_and_right(ABC)": {
     "1": {
       "premise": "IsoscelesTriangle(ABC)&RightTriangle(CAB)",
@@ -1391,6 +1425,31 @@
       ]
     }
   },
+  "kite_property_symmetry_congruent(ABCD)": {
+    "1": {
+      "premise": "Kite(ABCD)&Line(AC)",
+      "conclusion": [
+        "MirrorCongruentBetweenTriangle(ABC,ACD)",
+        "Equal(MeasureOfAngle(CAB),MeasureOfAngle(DAC))",
+        "Equal(MeasureOfAngle(BCA),MeasureOfAngle(ACD))",
+        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(CDA))"
+      ]
+    }
+  },
+  "kite_property_symmetry_cocircular(ABCD,O)": {
+    "1": {
+      "premise": "Kite(ABCD)&Cocircular(O,ABD)&Line(AC)",
+      "conclusion": [
+        "Collinear(AOC)"
+      ]
+    },
+    "2": {
+      "premise": "Kite(ABCD)&Cocircular(O,BCD)&Line(AC)",
+      "conclusion": [
+        "Collinear(AOC)"
+      ]
+    }
+  },
   "kite_area_formula_diagonal(ABCD)": {
     "1": {
       "premise": "Kite(ABCD)&Line(BD)&Line(AC)",
@@ -1471,6 +1530,14 @@
       ]
     }
   },
+  "square_property_cocircular(ABCD,O)": {
+    "1": {
+      "premise": "Square(ABCD)&Cocircular(O,ABC)&Line(OA)&Line(OB)",
+      "conclusion": [
+        "IsoscelesRightTriangle(OAB)"
+      ]
+    }
+  },
   "trapezoid_judgment_parallel(ABCD)": {
     "1": {
       "premise": "Polygon(ABCD)&ParallelBetweenLine(AD,BC)&~ParallelBetweenLine(BA,CD)",
@@ -1531,7 +1598,8 @@
     "1": {
       "premise": "IsoscelesTrapezoid(ABCD)",
       "conclusion": [
-        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(BCD))"
+        "Equal(MeasureOfAngle(ABC),MeasureOfAngle(BCD))",
+        "Equal(MeasureOfAngle(DAB),MeasureOfAngle(CDA))"
       ]
     }
   },
@@ -1543,27 +1611,25 @@
       ]
     }
   },
+  "isosceles_trapezoid_property_cocircular(ABCD,O)": {
+    "1": {
+      "premise": "IsoscelesTrapezoid(ABCD)&Cocircular(O,ABC)",
+      "conclusion": [
+        "Cocircular(O,ABCD)"
+      ]
+    },
+    "2": {
+      "premise": "IsoscelesTrapezoid(ABCD)&Cocircular(O,ABD)",
+      "conclusion": [
+        "Cocircular(O,ABCD)"
+      ]
+    }
+  },
   "round_arc(OAB,OBA)": {
     "1": {
       "premise": "Arc(OAB)&Arc(OBA)",
       "conclusion": [
         "Equal(Add(MeasureOfArc(OAB),MeasureOfArc(OBA)),360)"
-      ]
-    }
-  },
-  "arc_addition_length(OAB,OBC)": {
-    "1": {
-      "premise": "Arc(OAB)&Arc(OBC)&Arc(OAC)",
-      "conclusion": [
-        "Equal(LengthOfArc(OAC),Add(LengthOfArc(OAB),LengthOfArc(OBC)))"
-      ]
-    }
-  },
-  "arc_addition_measure(OAB,OBC)": {
-    "1": {
-      "premise": "Arc(OAB)&Arc(OBC)&Arc(OAC)",
-      "conclusion": [
-        "Equal(MeasureOfArc(OAC),Add(MeasureOfArc(OAB),MeasureOfArc(OBC)))"
       ]
     }
   },
@@ -1588,22 +1654,6 @@
       "premise": "Cocircular(O,ADB)&Angle(ADB)&Angle(BOA)",
       "conclusion": [
         "Equal(MeasureOfAngle(ADB),Sub(180,Mul(MeasureOfAngle(BOA),1/2)))"
-      ]
-    }
-  },
-  "arc_length_formula(OAB)": {
-    "1": {
-      "premise": "Arc(OAB)",
-      "conclusion": [
-        "Equal(LengthOfArc(OAB),Mul(MeasureOfArc(OAB),1/180*pi,RadiusOfCircle(O)))"
-      ]
-    }
-  },
-  "congruent_arc_judgment_length_equal(XAB,YCD)": {
-    "1": {
-      "premise": "Arc(XAB)&Arc(YCD)&Cocircular(X,CD)&Equal(LengthOfArc(XAB),LengthOfArc(YCD))",
-      "conclusion": [
-        "CongruentBetweenArc(XAB,YCD)"
       ]
     }
   },
@@ -1777,6 +1827,22 @@
       ]
     }
   },
+  "circle_property_diagonal_of_quadrilateral_sum(ABCD,O)": {
+    "1": {
+      "premise": "Cocircular(O,ABCD)&Line(AB)&Line(BC)&Line(CD)&Line(AD)",
+      "conclusion": [
+        "Equal(Add(MeasureOfAngle(ABC),MeasureOfAngle(CDA)),180)",
+        "Equal(Add(MeasureOfAngle(BCD),MeasureOfAngle(DAB)),180)"
+      ]
+    },
+    "2": {
+      "premise": "IsCircumcenterOfQuadrilateral(O,ABCD)",
+      "conclusion": [
+        "Equal(Add(MeasureOfAngle(ABC),MeasureOfAngle(CDA)),180)",
+        "Equal(Add(MeasureOfAngle(BCD),MeasureOfAngle(DAB)),180)"
+      ]
+    }
+  },
   "circle_property_angle_of_alternate_segment(OABD,P)": {
     "1": {
       "premise": "Cocircular(O,ABD)&Arc(OAB)&Angle(BAP)&Angle(BDA)&IsTangentOfCircle(PA,O)",
@@ -1888,6 +1954,14 @@
       "premise": "IsTangentOfCircle(PA,O)&IsTangentOfCircle(PB,O)",
       "conclusion": [
         "Equal(LengthOfLine(PA),LengthOfLine(PB))"
+      ]
+    }
+  },
+  "tangent_of_circle_property_length_equal_2(PA,PB,O)": {
+    "1": {
+      "premise": "IsTangentOfCircle(PA,O)&Line(PB)&Cocircular(O,B)&Equal(LengthOfLine(PA),LengthOfLine(PB))",
+      "conclusion": [
+        "IsTangentOfCircle(PB,O)"
       ]
     }
   },

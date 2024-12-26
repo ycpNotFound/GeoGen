@@ -1,8 +1,14 @@
 import random
 import time
+from collections import defaultdict
 from copy import copy, deepcopy
+from functools import wraps
+
+import sympy as sp
+from func_timeout import FunctionTimedOut, func_timeout
+from sympy import Eq, cos, rad, simplify, sin, solve, sqrt, tan
 from tqdm import tqdm
-from sympy import Eq, solve, sqrt, sin, cos, tan, rad, simplify
+
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
 from formalgeo.parse import (parse_predicate_gdl, parse_problem_cdl,
@@ -12,9 +18,8 @@ from formalgeo.tools import debug_print, get_used_pid_and_theorem
 from inter_gps_solver.extended_definition import ExtendedDefinition
 from inter_gps_solver.logic_parser import LogicParser
 from inter_gps_solver.logic_solver import LogicSolver
-from utils import formalgeo_to_intergps, parse_clause
-from functools import wraps
-from func_timeout import func_timeout, FunctionTimedOut
+from utils.symbolic import degree_of_expr, formalgeo_to_intergps, parse_clause
+
 
 def make_timing_decorator(debug_attr='debug'):
     def decorator(func):
@@ -197,8 +202,7 @@ class FormalGeoSolver:
                         depth = len(pos)
                         new_pos = pos[:-1] + (pos[-1] + 1,)
                     else:
-                        # copy from `add_selections`
-                        depth = len(pos) + 1
+                        depth = len(pos)
                         if depth not in self.node_count:
                             self.node_count[depth] = 1
                         new_pos = tuple(list(pos) + [self.node_count[depth]])
@@ -268,7 +272,7 @@ class FormalGeoSolver:
                     if eq_idx in list(v.keys()):
                         pos = k
                 # get new depth and pos
-                depth = len(pos) + 1
+                depth = len(pos)
                 if depth not in self.node_count:
                     self.node_count[depth] = 1
                 new_pos = tuple(list(pos) + [self.node_count[depth]])
@@ -281,6 +285,105 @@ class FormalGeoSolver:
 
         return 
     
+    def solve_equivalence_relation(self):
+        def set2key(set_input):
+            res = sorted(set_input, key=lambda x: str(x))
+            return tuple(res)
+        
+        def contains_sqrt(expr):
+            return any(isinstance(term, sp.Pow) and term.exp == sp.S.Half for term in sp.preorder_traversal(expr))
+        
+        def is_equal_expr(expr):
+            f1 = len(expr.free_symbols) == 2
+            f2 = all(abs(v) == 1 for v in expr.as_coefficients_dict().values()) 
+            f3 = not contains_sqrt(expr)
+            return f1 and f2 and f3
+        
+        # expand equivalence relation in equation groups
+        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
+        # split expr like: ll_ab - ll_cd
+        expr_list = [
+            expr for expr in eq_exprs if is_equal_expr(expr)
+        ]
+
+        eq_sym_groups = [] # list of set (symbols)
+        eq_groups_to_ids = {} # dict: tuple (symbols) -> id set (premise)
+
+        
+        
+        # find equivalent class (symbols group)
+        for expr in expr_list:
+            var_a, var_b = list(expr.free_symbols)
+            class_a, class_b = None, None
+            for sym_group in eq_sym_groups:
+                if var_a in sym_group:
+                    class_a = sym_group
+                if var_b in sym_group:
+                    class_b = sym_group
+            
+            # merge symbols group, remove origin and add new
+            if class_a is not None and class_b is not None:
+                if class_a != class_b:
+                    eq_sym_groups.remove(class_a)
+                    eq_sym_groups.remove(class_b)
+                    eq_sym_groups.append(class_a.union(class_b))
+                    id_1 = eq_groups_to_ids.pop(set2key(class_a))
+                    id_2 = eq_groups_to_ids.pop(set2key(class_b))
+                    # premise id from class a, class b, new expr
+                    eq_groups_to_ids[set2key(class_a.union(class_b))] = set(list(id_1) + list(id_2) + eq_exprs[expr])
+            elif class_a is not None:
+                id_1 = eq_groups_to_ids.pop(set2key(class_a))
+                class_a.add(var_b)
+                eq_groups_to_ids[set2key(class_a)] = set(list(id_1) + eq_exprs[expr])
+
+            elif class_b is not None:
+                id_1 = eq_groups_to_ids.pop(set2key(class_b))
+                class_b.add(var_a)
+                eq_groups_to_ids[set2key(class_b)] = set(list(id_1) + eq_exprs[expr])
+            else:
+                eq_sym_groups.append({var_a, var_b})
+                eq_groups_to_ids[set2key({var_a, var_b})] = set(eq_exprs[expr])
+        
+        # get new expr
+        new_expr_list = []
+        premise_list = []
+        for sym_group_set in eq_sym_groups:
+            sym_group = list(sym_group_set)
+            for i in range(len(sym_group) - 1):
+                for j in range(i + 1, len(sym_group)):
+                    new_expr_1 = sym_group[i] - sym_group[j]
+                    new_expr_2 = sym_group[j] - sym_group[i]
+                    if new_expr_1 not in expr_list and new_expr_2 not in expr_list:
+                        new_expr_list.append(new_expr_1)
+                        premise_list.append(list(eq_groups_to_ids[set2key(sym_group)]))
+        
+        for expr, premise in zip(new_expr_list, premise_list):
+            # add condition in `items`
+            last_step = len(self.problem.condition.items)
+            self.problem.add('Equation', expr, premise, ('solve_eq', None, None))
+            new_condition = deepcopy(self.problem.condition.items[last_step:])
+            
+            if len(new_condition) > 0:
+                # add condition in `leveled_condition`
+                pos = list(self.leveled_condition.keys())[-1]
+                for k, v in self.leveled_condition.items():
+                    if premise[0] in list(v.keys()):
+                        pos = k
+                        
+                depth = len(pos)
+                if depth not in self.node_count:
+                    self.node_count[depth] = 1
+                new_pos = tuple(list(pos) + [self.node_count[depth]])
+                self.node_count[depth] += 1
+                self.leveled_condition[new_pos] = {}
+                for i in range(len(new_condition)):
+                    self.leveled_condition[new_pos][last_step+i] = new_condition[i]
+                
+            self.problem.step(('solve_eq', None, None), 0)
+            
+        return 
+
+
     @make_timing_decorator('debug')
     def solve_equation_groups(self):
         eq_exprs = deepcopy(self.problem.condition.simplified_equation)
@@ -288,55 +391,67 @@ class FormalGeoSolver:
         update = False
         
         for i, expr_i in enumerate(eq_exprs):
-            if len(expr_i.free_symbols) == 2:
-                for expr_j in list(eq_exprs.keys())[i+1:]:
-                    last_step = len(self.problem.condition.items)
-                    
-                    if len(expr_i.free_symbols & expr_j.free_symbols) == 2:
-                        premise = eq_exprs[expr_i] + eq_exprs[expr_j]
+            if degree_of_expr(expr_i) >= 2:
+                continue
+            if len(expr_i.free_symbols) != 2:
+                continue
+            # assert expr_i has 2 free symbols
+            related_exprs = [
+                expr for expr in list(eq_exprs.keys())[i+1:]
+                if len(expr_i.free_symbols & expr.free_symbols) == 2
+            ]
+            last_step = len(self.problem.condition.items)
+            
+            for expr_j in related_exprs:
+                premise = eq_exprs[expr_i] + eq_exprs[expr_j]
 
-                        try:
-                            results = func_timeout(
-                                2, solve, 
-                                args=((expr_i, expr_j), expr_i.free_symbols),
-                                kwargs={'dict': True}
-                            )
-                        except FunctionTimedOut:
-                            results = {}
-                        # results = solve((expr_i, expr_j), expr_i.free_symbols, dict=True)
-                        if len(results) == 0:
-                            continue
-                        if isinstance(results, list):
-                            results = results[0]
-                            
-                        # add conditions
-                        for k, v in results.items():
-                            expr_new = k - v
-                            # check if already in equations
-                            if simplify(Eq(expr_new, 0)) in eqs:
-                                continue
-                            self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
-                            self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
-                            
+                # 1. if expr_j is linear, use sympy `solve`
+                # 2. if expr_j's degree == 2, substitute to get new expr
+                if degree_of_expr(expr_j) == 1:
+                    results = solve((expr_i, expr_j), expr_i.free_symbols, dict=True)
+                elif degree_of_expr(expr_j) == 2:
+                    sym_1, sym_2 = list(expr_i.free_symbols)
+                    expr_i_result = solve(expr_i, sym_1, dict=True)
+                    if isinstance(expr_i_result, list):
+                        expr_i_result = expr_i_result[0]
+                    expr_new = expr_j.subs(expr_i_result)
+                    results = solve(expr_new, sym_2, dict=True)
+                else:
+                    continue
+                
+                if len(results) == 0:
+                    continue
+                if isinstance(results, list):
+                    results = results[0]
                     
-                    # add condition
-                    if len(self.problem.condition.items) - last_step > 0:
-                        new_condition = deepcopy(self.problem.condition.items[last_step:])
-                        # find position in search tree
-                        pos = list(self.leveled_condition.keys())[-1]
-                        for k, v in self.leveled_condition.items():
-                            if max(premise) in list(v.keys()):
-                                pos = k
-                        # get new depth and pos
-                        depth = len(pos) + 1
-                        if depth not in self.node_count:
-                            self.node_count[depth] = 1
-                        new_pos = tuple(list(pos) + [self.node_count[depth]])
-                        self.node_count[depth] += 1
-                        self.leveled_condition[new_pos] = {}
-                        for i in range(len(new_condition)):
-                            self.leveled_condition[new_pos][last_step+i] = new_condition[i]
-                        update = True
+                # add conditions
+                for k, v in results.items():
+                    expr_new = k - v
+                    # check if already in equations
+                    if simplify(Eq(expr_new, 0)) in eqs:
+                        continue
+                    self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
+                    self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
+                    
+            
+            # add condition
+            if len(self.problem.condition.items) - last_step > 0:
+                new_condition = deepcopy(self.problem.condition.items[last_step:])
+                # find position in search tree
+                pos = list(self.leveled_condition.keys())[-1]
+                for k, v in self.leveled_condition.items():
+                    if max(premise) in list(v.keys()):
+                        pos = k
+                # get new depth and pos
+                depth = len(pos)
+                if depth not in self.node_count:
+                    self.node_count[depth] = 1
+                new_pos = tuple(list(pos) + [self.node_count[depth]])
+                self.node_count[depth] += 1
+                self.leveled_condition[new_pos] = {}
+                for i in range(len(new_condition)):
+                    self.leveled_condition[new_pos][last_step+i] = new_condition[i]
+                update = True
         if update:
             self.problem.step(('solve_eq', None, None), 0)
         return 
@@ -380,14 +495,6 @@ class FormalGeoSolver:
                 # last_step = len(self.problem.condition.items)
                 solved = self.apply_and_check_goal(selection, pos)
                 
-                
-                # if len(self.problem.condition.items) - last_step > 0:
-                #     new_condition = deepcopy(self.problem.condition.items[last_step:])
-                #     self.leveled_condition[pos] = {}
-                #     for i in range(len(new_condition)):
-                #         self.leveled_condition[pos][last_step+i] = new_condition[i]
-                
-                
                 # debug_print(self.debug, "(solved={}, timing={:.4f}s) Apply selection and check goal.".format(solved, time.time() - timing))
                 if solved is None:  # not update, close search branch
                     continue
@@ -415,6 +522,7 @@ class FormalGeoSolver:
             self.solve_special_angles()
             self.solve_equations()
             self.solve_equation_groups()
+            self.solve_equivalence_relation()
             selections = self.get_theorem_selection()
             self.add_selections(pos, selections)
             cur_depth += 1
@@ -598,10 +706,7 @@ class FormalGeoSolver:
         #     sample_num_per_th=sample_num_per_th
         # )
         debug_theorems = [
-            # 'cocircular_judgement',
-            # 'circle_property_length_of_radius_equal',
-            # 'rectangle_property_cocircular'
-            'tangent_of_circle_judgment_perpendicular'
+            'collinear_judgement_angle'
         ]
         for t_name, t_branch, t_letters in related_pres:
             if 'similar_arc' in t_name:
@@ -706,7 +811,7 @@ class FormalGeoSolver:
         update = False
         t_msg, conclusions = selection
         
-        if 'rectangle_property_cocircular' == t_msg[0]:
+        if 'square_property_cocircular' == t_msg[0]:
             a = 1
         last_idx = len(self.problem.condition.items)    
         for predicate, item, premise in conclusions:

@@ -2,23 +2,24 @@ import itertools
 import math
 import random
 import re
-import numpy as np
 import string
-import sympy
-from sympy import (Eq, Expr, Float, I, Symbol, cos, im, nsimplify, pi,
-                   simplify, solve, symbols, And, Or, StrictLessThan, StrictGreaterThan, oo)
 from copy import deepcopy
+
+import numpy as np
+import sympy
+from sympy import (And, Eq, Expr, Float, I, Or, StrictGreaterThan,
+                   StrictLessThan, Symbol, cos, im, nsimplify, oo, pi,
+                   simplify, solve, symbols)
+
 from formalgeo.data import DatasetLoader
 from generator import ClauseGenerator
-from utils import (PREDICATES_ENT, PREDICATES_REL, extract_sqrt_terms,
-                   find_target_for_construct, get_content, get_points,
-                   get_predicate_name, get_symbol, max_letter_index,
-                   parse_clause, replace_points, setup_seed, simplify_and_trim, remove_duplicates, append_lst, random_generate_line_length, random_generate_angle_measure, replace_for_clause)
-
-# ClauseGenerator 
-# Allocator
-# Plotter
-# Solver
+from utils.preset import PREDICATES_ENT, PREDICATES_REL
+from utils.symbolic import (find_target_for_construct, get_predicate_name,
+                            get_symbol, max_letter_index, parse_clause,
+                            random_generate_angle_measure,
+                            random_generate_line_length, replace_for_clause,
+                            replace_points, simplify_and_trim)
+from utils.tools import append_lst, remove_duplicates, setup_seed
 
 IGNORE_NAMES = [
     'Shape',
@@ -825,10 +826,15 @@ class Allocator():
             # self.define_points([D])
                     
             if mode == 'random':
-                angle_BAD = - math.radians(random.uniform(100, 150)) 
+                xd, yd = self.p_pos[D] # symbol
+                BAC_val = math.acos(self.get_cos(''.join((B, A, C)))) / np.pi * 180
+                if BAC_val > 150:
+                    angle_BAD = - math.radians(random.uniform(BAC_val, 170))
+                else:
+                     angle_BAD = - math.radians(random.uniform(BAC_val, 150))
                 cos_val = math.cos(angle_BAD)
                 sin_val = math.sin(angle_BAD)
-                ratio_AD = random.uniform(0.8, 1.0)
+                ratio_AD = random.uniform(0.6, 1.0)
                 xd = xa + ((xb - xa) * cos_val - (yb - ya) * sin_val) * ratio_AD
                 yd = ya + ((xb - xa) * sin_val + (yb - ya) * cos_val) * ratio_AD
                 xd, yd = xd * ratio_AD, yd * ratio_AD
@@ -913,7 +919,7 @@ class Allocator():
             b_len = random.uniform(5, 10)
             xb, yb = b_len * math.cos(theta), b_len * math.sin(theta)
 
-        interval = random.choice([(45, 80), (100, 135)])
+        interval = random.choice([(45, 80), (100, 130)])
         top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
@@ -1615,6 +1621,8 @@ class Allocator():
     
     def get_cos(self, angle):
         # angle ABC
+        if isinstance(angle, tuple):
+            angle = ''.join(angle)
         if angle.isdigit():
             return float(cos(float(angle) * pi / 180))
         p1, p2, p3 = angle
@@ -1629,6 +1637,8 @@ class Allocator():
         return dot_product / (len_BA * len_BC)
     
     def get_cos_2(self, angle):
+        if isinstance(angle, tuple):
+            angle = ''.join(angle)
         if angle.isdigit():
             return float(cos(float(angle) * pi / 180) ** 2)
         p1, p2, p3 = angle

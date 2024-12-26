@@ -1,30 +1,35 @@
+import itertools
 import json
 import random
-import itertools
 import re
 import string
-from typing import Dict, Tuple
-from collections import deque
 import time
+from collections import defaultdict, deque
+from typing import Dict, Tuple
+
 import numpy as np
-from sympy import Eq, Symbol, solve, total_degree, Integer, Float, sqrt, simplify
-from collections import defaultdict
+from sympy import (Eq, Float, Integer, Symbol, simplify, solve, sqrt,
+                   total_degree)
+
 from allocator import Allocator
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.data import DatasetLoader
-from formalgeo.parse import inverse_parse_one_theorem, parse_theorem_seqs, inverse_parse_one
+from formalgeo.parse import (inverse_parse_one, inverse_parse_one_theorem,
+                             parse_theorem_seqs)
+from formalgeo.problem import Problem
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import BackwardSearcher, ForwardSearcher, Interactor
-from formalgeo.problem import Problem
 from generator import ClauseGenerator
-from graph import (ConditionGraph, ConditionNode, display_solution, draw_graph,
-                   topological_sort, topological_sort_bfs)
+from graph import (ConditionGraph, ConditionNode, draw_graph, topological_sort,
+                   topological_sort_bfs)
 from plotter import Plotter
 from solver import FormalGeoSolver, InterGPSSolver
-from utils import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, 
-                   PRESET_COLOR_PROBS, PRESET_COLORS,
-                   clause_to_nature_language, parse_clause, replace_for_clause,
-                   setup_seed, formulate_eqs, SYMBOL_MAPPING_2, get_angle_measure, subs_without_simplification)
+from utils.formulate import clause_to_nature_language, formulate_eqs
+from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
+                          SYMBOL_MAPPING_2)
+from utils.symbolic import (get_angle_measure, parse_clause,
+                            replace_for_clause, subs_without_simplification)
+from utils.tools import setup_seed
 
 
 class TargetFinder(): 
@@ -146,7 +151,7 @@ class TargetFinder():
     def targets_filter_1(self, conditions_to_sample):
         # the first filter: 
         # for potential calculation target: 
-        # 1. only has <= 2 vars
+        # 1. only has <= 2 vars (<=3 for lines)
         # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
         # 4. only has symbols begin with 'll_' or 'ma_'
@@ -154,12 +159,14 @@ class TargetFinder():
         new_targets = []
         for condition in conditions_to_sample:
             if condition[0] == 'Equation':
-                f1 = len(condition[1].free_symbols) <= 2
+                syms = [str(x) for x in list(condition[1].free_symbols)]
+                f1 = len(condition[1].free_symbols) <= 2 or \
+                    (len(condition[1].free_symbols) <= 3 and \
+                    all(['ll_' in sym for sym in syms]))
                 try:
                     f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() <= 2
                 except:
                     f2 = False
-                syms = [str(x) for x in list(condition[1].free_symbols)]
                 f3 = True
                 if len(condition[1].free_symbols) == 2:
                     if all([
@@ -171,7 +178,8 @@ class TargetFinder():
                 f4 = all(['ll_' in sym or 'ma_' in sym for sym in syms])
                 f5 = True
                 if all(['ma_' in sym for sym in syms]):
-                    f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
+                    if len(syms) == 1:
+                        f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
                 if all([f1, f2, f3, f4, f5]):
                     new_targets.append(condition)
                     
@@ -248,12 +256,14 @@ class TargetFinder():
             if len(k) == max_depth:
                 conditions_to_sample += list(v.values())
             
-        if len(conditions_to_sample) < 8:
+        # filter 1, if only have few targets, decrease max_depth
+        new_targets = self.targets_filter_1(conditions_to_sample)
+        if len(new_targets) < 8:
             for k, v in self.solver.leveled_condition.items():
                 if max_depth > 1 and len(k) == max_depth - 1:
                     conditions_to_sample += list(v.values())
-        # filter 1
-        new_targets = self.targets_filter_1(conditions_to_sample)
+            new_targets = self.targets_filter_1(conditions_to_sample)
+            
         # find solution / theorems for each target
         theorems_for_targets = {}
         solution_for_targets = {}
@@ -294,21 +304,18 @@ class TargetFinder():
         # filter 3
         targets_dict = self.targets_filter_3(new_targets)
         # random choose target type
-        target_type = random.choice(['angle', 'line', 'prove'])
-        chosen_targets = targets_dict[target_type]
-        if len(chosen_targets) == 0:
-            for k, v in targets_dict.items():
-                if len(v) != 0:
-                    target_type, chosen_targets = k, v
-                    break
-        
-        if len(chosen_targets) == 0:
+        types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
+        if len(types_to_choose) == 0:
             return None, None, None, None, None
+        target_type = random.choice(types_to_choose)
+        chosen_targets = targets_dict[target_type]
+        
         # random choose target (from top-5)
         chosen_target = random.choice(chosen_targets[:5])
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
-        problem_level = level_for_targets[chosen_target]
+        # problem_level = level_for_targets[chosen_target]
+        problem_level = len(chosen_thoerems)
         _ = self.find_solution_for_target(
             self.solver.problem,
             condition_graph,
@@ -339,7 +346,8 @@ class TargetFinder():
             sub_nodes_clauses, 
             self.natural_template,
             upper=False,
-            symbol2nature=False
+            replace_sym=True,
+            replace_sym_mode='math'
         )
         pred_ignore = ['Angle', 'Line', 'Point', 'Shape', 'Polygon', 'Triangle', 'Arc', 'Circle', 'Free']
         extend_nodes = [n for n in sub_nodes if n.value[3][0] == 'extended' and n.value[0] not in pred_ignore]
@@ -422,15 +430,24 @@ class TargetFinder():
                 # append conclusion in the previous step
                 f1 = theorem != last_theorem
                 f2 = node.value[2] != last_premise_ids
-                f3 = theorem == 'solve_eq'
-                
-                if (f1 and f2) or f3:
+                f3 = len(premise_statements) != 0
+                f4 = theorem == 'solve_eq'
+                if f4:
+                    step_count += 1
+                    solution_str += f'\n{step_count}. Solve equations:\n'
+                    eq_solution = formulate_eqs(premise_statements, statement, self.solver.problem)
+                    
+                    # check if solve too many eqs in one step
+                    if eq_solution is None: 
+                        too_complex = True
+                        break
+                    solution_str += eq_solution
+                        
+                elif f1 or (f2 and f3):
                     step_count += 1
                     solution_str += f'\n{step_count}. <by> {theorem}, '
                     # add all premise statements
                     if len(premise_statements) != 0:
-                        if theorem == 'solve_eq':
-                            premise_statements = formulate_eqs(premise_statements, statement)
                         solution_str += '<because> '
                         if len(premise_statements) == 1:
                             k = list(premise_statements.keys())[0]
@@ -439,9 +456,7 @@ class TargetFinder():
                         else:
                             for k, v in premise_statements.items():
                                 solution_str += f"{', '.join(v)} from {k}, "
-                    # check if solve too many eqs in one step
-                    if len(premise_statements)>3 and theorem=='solve_eq':
-                        too_complex = True
+
                         
                 extend_conditions = [statement]
                 extend_nodes_i = [node]
@@ -458,10 +473,10 @@ class TargetFinder():
                             queue.append(n)
                 
                 extend_str= '\n- '.join(extend_conditions)
-                if not ((f1 and f2) or f3):
+                if not (f1 or (f2 and f3)) and not f4:
                     # same theorem and no premise statements
                     solution_str += f'\n- {extend_str}. '
-                    sub_nodes_by_step[step_count].append(extend_nodes_i) 
+                    sub_nodes_by_step[step_count] += extend_nodes_i
                 else:
                     solution_str += f"<therefore>\n- {extend_str}. "
                     sub_nodes_by_step[step_count] = extend_nodes_i
@@ -471,6 +486,46 @@ class TargetFinder():
             
         return solution_str, theorems_formal, sub_nodes, too_complex
     
+    def distance(self, line):
+        p1, p2 = line
+        x1, y1 = self.p_pos[p1]
+        x2, y2 = self.p_pos[p2]
+        return sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 )
+    
+    def create_question_three_line_symbols(self, target):
+        target_sym = random.choice(list(target[1].free_symbols))
+        target_line = str(target_sym).split('_')[-1].upper()
+        sym_1, sym_2 = list(target[1].free_symbols - set([target_sym]))
+        line_1 = str(sym_1).split('_')[-1].upper()
+        line_2 = str(sym_2).split('_')[-1].upper()
+
+        len_1 = int(self.distance(line_1))
+        len_2 = int(self.distance(line_2))
+        expr = target[1].subs({sym_1: len_1, sym_2: len_2})
+        target_value = solve(Eq(expr, 0))[0]
+        if 'sqrt' in str(target_value):
+            target_value = re.sub(r'sqrt\(([^)]+)\)', r'√\1', str(target_value))
+            
+        target_str = f"find the length of {target_line}"
+        target_cdl = f"Value(LengthOfLine({target_line}))"
+        add_cdls = [
+            f"Equal(LengthOfLine({line_1}),{len_1})",
+            f"Equal(LengthOfLine({line_2}),{len_2})",
+        ]
+        add_conditions = [
+            f"{line_1} = {len_1}", f"{line_2} = {len_2}"
+        ]
+        conclusion = f"{target_line} = {target_value}"
+        res_info = {
+            "conclusion": conclusion,
+            "add_cdls": add_cdls,
+            "add_conditions": add_conditions,
+            "target_value": target_value,
+            "target_str": target_str,
+            "target_cdl": target_cdl
+        }
+        return res_info
+    
     def create_question_two_line_symbols(self, target):
         target_sym = random.choice(list(target[1].free_symbols))
         other_sym = list(target[1].free_symbols - set([target_sym]))[0]
@@ -478,7 +533,8 @@ class TargetFinder():
         other_line = str(other_sym).split('_')[-1].upper()
         # assign other_sym to value
         flag_1 = random.choice([True, False])
-        if flag_1:
+        flag_sqrt = 'sqrt' in str(target[1])
+        if flag_1 or flag_sqrt:
             value = random.randint(1, 10)
             expr = target[1].subs({other_sym: value})
             target_value = solve(Eq(expr, 0))[0]
@@ -638,11 +694,19 @@ class TargetFinder():
             conclusion = self.natural_template[target[0]][0].format(
                 points=''.join(target[1]))
             clause = f"{target[0]}({''.join(target[1])})"
-        else:
+        elif target[0] in PREDICATES_REL:
             clause = self.target_tuple_to_clause(target)
             _, items = parse_clause(clause)
             conclusion = self.natural_template[target[0]][0].format(
                 p1=items[0], p2=items[1])
+        elif target[0] == 'Collinear':
+            clause = f"Collinear({''.join(target[1])})"
+            conclusion = f"{', '.join(target[1])} is collinear"
+        elif target[0] == 'Cocircular':
+            clause = f"Cocircular({target[1][0]},{''.join(target[1][1:])})"
+            conclusion = f"{', '.join(target[1][1:])} is on circle {target[1][0]}"
+        else:
+            raise KeyError(target[0])
         
         target_str = f'prove that {conclusion}'
         target_cdl = f"Relation({clause})"
@@ -671,7 +735,9 @@ class TargetFinder():
             # self.problem_CDL['text_cdl'] + self.problem_CDL['image_cdl'],
             self.problem_CDL['text_cdl'] + self.problem_CDL['construction_cdl'],
             self.natural_template,
-            upper=False
+            upper=False,
+            replace_sym=True,
+            replace_sym_mode='math'
         )
 
         # information to return
@@ -679,7 +745,9 @@ class TargetFinder():
         # target_value, target_str, target_cdl
         # target[1] like: - ll_cd + ll_ed, ma_abc + ma_edf - 180
         if target[0] == 'Equation': 
-            if len(target[1].free_symbols) == 2:
+            if len(target[1].free_symbols) == 3:
+                res_info = self.create_question_three_line_symbols(target)
+            elif len(target[1].free_symbols) == 2:
                 sym_str = str(list(target[1].free_symbols)[0])
                 if 'll' in sym_str:
                     res_info = self.create_question_two_line_symbols(target)
@@ -732,28 +800,6 @@ class TargetFinder():
             j += 1
         clause = f"{target[0]}({''.join(items)})"
         return clause
-    
-    def re_solve_for_target(self, problem_CDL):
-        interact_solver = Interactor(self.predicate_GDL, self.theorem_GDL, self.t_info,
-                        debug=False
-                        )
-        interact_solver.load_problem(problem_CDL)
-
-        for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
-            interact_solver.apply_theorem(t_name, t_branch, t_para)
-        
-        interact_solver.problem.check_goal()
-        
-        # construct graph
-        condition_graph = ConditionGraph(interact_solver.problem.condition.items)
-        condition_graph.construct_graph()
-        target = interact_solver.problem.condition.items[-1]
-        solution, _, __ = self.find_solution_for_target(
-            interact_solver.problem,
-            condition_graph, 
-            target
-        )
-        return solution
         
     def formulate(self):
         start_time = time.time()
@@ -803,7 +849,8 @@ class TargetFinder():
             "image_cdl": self.image_cdls,
             "goal_cdl": target_cdl,
             "problem_answer": target_value,
-            "theorems": theorems
+            "theorems": theorems,
+            "time": round(cost_time, 3)
         }
         info_dict_for_llm = {
             "problem_type": target_type,
@@ -827,7 +874,7 @@ if __name__ == '__main__':
     total_len = len(list(itertools.product(PREDICATES_ENT, PREDICATES_REL)))
     for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
         cnt += 1
-        if cnt < 59:
+        if cnt < 204:
             continue
         clauses_base = [clauses_base]
         clauses_rel = [clauses_rel]
@@ -868,7 +915,6 @@ if __name__ == '__main__':
         for c_cdl in allocator.formulated_cdls['construct_cdls']:
             print('\t', c_cdl)
             
-        
         # t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
         t_info = json.load(open("json/t_info_new.json"))
         t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
