@@ -882,7 +882,7 @@ class GeometryPredicateLogicExecutor:
                     result, premise = EquationKiller.solve_target(eq, problem)
                 except FunctionTimedOut:
                     msg = "Timeout when solve target: {}".format(str(eq))
-                    warnings.warn(msg)
+                    # warnings.warn(msg)
                 else:
                     if result is not None and rough_equal(result, 0):  # meet constraints
                         r_id = tuple(set(premise + list(r1_ids[i])))

@@ -256,7 +256,24 @@ def test_sympy_subs():
 
     print(new_expr)
     
-
+def test_parse():
+    from utils.symbolic import parse_clause
+    
+    clause = "Equal(LengthOfLine(EB),RadiusOfCircle(E))"
+    pred_name, items = parse_clause(clause)
+    
+    assert pred_name == "Equal"
+    pred_l, item_l = parse_clause(items[0])
+    pred_r, item_r = parse_clause(items[1])
+    condition_dict = {
+        "LengthOfLine": "{item}",
+        "MeasureOfAngle": "\\angle {item}",
+        "RadiusOfCircle": "radius of \\circle {item}",
+        "MeasureOfArc": "\\arc {item}"
+    }
+    condition_l = condition_dict[pred_l].format(item=item_l[0])
+    condition_r = condition_dict[pred_r].format(item=item_r[0])
+    condition_i = f"{condition_l} = {condition_r}"
 
 if __name__ == '__main__':
 
@@ -275,4 +292,5 @@ if __name__ == '__main__':
     # formulate_eqs(eq_str_list, target_str)
     # test_wolframe_alpha()
     # test_sympy_subs()
-    filter_no_sqrt()
+    # filter_no_sqrt()
+    test_parse()

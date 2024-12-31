@@ -171,9 +171,9 @@ def parse_clause(clause):
         predicate_l = predicate_l.strip()
         if predicate_r is None or predicate_r == predicate_l:
             return predicate_l, (content_l, content_r)
-        else:
-            print(predicate_r)
-            print('Error')
+        elif predicate_r is not None:
+            return 'Equal', (item_l, item_r)
+        
     elif '(' not in clause and ')' not in clause:
         return clause
     else:
@@ -355,7 +355,10 @@ def subs_without_simplification(expr, substitutions):
     return expr
 
 def degree_of_expr(expr):
-    return expr.as_poly(*list(expr.free_symbols)).total_degree()
+    try:
+        return expr.as_poly(*list(expr.free_symbols)).total_degree()
+    except:
+        return 3 # ignore
 
 def formalgeo_to_intergps(clause):
     name, items = parse_clause(clause)

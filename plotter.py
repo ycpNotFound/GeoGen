@@ -75,7 +75,7 @@ class Plotter():
         if self.debug:
             print("Font Size: ", font_size)
             
-        natural_template_path = "json/natural_language_template.json"
+        natural_template_path = "json/predicates_to_nature_language.json"
         self.natural_template = json.load(open(natural_template_path, 'r'))
         
     @staticmethod

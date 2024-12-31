@@ -219,7 +219,11 @@ def clause_to_nature_language(clauses,
             symbol_mapping = SYMBOL_MAPPING_2
 
     for clause in clauses:
-        pred, items = parse_clause(clause)
+        try:
+            pred, items = parse_clause(clause)
+        except Exception as e:
+            print('clause: ', clause)
+            raise e
         if 'Value' in clause:
             clause = clause.replace('Value', 'Equal')
         if 'Equal' in clause:
@@ -254,6 +258,18 @@ def clause_to_nature_language(clauses,
             elif pred == 'RatioOfSimilarTriangle':
                 tri_1, tri_2 = items[0][:3], items[0][3:]
                 condition_i = f"ratio of similar \\triangle {tri_1} and \\triangle {tri_2} = {items[1]}"
+            elif pred == 'Equal':
+                pred_l, item_l = parse_clause(items[0])
+                pred_r, item_r = parse_clause(items[1])
+                condition_dict = {
+                    "LengthOfLine": "{item}",
+                    "MeasureOfAngle": "\\angle {item}",
+                    "RadiusOfCircle": "radius of \\odot {item}",
+                    "MeasureOfArc": "\\arc {item}"
+                }
+                condition_l = condition_dict[pred_l].format(item=item_l[0])
+                condition_r = condition_dict[pred_r].format(item=item_r[0])
+                condition_i = f"{condition_l} = {condition_r}"
             else:
                 raise KeyError(pred)
         elif 'Shape' in clause:
@@ -271,7 +287,7 @@ def clause_to_nature_language(clauses,
             circle, points = items
             condition_i = random.choice([
                 f"{', '.join(points)} lie on the circle {circle}",
-                f"{', '.join(points)} lie on the same circle centered at point {circle}",
+                f"{', '.join(points)} lie on the same circle centered at {circle}",
                 f"{', '.join(points)} are on circle {circle}"
             ])
         elif pred in PREDICATES_ENT:

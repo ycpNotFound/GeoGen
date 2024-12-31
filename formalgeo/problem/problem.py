@@ -83,7 +83,7 @@ class Problem:
                 self.add(predicate, tuple(item_1), (-1,), ("prerequisite", None, None))
                 self.add(predicate, tuple(item_2), (-1,), ("prerequisite", None, None))
             elif predicate == 'IsBisectorOfAngle':
-                item = item[:2] + self.sort_counter_clocksiwe_angle(item[2:])
+                item = item[:2] + list(self.sort_counter_clocksiwe_angle(item[2:]))
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
             else:
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
@@ -497,8 +497,10 @@ class Problem:
             self.condition.add("Collinear", extended_item[::-1], (_id,), ("extended", None, None))
             self.condition.add("Angle", extended_item, (_id,), ("extended", None, None))
             self.condition.add("Angle", extended_item[::-1], (_id,), ("extended", None, None))
-            angle_sym = self.get_sym_of_attr('MeasureOfAngle', extended_item)
-            self.condition.add("Equation", angle_sym - 180, (_id, ), ("extended", None, None))
+            angle_sym_1 = self.get_sym_of_attr('MeasureOfAngle', extended_item)
+            angle_sym_2 = self.get_sym_of_attr('MeasureOfAngle', extended_item[::-1])
+            self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
+            self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
 
         # add potential collinear
         for ps in self.condition.get_items_by_predicate('Collinear'):

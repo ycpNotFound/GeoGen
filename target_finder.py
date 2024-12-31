@@ -66,13 +66,13 @@ class TargetFinder():
         if replace_characters:
             self.replace_characters()
         if predicate_num == 2:
-            self.max_depth = 4
+            self.max_depth = 5
             self.min_depth = 1
         elif predicate_num == 3:
-            self.max_depth = 5
+            self.max_depth = 7
             self.min_depth = 2
         elif predicate_num == 4:
-            self.max_depth = 6
+            self.max_depth = 9
             self.min_depth = 4
             
         assert solver_type in ['formalgeo', 'intergps']
@@ -104,7 +104,7 @@ class TargetFinder():
             "line_instances": self.lines,
             "circle_instances": self.circles
         }
-        natural_template_path = "json/natural_language_template.json"
+        natural_template_path = "json/predicates_to_nature_language.json"
         self.natural_template = json.load(open(natural_template_path, 'r'))
         self.symbols = []
         
@@ -501,6 +501,11 @@ class TargetFinder():
 
         len_1 = int(self.distance(line_1))
         len_2 = int(self.distance(line_2))
+        if len_1 == len_2:
+            if self.distance(line_1) < self.distance(line_2):
+                len_1 -= 1
+            else:
+                len_2 -= 1 
         expr = target[1].subs({sym_1: len_1, sym_2: len_2})
         target_value = solve(Eq(expr, 0))[0]
         if 'sqrt' in str(target_value):
@@ -550,6 +555,8 @@ class TargetFinder():
             v4 = random.randint(1, 10)
             if v1 == v3:
                 v3 = v3 + random.randint(1, 5)
+            if v2 == v4:
+                v4 = v4 + random.randint(1, 5)
             new_sym = self.add_new_symbol()
             expr_1 = v1*new_sym + v2
             expr_2 = v3*new_sym + v4
@@ -694,7 +701,7 @@ class TargetFinder():
             conclusion = self.natural_template[target[0]][0].format(
                 points=''.join(target[1]))
             clause = f"{target[0]}({''.join(target[1])})"
-        elif target[0] in PREDICATES_REL:
+        elif target[0] in PREDICATES_REL + PREDICATES_REL_2:
             clause = self.target_tuple_to_clause(target)
             _, items = parse_clause(clause)
             conclusion = self.natural_template[target[0]][0].format(
@@ -863,34 +870,55 @@ class TargetFinder():
         return info_dict_for_symbolic, info_dict_for_llm
             
             
-        
+def build_input_args(pred_base_combs, 
+                     pred_rel_combs, 
+                     n_more_lines,
+                     repeat_times):
+    input_args = []
+    for predicate_base in pred_base_combs:
+        for predicate_rel in pred_rel_combs:
+            for _ in range(repeat_times):
+                input_args.append(
+                    (predicate_base, predicate_rel, n_more_lines, None)
+                )
+    return input_args
+
 if __name__ == '__main__':
     setup_seed(1234)
     
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
     # for i in range(10):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
     cnt = 0
-    total_len = len(list(itertools.product(PREDICATES_ENT, PREDICATES_REL)))
-    for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
+    # total_len = len(list(itertools.product(PREDICATES_ENT, PREDICATES_REL)))
+    # for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_1 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=10)
+    total_len = len(input_args_1)
+    for predicate_base, predicate_rel, n_more_lines, color_config in input_args_1:
         cnt += 1
-        if cnt < 204:
+        if cnt < 44:
             continue
-        clauses_base = [clauses_base]
-        clauses_rel = [clauses_rel]
-        # clauses_base = random.choices(PREDICATES_ENT, k=1)
-        # clauses_rel = random.choices(PREDICATES_REL, k=1)
-        # clauses_base = [
-        #     "Triangle",
-        # ]
-        # clauses_rel = [
-        #     'IsMidpointOfArc', 
-        # ]
-        cg = ClauseGenerator(dl.predicate_GDL, dl.theorem_GDL)
+
+        # predicate_base = random.choices(PREDICATES_ENT, k=1)
+        # predicate_rel = random.choices(PREDICATES_REL, k=1)
+        predicate_base = [
+            "Triangle",
+        ]
+        predicate_rel = [
+            'IsMidpointOfArc', 
+            'IsDiameterOfCircle'
+        ]
+        cg = ClauseGenerator(predicate_GDL, theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
-            clauses_base, 
-            clauses_rel, 
+            predicate_base, 
+            predicate_rel, 
             n_more_lines=1
         )
         states = cg.states
@@ -942,7 +970,7 @@ if __name__ == '__main__':
             replace_characters=False,
             # solver_type='intergps',
             solver_type='formalgeo',
-            predicate_num=len(clauses_base) + len(clauses_rel),
+            predicate_num=len(predicate_base) + len(predicate_rel),
             debug=True
         )
         info_dict_for_symbolic, info_dict_for_llm = goal_finder.formulate()

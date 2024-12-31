@@ -73,7 +73,7 @@ def generate_one_sample(predicate_GDL,
             allocator.image_cdls,
             replace_characters=False,
             solver_type='formalgeo',
-            debug=True
+            debug=False
         )
         info_dict_symbolic, info_dict_llm = goal_finder.formulate()
         
@@ -124,6 +124,8 @@ def generate_one_sample(predicate_GDL,
             "color_config": color_config,
             "error_message": tb
         }
+        print('pred_base: ',  predicate_base)
+        print('pred_rel: ', predicate_rel)
         return (False, task_info)
 
     
@@ -159,7 +161,7 @@ def generate_one_sample_with_timeout(
             "color_config": color_config,
             "error_message": "timeout"
         }
-        return (False, info, None)
+        return (False, info)
     # result = generate_one_sample(
     #         predicate_GDL, theorem_GDL, predicate_base, 
     #         predicate_rel, n_more_lines, color_config, 
@@ -188,7 +190,8 @@ def run_task(seed,
     theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
     
     t_info = json.load(open("json/t_info_new.json", 'r', encoding='utf-8'))
-    t_freq_info = json.load(open("json/theorem_freq.json", 'r', encoding='utf-8'))
+    t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
+    t_freq_info = {k: t_info[k][-1] for k in t_names}
     predicate_GDL_search = json.load(open('json/predicate_GDL_for_search.json', 'r', encoding='utf-8'))
     theorem_GDL_search = json.load(open('json/theorem_GDL_for_search.json', 'r', encoding='utf-8'))
     search_cfg = {
@@ -315,8 +318,28 @@ def task_1():
     print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
     return seed, task_name, input_args_list, num_process
 
+def task_2():
+    seed = 1234
+    task_name = "geosynth_ENT_1_REL_2"
+    input_args_list = []
+    num_process = 6
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_1 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=1)
+    print('Num: ', len(input_args_1))
+
+    
+    input_args_list = input_args_1
+    print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
+    return seed, task_name, input_args_list, num_process
+
 def main():
-    run_task(*task_1())
+    # run_task(*task_1())
+    run_task(*task_2())
     # run_task()
 
 def debug_main():
