@@ -542,8 +542,8 @@ class EquationKiller:
             all_symbols = set()
             for expr in try_mini_eqs:
                 all_symbols.update(expr.free_symbols)
-            if len(all_symbols) >= 4:
-                return None, []
+            # if len(all_symbols) >= 4:
+            #     return None, []
 
             if EquationKiller.sym_simplify:
                 try:

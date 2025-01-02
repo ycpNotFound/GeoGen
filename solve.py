@@ -2,9 +2,9 @@ import json
 import random
 import re
 from typing import Dict, Optional, Tuple
-
+import os
 import numpy as np
-
+import time
 import sympy
 from sympy import Eq
 from tqdm import tqdm
@@ -14,7 +14,7 @@ from formalgeo.data import DatasetLoader
 from formalgeo.parse import parse_theorem_seqs
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import Interactor
-from graph import ConditionGraph, ConditionNode, display_solution, draw_graph
+from graph import ConditionGraph, ConditionNode, display_solution, draw_graph, find_solution_for_target
 from utils.symbolic import move_subtractions_to_rhs
 
 
@@ -210,21 +210,24 @@ def solve_test():
         print('--------------------------')
     
 
-def solve_and_expand_iteration():
-    split = "train"
+def solve_main(split="train"):
+    save_dir = f"datasets/processed_data/fgo_{split}"
+    os.makedirs(save_dir, exist_ok=True)
+    
     data_path = f"datasets/processed_data/fgo_{split}.json"
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
-    save_path_1 = f"datasets/processed_data/fgo_{split}_solution.json"
-    save_path_2 = f"datasets/processed_data/fgo_{split}_solution_expand.json"
+    
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
-    solution_dict = {}
-    solution_expand_dict = {}
+    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
     
     for problem_idx in tqdm(keys):
         problem_idx = int(problem_idx)
+        if problem_idx < 291:
+            continue
+        search_start = time.time()
         solver = Interactor(dl.predicate_GDL, dl.theorem_GDL, t_info)
         
         problem_CDL = dl.get_problem(pid=problem_idx)
@@ -241,72 +244,43 @@ def solve_and_expand_iteration():
         # expand new conditions
         solver.expand_conditions()
         
+        search_time = time.time() - search_start
         # construct graph
         condition_graph = ConditionGraph(solver.problem.condition.items)
         condition_graph.construct_graph()
         
-        info_dict = display_solution(condition_graph, target, solver.problem.goal)
-        info_dict["problem_text"] = problem_CDL["problem_text_en"]
-        solution_dict[problem_idx] = info_dict
-        
-        # expand new target and solution
-        new_targets, new_goals = find_new_targets(solver, condition_graph, target)
-        for i in range(len(new_targets)):
-            new_target, new_goal = new_targets[i], new_goals[i]
-            info_dict_expand = display_solution(condition_graph, new_target, new_goal)
-            # save the new problem text
-            info_dict_expand["problem_text"] = create_problem_text(problem_CDL, new_goal)
-            solution_expand_dict[f"{problem_idx}_{i}"] = info_dict_expand
-        
-        if problem_idx % 100 == 0:
-            with open(save_path_1, 'w', encoding='utf-8') as f:
-                f.write(json.dumps(solution_dict, indent=4, ensure_ascii=False))
-            with open(save_path_2, 'w', encoding='utf-8') as f:
-                f.write(json.dumps(solution_expand_dict, indent=4, ensure_ascii=False))
-                
-    with open(save_path_1, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(solution_dict, indent=4, ensure_ascii=False))
-    with open(save_path_2, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(solution_expand_dict, indent=4, ensure_ascii=False))
-    
-def solve_iteration():
-    split = "train"
-    data_path = f"datasets/processed_data/fgo_{split}.json"
-    data = json.load(open(data_path, 'r', encoding='utf-8'))
-    keys = list(data.keys())
-    save_path = f"datasets/processed_data/fgo_{split}_solution.json"
-    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    
-    solution_dict = {}
-    for problem_idx in tqdm(keys):
-        problem_idx = int(problem_idx)
-        solver = Interactor(dl.predicate_GDL, dl.theorem_GDL, t_info)
-        
-        problem_CDL = dl.get_problem(pid=problem_idx)
-        solver.load_problem(problem_CDL)
-
-        for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
-            solver.apply_theorem(t_name, t_branch, t_para)
+        solution_str, _, __  = find_solution_for_target(
+            solver.problem, 
+            condition_graph, 
+            target, 
+            natural_template
+        )
+        if not solver.problem.goal.solved:
+            print(f'{problem_idx} not solved')
             
-        solver.problem.check_goal()
-        
-        conditions = solver.problem.condition
-        target_condition = conditions.items[-1]
-        
-        condition_graph = ConditionGraph(conditions.items)
-        condition_graph.construct_graph()
+        data_info = {
+            "key": problem_idx,
+            "solved": solver.problem.goal.solved,
+            "construction_cdl": problem_CDL['construction_cdl'],
+            "text_cdl": problem_CDL['text_cdl'],
+            "image_cdl": problem_CDL['image_cdl'],
+            "positions": [],
+            "goal_cdl": problem_CDL['goal_cdl'],
+            "search_time": search_time,
+            "theorems": problem_CDL['theorem_seqs'],
+            "llm_info": {
+                "key": problem_idx,
+                "problem_level": len(problem_CDL['theorem_seqs']),
+                "problem_text": problem_CDL['problem_text_en'],
+                "problem_answer": problem_CDL['problem_answer'],
+                "solution_str": solution_str,
+                "caption_str": ""
+            }
+        }
+        with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
+            json.dump(data_info, f, indent=4, ensure_ascii=False)
 
-        info_dict = display_solution(condition_graph, target_condition, solver.problem.goal)
-        solution_dict[problem_idx] = info_dict
-        
-        if problem_idx % 100 == 0:
-            with open(save_path, 'w', encoding='utf-8') as f:
-                f.write(json.dumps(solution_dict, indent=4, ensure_ascii=False))
-                
-    with open(save_path, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(solution_dict, indent=4, ensure_ascii=False))
-    
+ 
 def draw_iteration():
     split = "train"
     data_path = f"datasets/processed_data/fgo_{split}.json"
@@ -375,8 +349,8 @@ def setup_seed():
 
 if __name__ == '__main__':
     setup_seed()
-    solve_test()
+    # solve_test()
     # check_type()
     # solve_iteration()
     # draw_iteration()
-    # solve_and_expand_iteration()
+    solve_main()

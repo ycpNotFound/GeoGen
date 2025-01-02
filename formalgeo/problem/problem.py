@@ -78,7 +78,7 @@ class Problem:
             elif predicate == "Equation":
                 self.add("Equation", parse_expr(self, item),
                          (-1,), ("prerequisite", None, None))
-            elif predicate == 'ParallelBetweenLine':
+            elif predicate == 'ParallelBetweenLine' and self.p_pos is not None:
                 item_1, item_2 = self.same_side_for_parallel(item)
                 self.add(predicate, tuple(item_1), (-1,), ("prerequisite", None, None))
                 self.add(predicate, tuple(item_2), (-1,), ("prerequisite", None, None))

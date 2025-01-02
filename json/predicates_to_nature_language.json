@@ -145,5 +145,18 @@
     "CongruentBetweenQuadrilateral": [
         "quadrilateral {p1} is congruent to quadrilateral {p2}",
         "quadrilateral {p2} is congruent to quadrilateral {p1}"
+    ],
+
+    "IsCentreOfCircle": [
+        "{p1} is a circle"
+    ],
+    "CongruentBetweenArc": [
+        "\\arc {p1} is congruent to \\arc {p2}"
+    ],
+    "IsAltitudeOfQuadrilateral": [
+        "{p1} is the altitude of {p2}"
+    ],
+    "IsIncenterOfQuadrilateral": [
+        "{p1} is the incenter of {p2}"
     ]
 }

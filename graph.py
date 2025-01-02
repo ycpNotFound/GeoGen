@@ -16,11 +16,13 @@ from tqdm import tqdm
 from formalgeo.data import (DatasetLoader, download_dataset,
                             show_available_datasets)
 from formalgeo.parse import parse_theorem_seqs
+from formalgeo.problem import Problem
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import Interactor
 from formalgeo.tools import show_solution
 from utils.symbolic import move_subtractions_to_rhs
-
+from utils.formulate import clause_to_nature_language, formulate_eqs, formulate_eqs_simple
+from formalgeo.parse import inverse_parse_one, inverse_parse_one_theorem
 # show_available_datasets()
 
 class ConditionNode():
@@ -382,4 +384,160 @@ def display_solution(condition_graph: ConditionGraph,
     # print(solution_str)
     return info_dict
 
+def find_solution_for_target(
+        problem: Problem,
+        condition_graph: ConditionGraph, 
+        target_condition: Tuple,
+        natural_template: Dict
+    ):
+    too_complex = False
+    sub_nodes, sub_nodes_adj_table = condition_graph.backward_construct_sub_graph([target_condition])
 
+    # sort by index of applying theorem 
+    sub_nodes = topological_sort(sub_nodes, sub_nodes_adj_table)
+    # sub_nodes = topological_sort_bfs(sub_nodes, sub_nodes_adj_table)
+    
+    sub_nodes_idx = [n.idx for n in sub_nodes]
+    sub_nodes_clauses = [
+        inverse_parse_one(n.value[0], n.value[1], problem)
+        for n in sub_nodes
+    ]
+    # inverse_parse_one('Equation', Symbol('rst_bcaabd')-sqrt(2), problem)
+    sub_nodes_statements = clause_to_nature_language(
+        sub_nodes_clauses, 
+        natural_template,
+        upper=False,
+        replace_sym=True,
+        replace_sym_mode='math'
+    )
+    pred_ignore = ['Angle', 'Line', 'Point', 'Shape', 'Polygon', 'Triangle', 'Arc', 'Circle', 'Free']
+    extend_nodes = [n for n in sub_nodes if n.value[3][0] == 'extended' and n.value[0] not in pred_ignore]
+
+    solution_str = "Solution: "
+    step_count = 0
+    sub_nodes_by_step = {}
+    last_theorem = None
+    last_premise_ids = None
+    # special token: 
+    # <by> - theorem
+    # <because> - premise condition
+    # <therefore> - extend condition
+    
+    for i, node in enumerate(sub_nodes):
+        theorem = node.value[3][0]
+        predicate = node.value[0]
+        statement = sub_nodes_statements[i]
+
+            
+        if theorem == 'prerequisite': 
+            # add all extended condition
+            extend_conditions = []
+            # add all nodes in current step
+            extend_nodes_i = []
+            queue = deque([n for n in extend_nodes if node.idx in n.value[2]])
+            while queue:
+                extend_node = queue.popleft()
+                extend_idx = sub_nodes.index(extend_node)
+                extend_statement = sub_nodes_statements[extend_idx]
+                extend_predicate = extend_node.value[0]
+                if predicate == extend_predicate and predicate in ['Collinear', 'Cocircular']:
+                    continue
+                extend_conditions.append(extend_statement)
+                extend_nodes_i.append(extend_node)
+                for n in extend_nodes:
+                    if extend_node.idx in n.value[2]:
+                        queue.append(n)
+            if len(extend_conditions) != 0:
+                step_count += 1
+                sub_nodes_by_step[step_count] = extend_nodes_i
+                solution_str += f"\n{step_count}. <because> {statement}, <therefore>"
+                for c in extend_conditions:
+                    solution_str += f'\n- {c}.'
+                
+        elif theorem == 'extended': 
+            # add extended condition in 'prerequisite' or other theorems
+            pass
+            
+        else: # using theorem 
+            # find all premise statements grouped by step
+            premise_statements = {}
+            for premise_idx in node.value[2]:
+                if premise_idx not in sub_nodes_idx:
+                    continue
+                # ignore condition like Line(AB)
+                premise_node = sub_nodes[sub_nodes_idx.index(premise_idx)]
+                if premise_node.value[0] in pred_ignore:
+                    continue
+                premise_step = next((k for k, v in sub_nodes_by_step.items() if premise_node in v), None)
+                premise_statement = sub_nodes_statements[sub_nodes_idx.index(premise_idx)]
+                if premise_step is None:
+                    if 'given condition' not in premise_statements:    
+                        premise_statements['given condition'] = [premise_statement]
+                    else:
+                        premise_statements['given condition'].append(premise_statement)
+                else:
+                    if f"step {premise_step}" not in premise_statements:
+                        premise_statements[f"step {premise_step}"] = [premise_statement]
+                    else:
+                        premise_statements[f"step {premise_step}"].append(premise_statement)
+
+            # add theorem first
+            # if use the same theorem and same premise condition
+            # append conclusion in the previous step
+            f1 = theorem != last_theorem
+            f2 = node.value[2] != last_premise_ids
+            f3 = len(premise_statements) != 0
+            f4 = theorem == 'solve_eq'
+            if f4:
+                step_count += 1
+                solution_str += f'\n{step_count}. Solve equations:\n'
+                eq_solution = formulate_eqs_simple(premise_statements, statement, problem)
+                
+                # check if solve too many eqs in one step
+                if eq_solution is None: 
+                    too_complex = True
+                    break
+                solution_str += eq_solution
+                    
+            elif f1 or (f2 and f3):
+                step_count += 1
+                solution_str += f'\n{step_count}. <by> {theorem}, '
+                # add all premise statements
+                if len(premise_statements) != 0:
+                    solution_str += '<because> '
+                    if len(premise_statements) == 1:
+                        k = list(premise_statements.keys())[0]
+                        v = premise_statements[k]
+                        solution_str += f"{', '.join(v)} from {k}, "
+                    else:
+                        for k, v in premise_statements.items():
+                            solution_str += f"{', '.join(v)} from {k}, "
+
+                    
+            extend_conditions = [statement]
+            extend_nodes_i = [node]
+            # add all extended conditions
+            queue = deque([n for n in extend_nodes if node.idx in n.value[2]])
+            while queue:
+                extend_node = queue.popleft()
+                extend_idx = sub_nodes.index(extend_node)
+                extend_statement = sub_nodes_statements[extend_idx]
+                extend_conditions.append(extend_statement)
+                extend_nodes_i.append(extend_node)
+                for n in extend_nodes:
+                    if extend_node.idx in n.value[2]:
+                        queue.append(n)
+            
+            extend_str= '\n- '.join(extend_conditions)
+            if not (f1 or (f2 and f3)) and not f4:
+                # same theorem and no premise statements
+                solution_str += f'\n- {extend_str}. '
+                sub_nodes_by_step[step_count] += extend_nodes_i
+            else:
+                solution_str += f"<therefore>\n- {extend_str}. "
+                sub_nodes_by_step[step_count] = extend_nodes_i
+            
+            last_theorem = theorem
+            last_premise_ids = node.value[2]
+        
+    return solution_str, sub_nodes, too_complex

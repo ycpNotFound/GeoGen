@@ -5,20 +5,39 @@ import re
 import sympy
 from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer
 
-from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
+from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PREDICATES_REL_3, 
                      SYMBOL_MAPPING_1, SYMBOL_MAPPING_2)
 from .symbolic import parse_clause
 
-def json_formatter(input_dict):
-    for k, v in input_dict.items():
-        if isinstance(v, dict):
-            v = json_formatter(v)
-        elif isinstance(v, list):
-            v = [json_formatter(item) for item in v]
-        elif isinstance(v, Integer):
-            v = int(v)
-        elif isinstance(v, Float):
-            v = float(v)
+def inverse_parse_one_theorem(theorem, parsed_theorem_GDL):
+    """
+    Inverse parse theorem to formal language.
+    >> inverse_parse_one_theorem('t_name', 1, ('R', 'S', 'T'), parsed_theorem_GDL)
+    't_name(1,RST)'
+    >> inverse_parse_one_theorem('t_name', None, ('R', 'S', 'T'), parsed_theorem_GDL)
+    't_name(RST)'
+    >> inverse_parse_one_theorem('t_name', None, None, parsed_theorem_GDL)
+    't_name'
+    """
+    t_name, t_branch, t_para = theorem
+    if t_para is None:
+        if t_branch is None:
+            return t_name
+        return "{}({})".format(t_name, t_branch)
+    else:
+        result = []
+        i = 0
+        for l in parsed_theorem_GDL[t_name]["para_len"]:
+            result.append("")
+            for _ in range(l):
+                result[-1] += t_para[i]
+                i += 1
+        t_para = ",".join(result)
+
+        if t_branch is None:
+            return "{}({})".format(t_name, t_para)
+        return "{}({},{})".format(t_name, t_branch, t_para)
+
 
 def sympy_to_latex(expr):
     lhs, rhs = expr.split('=') if '=' in expr else (expr, '0')
@@ -91,20 +110,17 @@ def latex_to_sympy(latex_str, problem=None):
     expr = simplify(f"({lhs})-({rhs})")
     return expr
 
-# def formulate_eqs(eq_str_dict, target_str, problem):
-#     if len(eq_str_dict) >= 3:
-#         return formulate_eqs_complex(eq_str_dict, target_str, problem)
-#     else:
-#         eqs = [Eq(expr, 0) for expr in eq_str_dict.values()]
+def formulate_eqs_simple(eq_str_dict, target_str, problem):
+    formulated_str = "- <because> " 
+    for k, v in eq_str_dict.items():
+        formulated_str += f"{', '.join(v)} from {k}, "
+    return formulated_str
         
 
 def formulate_eqs(eq_str_dict, target_str, problem):
     if len(eq_str_dict) <= 2:
-        formulated_str = "- <because> " 
-        for k, v in eq_str_dict.items():
-            formulated_str += f"{', '.join(v)} from {k}, "
-        return formulated_str
-    
+        return formulate_eqs_simple(eq_str_dict, target_str, problem)
+
     eq_str_list = []
     eq_str_premise_step = []
     for k, v in eq_str_dict.items():
@@ -232,6 +248,7 @@ def clause_to_nature_language(clauses,
                     items[0],
                     items[1].replace('sqrt', '\\sqrt')
                 ])
+                
             if pred == 'MeasureOfAngle':
                 if items[1].isalpha():
                     condition_i = f"\\angle {items[0]} = \\angle {items[1]}"
@@ -247,7 +264,7 @@ def clause_to_nature_language(clauses,
             elif pred == 'MeasureOfArc':
                 # OAB -> BOA
                 angle_1 = ''.join([items[0][2], items[0][0], items[0][1]])
-                if items[1].isalpha():
+                if len(items[1]) == 3:
                     angle_2 = ''.join([items[1][2], items[1][0], items[1][1]])
                     condition_i = f"\\angle {angle_1} = \\angle {angle_2}"
                 else:
@@ -255,25 +272,60 @@ def clause_to_nature_language(clauses,
                         condition_i = f"\\angle {angle_1} = ({items[1]})°"
                     else:
                         condition_i = f"\\angle {angle_1} = {items[1]}°"
+            elif pred == 'RadiusOfCircle':
+                condition_i = f'radius of \\odot {items[0]} = {items[1]}'
+            elif pred == 'AreaOfTriangle':
+                condition_i = f"area of \\triangle {items[0]} = {items[1]}"
+            elif pred == 'DiameterOfCircle':
+                condition_i = f"diameter of \\odot {items[0]} = {items[1]}"
+            elif pred == "AreaOfQuadrilateral":
+                condition_i = f"area of {items[0]} = {items[1]}"
+            elif pred == 'PerimeterOfTriangle':
+                condition_i = f"perimeter of \\triangle {items[0]} = {items[1]}"
+            elif pred == "PerimeterOfQuadrilateral":
+                condition_i = f"perimeter of {items[0]} = {items[1]}"
             elif pred == 'RatioOfSimilarTriangle':
                 tri_1, tri_2 = items[0][:3], items[0][3:]
                 condition_i = f"ratio of similar \\triangle {tri_1} and \\triangle {tri_2} = {items[1]}"
+            elif pred == 'RatioOfMirrorSimilarTriangle':
+                tri_1, tri_2 = items[0][:3], items[0][3:]
+                tri_2 = ''.join([list(tri_2)[0]] + list(tri_2)[1:][::-1])
+                condition_i = f"ratio of similar \\triangle {tri_1} and \\triangle {tri_2} = {items[1]}"
+            elif pred == 'RatioOfSimilarQuadrilateral':
+                quad_1, quad_2 = items[0][:4], items[0][4:]
+                condition_i = f"ratio of similar quadrilateral {quad_1} and {quad_2} = {items[1]}"
+            
+            elif pred == 'HeightOfQuadrilateral':
+                condition_i = f"height of {items[0]} = {items[1]}"
+            elif pred == 'AreaOfCircle':
+                condition_i = f"area of \\odot {items[0]} = {items[1]}"
+            elif pred == 'RatioOfSimilarArc':
+                arc_1, arc_2 = items[0][:3], items[0][3:]
+                condition_i = f"ratio of \\arc {arc_1} and {arc_2} = {items[1]}"
+            elif pred == "AreaOfSector":
+                condition_i = f"area of sector {items[0]} = {items[1]}"
             elif pred == 'Equal':
-                pred_l, item_l = parse_clause(items[0])
-                pred_r, item_r = parse_clause(items[1])
                 condition_dict = {
                     "LengthOfLine": "{item}",
                     "MeasureOfAngle": "\\angle {item}",
                     "RadiusOfCircle": "radius of \\odot {item}",
                     "MeasureOfArc": "\\arc {item}"
                 }
-                condition_l = condition_dict[pred_l].format(item=item_l[0])
-                condition_r = condition_dict[pred_r].format(item=item_r[0])
+                if items[0] not in condition_dict: # y = 10
+                    condition_l, condition_r = items[0], items[1]
+                else: # Equal, MeasureOfAngle(..), MeasureOfArc(..)
+                    pred_l, item_l = parse_clause(items[0])
+                    pred_r, item_r = parse_clause(items[1])
+                    condition_l = condition_dict[pred_l].format(item=item_l[0])
+                    condition_r = condition_dict[pred_r].format(item=item_r[0])
+                    
                 condition_i = f"{condition_l} = {condition_r}"
             else:
                 raise KeyError(pred)
         elif 'Shape' in clause:
             continue
+        elif 'Circle' in clause:
+            condition_i = f"\\odot {items[0]}"
         elif 'Collinear' in clause:
             points = items[0]
             condition_i = random.choice([
@@ -293,7 +345,7 @@ def clause_to_nature_language(clauses,
         elif pred in PREDICATES_ENT:
             template = random.choice(natural_template[pred])
             condition_i = template.format(points=items[0])
-        elif pred in PREDICATES_REL + PREDICATES_REL_2:
+        elif pred in PREDICATES_REL + PREDICATES_REL_2 + PREDICATES_REL + PREDICATES_REL_3:
             template = random.choice(natural_template[pred])
             condition_i = template.format(p1=items[0], p2=items[1])
         elif 'Mirror' in clause:
@@ -313,6 +365,7 @@ def clause_to_nature_language(clauses,
             condition_i = f"\\angle {items[0]}"
         elif 'Arc' == pred:
             condition_i = f"\\arc {items[0]}"
+        
         else:
             raise KeyError(clause)
         if upper:

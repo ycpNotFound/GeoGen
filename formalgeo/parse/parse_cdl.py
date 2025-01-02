@@ -16,8 +16,8 @@ def parse_problem_cdl(problem_CDL):
             "text_and_image_cdl": [],
             "goal": {},
         },
-        "lines": problem_CDL['line_instances'],
-        "points": list(problem_CDL['point_positions'].keys())
+        "lines": problem_CDL['line_instances'] if 'line_instances' in problem_CDL else [],
+        "points": list(problem_CDL['point_positions'].keys()) if 'point_positions' in problem_CDL else []
     }
     for fl in problem_CDL["construction_cdl"]:
         predicate, para = fl.split("(")

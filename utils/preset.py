@@ -59,8 +59,15 @@ PREDICATES_REL_2 = [
     # "CongruentBetweenArc",
     "CongruentBetweenQuadrilateral",
     # "MirrorCongruentBetweenQuadrilateral",
-    
 ]
+
+PREDICATES_REL_3 = [
+    "IsCentreOfCircle", 
+    "CongruentBetweenArc",
+    "IsAltitudeOfQuadrilateral",
+    "IsIncenterOfQuadrilateral",
+]
+
 PREDICATES_ATTR = [
     # Attribution
     "LengthOfLine",
@@ -81,6 +88,8 @@ PREDICATES_ATTR = [
     "RatioOfMirrorSimilarTriangle",
     "RatioOfSimilarQuadrilateral",
 ]
+
+
 PREDICATES = PREDICATES_PRE + PREDICATES_ENT + PREDICATES_ATTR + PREDICATES_REL + PREDICATES_REL_2
 
 PREDICATES_TO_NAMES = {

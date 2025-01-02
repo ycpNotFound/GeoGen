@@ -168,10 +168,16 @@ def parse_clause(clause):
                 content_r = content_r[0]
         content_l = content_l.strip()
         content_r = content_r.strip()
-        predicate_l = predicate_l.strip()
-        if predicate_r is None or predicate_r == predicate_l:
-            return predicate_l, (content_l, content_r)
-        elif predicate_r is not None:
+        if predicate_l is not None:
+            predicate_l = predicate_l.strip()
+            if predicate_r is None or predicate_r == predicate_l:
+                # Equal(MeasureOfAngle, MeasureOfAngle)
+                return predicate_l, (content_l, content_r)
+            elif predicate_r is not None: 
+                # Equal(MeasureOfAngle, MeasureOfArc)
+                return 'Equal', (item_l, item_r)
+        else: 
+            # Equal(y, 10)
             return 'Equal', (item_l, item_r)
         
     elif '(' not in clause and ')' not in clause:
