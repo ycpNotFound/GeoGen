@@ -153,10 +153,16 @@
     "CongruentBetweenArc": [
         "\\arc {p1} is congruent to \\arc {p2}"
     ],
+    "SimilarBetweenArc": [
+        "\\arc {p1} is similar to \\arc {p2}"
+    ],
     "IsAltitudeOfQuadrilateral": [
         "{p1} is the altitude of {p2}"
     ],
     "IsIncenterOfQuadrilateral": [
         "{p1} is the incenter of {p2}"
+    ],
+    "IsOrthocenterOfTriangle": [
+        "{p1} is the orthocenter of {p2}"
     ]
 }

@@ -1,20 +1,25 @@
 import json
+import os
 import random
 import re
-from typing import Dict, Optional, Tuple
-import os
-import numpy as np
 import time
+from multiprocessing import Pool
+from typing import Dict, Optional, Tuple
+
+import numpy as np
 import sympy
 from sympy import Eq
 from tqdm import tqdm
 
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.data import DatasetLoader
-from formalgeo.parse import parse_theorem_seqs
+from formalgeo.parse import inverse_parse_one, parse_theorem_seqs
+from formalgeo.problem import Problem
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import Interactor
-from graph import ConditionGraph, ConditionNode, display_solution, draw_graph, find_solution_for_target
+from graph import ConditionGraph, ConditionNode, display_solution, draw_graph
+from target_finder import TargetFinder
+from utils.formulate import clause_to_nature_language
 from utils.symbolic import move_subtractions_to_rhs
 
 
@@ -132,23 +137,18 @@ def expr_to_upper(expr_str):
             expr_upper = f'the {expr_upper}' 
     return expr_upper
 
-def create_problem_text(problem_CDL: Dict, goal: Goal):
-    origin_p_text = problem_CDL["problem_text_en"]
-    if 'Find' in origin_p_text:
-        origin_conditions = origin_p_text.split('Find')[0]
-    elif 'Prove' in origin_p_text:
-        origin_conditions = origin_p_text.split('Prove')[0]
-    
-    if goal.answer == 0: # ll_ab - ll_bc
-        eq_str = move_subtractions_to_rhs(Eq(goal.item, 0))
-        eq_str = expr_to_upper(eq_str.strip())
-        p_text = f"Prove that {eq_str}. "
-    else:
-        goal_str = expr_to_upper(goal.item)
-        p_text = f"Find {goal_str}."
-
-    problem_text = origin_conditions + p_text
-    return problem_text
+def create_problem_prove(target: Tuple, problem: Problem, natural_template: Dict):
+    target_clause = inverse_parse_one(
+        target[0], target[1], problem
+    )
+    target_statement = clause_to_nature_language(
+        [target_clause],
+        natural_template,
+        upper=False,
+        replace_sym=True,
+        replace_sym_mode='math'
+    )
+    return f'Prove that {target_statement[0]}.'
     
 
 def solve_test():
@@ -209,78 +209,181 @@ def solve_test():
         print(info_dict['solution_str'])
         print('--------------------------')
     
+def expand_one_sample(
+    problem_idx,
+    dl,
+    t_info,
+    natural_template,
+    save_dir
+):
+    search_start = time.time()
+    solver = Interactor(dl.predicate_GDL, dl.theorem_GDL, t_info)
+    
+    problem_CDL = dl.get_problem(pid=problem_idx)
+    solver.load_problem(problem_CDL)
 
-def solve_main(split="train"):
+    for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
+        solver.apply_theorem(t_name, t_branch, t_para)
+        
+    solver.problem.check_goal()
+    
+    # save target_condition first
+    target = solver.problem.condition.items[-1]
+    
+    # expand new conditions
+    solver.expand_conditions()
+    
+    search_time = time.time() - search_start
+    # construct graph
+    condition_graph = ConditionGraph(solver.problem.condition.items)
+    condition_graph.construct_graph()
+    
+    # solution to original target
+    solution_str, _, _, _ = TargetFinder.find_solution_for_target(
+        solver.problem, 
+        condition_graph, 
+        target, 
+        natural_template,
+        solver.parsed_theorem_GDL,
+        expand_flag=True
+    )
+    if not solver.problem.goal.solved:
+        print(f'{problem_idx} not solved')
+        
+    data_info = {
+        "key": problem_idx,
+        "solved": solver.problem.goal.solved,
+        "construction_cdl": problem_CDL['construction_cdl'],
+        "text_cdl": problem_CDL['text_cdl'],
+        "image_cdl": problem_CDL['image_cdl'],
+        "positions": [],
+        "goal_cdl": problem_CDL['goal_cdl'],
+        "search_time": search_time,
+        "theorems": problem_CDL['theorem_seqs'],
+        "llm_info": {
+            "key": problem_idx,
+            "problem_level": len(problem_CDL['theorem_seqs']),
+            "problem_text": problem_CDL['problem_text_en'],
+            "problem_answer": problem_CDL['problem_answer'],
+            "solution_str": solution_str,
+            "caption_str": ""
+        }
+    }
+    with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
+        json.dump(data_info, f, indent=4, ensure_ascii=False)
+        
+    # solution to expanded target, like `find_target_and_solution`
+    conditions_to_sample = solver.problem.condition.items[-10:-1]
+    # filter 1
+    new_targets = TargetFinder.targets_filter_1(
+        conditions_to_sample,
+        solver.problem.condition.value_of_sym
+    )
+    if len(new_targets) == 0:
+        return 
+    theorems_for_targets = {}
+    solution_for_targets = {}
+    level_for_targets = {}
+    for target in new_targets:
+        solution_str, theorems, _, _ = TargetFinder.find_solution_for_target(
+            solver.problem,
+            condition_graph, 
+            target, 
+            natural_template,
+            solver.parsed_theorem_GDL,
+            expand_flag=True
+        )
+        theorems_for_targets[target] = theorems
+        solution_for_targets[target] = solution_str
+        level_for_targets[target] = len(theorems)
+    # filter 2
+    new_targets, _ = TargetFinder.targets_filter_2(
+        new_targets, theorems_for_targets, level_for_targets
+    )
+    # filter 3
+    targets_dict = TargetFinder.targets_filter_3(new_targets)
+    types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
+    if len(types_to_choose) == 0:
+        return 
+    elif len(types_to_choose) == 1:
+        # expand 1 target
+        chosen_targets = targets_dict[types_to_choose[0]][:1] 
+    else:
+        # expand 2 target
+        types_to_choose = random.sample(types_to_choose, 2)
+        chosen_targets = [targets_dict[t][0] for t in types_to_choose]
+    
+    for i, chosen_target in enumerate(chosen_targets):
+        chosen_thoerems = theorems_for_targets[chosen_target]
+        chosen_solution = solution_for_targets[chosen_target]
+        problem_text = create_problem_prove(
+            chosen_target, solver.problem, natural_template
+        )
+        problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
+        data_info = {
+            "key": problem_idx,
+            "solved": True,
+            "construction_cdl": problem_CDL['construction_cdl'],
+            "text_cdl": problem_CDL['text_cdl'],
+            "image_cdl": problem_CDL['image_cdl'],
+            "positions": [],
+            "goal_cdl": '',
+            "search_time": search_time,
+            "theorems": chosen_thoerems,
+            "llm_info": {
+                "key": problem_idx,
+                "problem_level": level_for_targets[chosen_target],
+                "problem_text": problem_text,
+                "problem_answer": '',
+                "solution_str": chosen_solution,
+                "caption_str": ""
+            }
+        }
+        with open(f"{save_dir}_expand/{problem_idx}_{i}.json", 'w', encoding='utf-8') as f:
+            json.dump(data_info, f, indent=4, ensure_ascii=False)
+            
+    return
+                
+def solve_main(split="test"):
     save_dir = f"datasets/processed_data/fgo_{split}"
     os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(f"{save_dir}_expand", exist_ok=True)
     
     data_path = f"datasets/processed_data/fgo_{split}.json"
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
     
+    num_process = 6
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
     natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
     
-    for problem_idx in tqdm(keys):
-        problem_idx = int(problem_idx)
-        if problem_idx < 291:
-            continue
-        search_start = time.time()
-        solver = Interactor(dl.predicate_GDL, dl.theorem_GDL, t_info)
-        
-        problem_CDL = dl.get_problem(pid=problem_idx)
-        solver.load_problem(problem_CDL)
+    pool = Pool(num_process)
+    results = []
+    with tqdm(total=len(keys), desc="Processing") as pbar:
+        def update(*args, **kwargs):
+            pbar.update()
+        for i, problem_idx in enumerate(keys):
+            problem_idx = int(problem_idx)
+            res = pool.apply_async(
+                expand_one_sample,
+                args=(problem_idx, dl, t_info, natural_template, save_dir),
+                callback=update
+            )
+            results.append(res)
+        for r in results:
+            r.wait()
+        # if os.path.exists(f"{save_dir}/{problem_idx}.json"):
+        #     tmp_data = json.load(open(f"{save_dir}/{problem_idx}.json", 'r', encoding='utf-8'))
+        #     if 'solved' in tmp_data:
+        #         continue
 
-        for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
-            solver.apply_theorem(t_name, t_branch, t_para)
-            
-        solver.problem.check_goal()
+    print("End for expand.")
         
-        # save target_condition first
-        target = solver.problem.condition.items[-1]
         
-        # expand new conditions
-        solver.expand_conditions()
         
-        search_time = time.time() - search_start
-        # construct graph
-        condition_graph = ConditionGraph(solver.problem.condition.items)
-        condition_graph.construct_graph()
-        
-        solution_str, _, __  = find_solution_for_target(
-            solver.problem, 
-            condition_graph, 
-            target, 
-            natural_template
-        )
-        if not solver.problem.goal.solved:
-            print(f'{problem_idx} not solved')
-            
-        data_info = {
-            "key": problem_idx,
-            "solved": solver.problem.goal.solved,
-            "construction_cdl": problem_CDL['construction_cdl'],
-            "text_cdl": problem_CDL['text_cdl'],
-            "image_cdl": problem_CDL['image_cdl'],
-            "positions": [],
-            "goal_cdl": problem_CDL['goal_cdl'],
-            "search_time": search_time,
-            "theorems": problem_CDL['theorem_seqs'],
-            "llm_info": {
-                "key": problem_idx,
-                "problem_level": len(problem_CDL['theorem_seqs']),
-                "problem_text": problem_CDL['problem_text_en'],
-                "problem_answer": problem_CDL['problem_answer'],
-                "solution_str": solution_str,
-                "caption_str": ""
-            }
-        }
-        with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
-            json.dump(data_info, f, indent=4, ensure_ascii=False)
 
- 
 def draw_iteration():
     split = "train"
     data_path = f"datasets/processed_data/fgo_{split}.json"
@@ -353,4 +456,4 @@ if __name__ == '__main__':
     # check_type()
     # solve_iteration()
     # draw_iteration()
-    solve_main()
+    solve_main(split='val')

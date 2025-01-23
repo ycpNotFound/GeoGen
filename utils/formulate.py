@@ -58,7 +58,8 @@ def sympy_to_latex(expr):
         if isinstance(expr, (Integer, Float)):
             return expr
         expr = expr.xreplace(
-            {s: symbols(str(s).upper()) for s in expr.free_symbols}
+            {s: symbols(str(s).upper()) for s in expr.free_symbols
+             if '_' in str(s)}
         )
         expr = str(expr)
         expr = expr.replace('MA_', '\\angle ').replace('LL_', '')
@@ -117,8 +118,8 @@ def formulate_eqs_simple(eq_str_dict, target_str, problem):
     return formulated_str
         
 
-def formulate_eqs(eq_str_dict, target_str, problem):
-    if len(eq_str_dict) <= 2:
+def formulate_eqs(eq_str_dict, target_str, problem, expand_flag=False):
+    if len(eq_str_dict) <= 2 or expand_flag:
         return formulate_eqs_simple(eq_str_dict, target_str, problem)
 
     eq_str_list = []
@@ -336,12 +337,15 @@ def clause_to_nature_language(clauses,
                 f"{points[1]} is on the line segment {points[0]}{points[2]}"
             ])
         elif 'Cocircular' in clause:
-            circle, points = items
-            condition_i = random.choice([
-                f"{', '.join(points)} lie on the circle {circle}",
-                f"{', '.join(points)} lie on the same circle centered at {circle}",
-                f"{', '.join(points)} are on circle {circle}"
-            ])
+            if len(items) == 1:
+                condition_i = f'circle {items[0]}'
+            else:
+                circle, points = items
+                condition_i = random.choice([
+                    f"{', '.join(points)} lie on the circle {circle}",
+                    f"{', '.join(points)} lie on the same circle centered at {circle}",
+                    f"{', '.join(points)} are on circle {circle}"
+                ])
         elif pred in PREDICATES_ENT:
             template = random.choice(natural_template[pred])
             condition_i = template.format(points=items[0])

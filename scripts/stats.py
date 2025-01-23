@@ -268,7 +268,12 @@ def stats_for_synth_2(dir_id=1):
         json.dump(seen_dict, f, ensure_ascii=False, indent=4)
     with open('json/unseen_theorems.json', 'w', encoding='utf-8') as f:
         json.dump(unseen_dict, f, ensure_ascii=False, indent=4)
+        
+    # special cases
+    
     return
+
+
 
 if __name__ == '__main__':
     # stats_for_formalgeo()

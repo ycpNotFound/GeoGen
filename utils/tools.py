@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import itertools
+from math import sqrt
 
 def setup_seed(seed=1234):
     random.seed(seed)
@@ -53,3 +54,8 @@ def identify_image(positions, fig_size):
             return False, f"outlier point {dist} > 3*{other_avg}"
         
     return True, None
+
+def distance(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+    return sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 )

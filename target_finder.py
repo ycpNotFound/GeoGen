@@ -8,7 +8,7 @@ from collections import defaultdict, deque
 from typing import Dict, Tuple
 
 import numpy as np
-from sympy import (Eq, Float, Integer, Symbol, simplify, solve, sqrt,
+from sympy import (Eq, Float, Integer, Rational, Symbol, simplify, solve, sqrt,
                    total_degree)
 
 from allocator import Allocator
@@ -29,7 +29,7 @@ from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
                           SYMBOL_MAPPING_2)
 from utils.symbolic import (get_angle_measure, parse_clause,
                             replace_for_clause, subs_without_simplification)
-from utils.tools import setup_seed
+from utils.tools import setup_seed, distance
 
 
 class TargetFinder(): 
@@ -148,7 +148,8 @@ class TargetFinder():
         self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
         return
     
-    def targets_filter_1(self, conditions_to_sample):
+    @staticmethod
+    def targets_filter_1(conditions_to_sample, value_of_sym):
         # the first filter: 
         # for potential calculation target: 
         # 1. only has <= 2 vars (<=3 for lines)
@@ -170,7 +171,7 @@ class TargetFinder():
                 f3 = True
                 if len(condition[1].free_symbols) == 2:
                     if all([
-                        self.solver.problem.condition.value_of_sym[sym] is not None 
+                        value_of_sym[sym] is not None 
                         for sym in list(condition[1].free_symbols)
                     ]):
                         f3 = False
@@ -188,7 +189,8 @@ class TargetFinder():
 
         return new_targets
     
-    def targets_filter_2(self, new_targets, theorems_for_targets, level_for_targets):
+    @staticmethod
+    def targets_filter_2(new_targets, theorems_for_targets, level_for_targets):
         # the second filter: 
         # 1. sort by len of theorems (more but not too large)
         # 2. sort by num of unsolved symbols (less)
@@ -221,7 +223,8 @@ class TargetFinder():
         idx_for_targets = [filter_idx(k, theorems_for_targets[k], level_for_targets[k]) for k in new_targets]
         return new_targets, idx_for_targets
     
-    def targets_filter_3(self, new_targets):
+    @staticmethod
+    def targets_filter_3(new_targets):
         # the third filter: 
         # classified into groups according to target type
         # choose only 2 targets for each 'prove' predicate name
@@ -257,12 +260,18 @@ class TargetFinder():
                 conditions_to_sample += list(v.values())
             
         # filter 1, if only have few targets, decrease max_depth
-        new_targets = self.targets_filter_1(conditions_to_sample)
+        new_targets = self.targets_filter_1(
+            conditions_to_sample,
+            self.solver.problem.condition.value_of_sym
+        )
         if len(new_targets) < 8:
             for k, v in self.solver.leveled_condition.items():
                 if max_depth > 1 and len(k) == max_depth - 1:
                     conditions_to_sample += list(v.values())
-            new_targets = self.targets_filter_1(conditions_to_sample)
+            new_targets = self.targets_filter_1(
+                conditions_to_sample,
+                self.solver.problem.condition.value_of_sym
+            )
             
         # find solution / theorems for each target
         theorems_for_targets = {}
@@ -278,6 +287,8 @@ class TargetFinder():
                 self.solver.problem,
                 condition_graph, 
                 target, 
+                self.natural_template,
+                self.solver.parsed_theorem_GDL
             )
             if too_complex_flag:
                 continue
@@ -319,15 +330,20 @@ class TargetFinder():
         _ = self.find_solution_for_target(
             self.solver.problem,
             condition_graph,
-            chosen_target
+            chosen_target,
+            self.natural_template,
+            self.solver.parsed_theorem_GDL
         )
         return target_type, chosen_target, problem_level, chosen_solution, chosen_thoerems
     
+    @staticmethod
     def find_solution_for_target(
-            self, 
             problem: Problem,
             condition_graph: ConditionGraph, 
-            target_condition: Tuple
+            target_condition: Tuple,
+            natural_template: Dict,
+            parsed_theorem_GDL: Dict,
+            expand_flag: bool = False
         ):
         too_complex = False
         sub_nodes, sub_nodes_adj_table = condition_graph.backward_construct_sub_graph([target_condition])
@@ -344,7 +360,7 @@ class TargetFinder():
         # inverse_parse_one('Equation', Symbol('rst_bcaabd')-sqrt(2), problem)
         sub_nodes_statements = clause_to_nature_language(
             sub_nodes_clauses, 
-            self.natural_template,
+            natural_template,
             upper=False,
             replace_sym=True,
             replace_sym_mode='math'
@@ -370,7 +386,7 @@ class TargetFinder():
             
             if theorem not in ['prerequisite', 'extended', 'solve_eq']:
                 theorems_formal.append(
-                    inverse_parse_one_theorem(node.value[3], self.solver.parsed_theorem_GDL)
+                    inverse_parse_one_theorem(node.value[3], parsed_theorem_GDL)
                 )
                 
             if theorem == 'prerequisite': 
@@ -435,7 +451,7 @@ class TargetFinder():
                 if f4:
                     step_count += 1
                     solution_str += f'\n{step_count}. Solve equations:\n'
-                    eq_solution = formulate_eqs(premise_statements, statement, self.solver.problem)
+                    eq_solution = formulate_eqs(premise_statements, statement, problem, expand_flag=expand_flag)
                     
                     # check if solve too many eqs in one step
                     if eq_solution is None: 

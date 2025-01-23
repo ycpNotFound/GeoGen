@@ -66,6 +66,8 @@ PREDICATES_REL_3 = [
     "CongruentBetweenArc",
     "IsAltitudeOfQuadrilateral",
     "IsIncenterOfQuadrilateral",
+    "SimilarBetweenArc",
+    "IsOrthocenterOfTriangle",
 ]
 
 PREDICATES_ATTR = [

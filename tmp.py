@@ -279,24 +279,95 @@ def test_print():
     a =  "\\arc {p1[1:]} is congruent to \\arc {p2[1:]}"
     a = a.format(p1=list('xcd'), p2=list('xad'))
     print(a)
+    
+def test_func_timeout():
+    from func_timeout import func_timeout, FunctionTimedOut
 
+    def my_function(param1, param2):
+        # 假设这是一个可能会运行很长时间的函数
+        while True:
+            pass
+
+    try:
+        # 尝试运行 my_function 5 秒钟超时
+        result = func_timeout(2, my_function, args=('value1', 'value2'))
+    except FunctionTimedOut as e:
+        # 自定义异常处理逻辑，这里可以选择性地打印或记录日志
+        print("The function took too long to execute.")
+        # 如果你不希望任何信息被打印，可以简单地pass
+        # pass
+        
+def test_chat():
+    from main_chat import Agent
+    agent = Agent('api.json')
+    model_name = 'qwen2.5-7b-instruct'
+    instruction = """## Transcription task
+Convert the following structured information parsed from a geometry diagram into a natural language description. 
+Output Requirements: 
+- The output should be a coherent piece of natural language text.
+- Do not miss geometry information, such as points, lines, circles(if exist), length or angle measure, and so on.
+- Try to keep description concise and mathematical, and avoid reasoning.
+""" 
+# - Try to refer to geometry knowledge related to the diagram, while keep description concise. """
+    input_str = [
+        "The geometric construction in this figure includes angle bisector, equilateral triangle and tangent line. Here is a detailed description:\nPoints: $ I, J, K,L,M,N $ .\nLines: $ I,JK,IK,KL,IN,IM,IM,NLK $ .\ncircles: $M$.\nGeometry Relations:\n- The shape IIK forms an equilateral triangle.\n- KL is the besector line of angle IkJ.\n- NI is the tangent of circle M.\nangle IJM = (4c+2)°.\n-Points N,L,K lie on the same line.\n-Points I,J,K,L lie on the circle M.",
+        
+        "In this diagram, the geometric pattern consists of triangle. Here is a detailed description:\nPoints: $ A, B, C $.\nLines: $ AB, BC, AC $ .\ncircles: there's no circle in the diagram. \n Geometry Relations:\n- The shape ABC forms a triangle. \n- ∠BAC =60°.\n- CAB =(3a-4)°",
+        
+        "The diagram shows a geometric figure with parallelogram. Here is a detailed description:\nPoints: $ I, J, K, L $.\nLines: $IJ, JK, KL, IL$.\nCircles: there's no circle in the diagram.\nGeometry Relations:\n- IJKL is a parallelogram."
+    ]
+    for str_i in input_str:
+        output, _ = agent.chat(f"{instruction}\n{str_i}", model_name)
+        print('-------------------------------')
+        print(output)
+        print(_)
+        
+    a = 1
+
+
+def find_formal_in_problem_text():
+    import os
+    from utils.preset import PREDICATES, PREDICATES_ENT
+    train_dir = 'datasets/processed_data/fgo_train'
+    delete_names = [p for p in PREDICATES if p not in PREDICATES_ENT]
+    cnt = 0
+    correct_paths = []
+    for name in os.listdir(train_dir):
+        data = json.load(open(f"{train_dir}/{name}", 'r', encoding='utf-8'))
+
+        problem = data['llm_info']['problem_text']
+        if any([x in problem for x in delete_names]):
+            if data['solved']:
+            # print(problem)
+                print(f"{train_dir}/{name}")
+                correct_paths.append(f"{train_dir}/{name}")
+                cnt += 1
+                
+    print(cnt)
+    return correct_paths
+    
+
+        
 if __name__ == '__main__':
 
-    eq_str_list = [
-        '∠ ABC = 90°', 
-        '∠ BCD = 90°', 
-        '∠ CDA = 90°', 
-        '∠ DAB = 90° from step 3', 
-        '$ ∠ ABC + ∠ BCA + ∠ CAB = 180 $', 
-        '$ ∠ BCD = ∠ ACD + ∠ BCA $ from given condition', 
-        '$ ∠ ACD + ∠ CDA + ∠ DAC = 180 $ from step 2', 
-        '$ ∠ DAB = ∠ CAB + ∠ DAC $ from step 1', 
-        '∠ BCA = ∠ CAB from step 4'
-    ]
-    target_str = '∠ BCA = 45°'
+    # eq_str_list = [
+    #     '∠ ABC = 90°', 
+    #     '∠ BCD = 90°', 
+    #     '∠ CDA = 90°', 
+    #     '∠ DAB = 90° from step 3', 
+    #     '$ ∠ ABC + ∠ BCA + ∠ CAB = 180 $', 
+    #     '$ ∠ BCD = ∠ ACD + ∠ BCA $ from given condition', 
+    #     '$ ∠ ACD + ∠ CDA + ∠ DAC = 180 $ from step 2', 
+    #     '$ ∠ DAB = ∠ CAB + ∠ DAC $ from step 1', 
+    #     '∠ BCA = ∠ CAB from step 4'
+    # ]
+    # target_str = '∠ BCA = 45°'
     # formulate_eqs(eq_str_list, target_str)
     # test_wolframe_alpha()
     # test_sympy_subs()
     # filter_no_sqrt()
     # test_parse()
-    test_print()
+    # test_print()
+    # test_func_timeout()
+    # test_chat()
+    find_formal_in_problem_text()

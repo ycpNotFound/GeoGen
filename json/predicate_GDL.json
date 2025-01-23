@@ -543,7 +543,7 @@
     "IsCircumcenterOfQuadrilateral(O,ABCD)": {
       "ee_check": [
         "Point(O)",
-        "'Polygon'(ABCD)",
+        "Polygon(ABCD)",
         "Cocircular(O,ABCD)"
       ],
       "fv_check": [
