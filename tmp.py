@@ -347,6 +347,21 @@ def find_formal_in_problem_text():
     return correct_paths
     
 
+def test_itertools():
+    import itertools
+    iter_cnt = 100
+    num_process = 10
+    iter_test = range(iter_cnt)
+    batch_size = iter_cnt // num_process
+    
+    batches = []
+    for i in range(num_process):
+        batch = itertools.islice(iter_test, i*batch_size, (i+1)*batch_size)
+        batches.append(batch)
+        
+    for b in batches:
+        print(list(b))
+        
         
 if __name__ == '__main__':
 
@@ -370,4 +385,5 @@ if __name__ == '__main__':
     # test_print()
     # test_func_timeout()
     # test_chat()
-    find_formal_in_problem_text()
+    # find_formal_in_problem_text()
+    test_itertools()

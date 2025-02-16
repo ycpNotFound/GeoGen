@@ -276,10 +276,12 @@ class TargetFinder():
         # find solution / theorems for each target
         theorems_for_targets = {}
         solution_for_targets = {}
+        solution_dict_for_targets = {}
         level_for_targets = {}
         for target in new_targets:
             (
-                solution_str, 
+                solution_str,
+                solution_formal_dict,
                 theorems, 
                 sub_nodes,
                 too_complex_flag
@@ -299,6 +301,7 @@ class TargetFinder():
                     break
             theorems_for_targets[target] = theorems
             solution_for_targets[target] = solution_str
+            solution_dict_for_targets[target] = solution_formal_dict
             level_for_targets[target] = level
 
         if self.debug:
@@ -325,6 +328,7 @@ class TargetFinder():
         chosen_target = random.choice(chosen_targets[:5])
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
+        chosen_solution_dict = solution_dict_for_targets[chosen_target]
         # problem_level = level_for_targets[chosen_target]
         problem_level = len(chosen_thoerems)
         _ = self.find_solution_for_target(
@@ -334,7 +338,7 @@ class TargetFinder():
             self.natural_template,
             self.solver.parsed_theorem_GDL
         )
-        return target_type, chosen_target, problem_level, chosen_solution, chosen_thoerems
+        return target_type, chosen_target, problem_level, chosen_solution, chosen_solution_dict, chosen_thoerems
     
     @staticmethod
     def find_solution_for_target(
@@ -370,6 +374,7 @@ class TargetFinder():
 
         theorems_formal = []
         solution_str = "Solution: "
+        solution_formal_dict = {}
         step_count = 0
         sub_nodes_by_step = {}
         last_theorem = None
@@ -383,6 +388,7 @@ class TargetFinder():
             theorem = node.value[3][0]
             predicate = node.value[0]
             statement = sub_nodes_statements[i]
+            clause_i = sub_nodes_clauses[i]
             
             if theorem not in ['prerequisite', 'extended', 'solve_eq']:
                 theorems_formal.append(
@@ -411,6 +417,13 @@ class TargetFinder():
                     step_count += 1
                     sub_nodes_by_step[step_count] = extend_nodes_i
                     solution_str += f"\n{step_count}. <because> {statement}, <therefore>"
+                    solution_formal_dict[step_count] = {
+                        "theorem": None,
+                        "condition": [clause_i],
+                        "conclusion": [sub_nodes_clauses[sub_nodes_statements.index(c)] for c in extend_conditions]
+                    }
+                    
+                    f"{step_count} | None | {clause_i} |"
                     for c in extend_conditions:
                         solution_str += f'\n- {c}.'
                     
@@ -458,10 +471,19 @@ class TargetFinder():
                         too_complex = True
                         break
                     solution_str += eq_solution
+                    solution_formal_dict[step_count] = {
+                        "theorem": "solve_eq",
+                        "condition": [item for sublist in premise_statements.values() for item in sublist]
+                    }
                         
                 elif f1 or (f2 and f3):
                     step_count += 1
                     solution_str += f'\n{step_count}. <by> {theorem}, '
+                    solution_formal_dict[step_count] = {
+                        "theorem": theorem,
+                        "condition": []
+                    }
+
                     # add all premise statements
                     if len(premise_statements) != 0:
                         solution_str += '<because> '
@@ -469,38 +491,50 @@ class TargetFinder():
                             k = list(premise_statements.keys())[0]
                             v = premise_statements[k]
                             solution_str += f"{', '.join(v)} from {k}, "
+                            premise_clauses = [sub_nodes_clauses[sub_nodes_statements.index(s)] for s in v]
+                            solution_formal_dict[step_count]['condition'] += premise_clauses
+                            # solution_formal_str += f"{' '.join(premise_clauses)}"
                         else:
                             for k, v in premise_statements.items():
                                 solution_str += f"{', '.join(v)} from {k}, "
+                                premise_clauses = [sub_nodes_clauses[sub_nodes_statements.index(s)] for s in v]
+                                solution_formal_dict[step_count]['condition'] += premise_clauses
+                                # solution_formal_str += f"{' '.join(premise_clauses)}"
 
                         
                 extend_conditions = [statement]
                 extend_nodes_i = [node]
+                extend_clause = [clause_i]
                 # add all extended conditions
                 queue = deque([n for n in extend_nodes if node.idx in n.value[2]])
                 while queue:
                     extend_node = queue.popleft()
                     extend_idx = sub_nodes.index(extend_node)
-                    extend_statement = sub_nodes_statements[extend_idx]
-                    extend_conditions.append(extend_statement)
                     extend_nodes_i.append(extend_node)
+                    extend_conditions.append(sub_nodes_statements[extend_idx])
+                    extend_clause.append(sub_nodes_clauses[extend_idx])
                     for n in extend_nodes:
                         if extend_node.idx in n.value[2]:
                             queue.append(n)
                 
                 extend_str= '\n- '.join(extend_conditions)
+                # extend_clause_str = ' '.join(extend_clause)
                 if not (f1 or (f2 and f3)) and not f4:
                     # same theorem and no premise statements
                     solution_str += f'\n- {extend_str}. '
                     sub_nodes_by_step[step_count] += extend_nodes_i
+                    solution_formal_dict[step_count]['conclusion'] = extend_clause
+                    # solution_formal_str += f' {extend_clause_str}'
                 else:
                     solution_str += f"<therefore>\n- {extend_str}. "
                     sub_nodes_by_step[step_count] = extend_nodes_i
+                    # solution_formal_str += f'| {extend_clause_str}'
+                    solution_formal_dict[step_count]['conclusion'] = extend_clause
                 
                 last_theorem = theorem
                 last_premise_ids = node.value[2]
             
-        return solution_str, theorems_formal, sub_nodes, too_complex
+        return solution_str, solution_formal_dict, theorems_formal, sub_nodes, too_complex
     
     def distance(self, line):
         p1, p2 = line
@@ -842,6 +876,7 @@ class TargetFinder():
             target, 
             problem_level, 
             solution_str, 
+            solution_dict,
             theorems
         ) = self.find_target_and_solution(condition_graph)
 
@@ -881,6 +916,7 @@ class TargetFinder():
             "problem_text": problem_text,
             "problem_answer": str(target_value),
             "solution_str": solution_str,
+            "solution_dict": solution_dict
         }
             
         return info_dict_for_symbolic, info_dict_for_llm
@@ -928,7 +964,7 @@ if __name__ == '__main__':
         ]
         predicate_rel = [
             'IsMidpointOfArc', 
-            'IsDiameterOfCircle'
+            # 'IsDiameterOfCircle'
         ]
         cg = ClauseGenerator(predicate_GDL, theorem_GDL)
         cg.empty_states()

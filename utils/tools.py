@@ -1,5 +1,5 @@
 import random
-
+import json
 import numpy as np
 import itertools
 from math import sqrt
@@ -7,7 +7,14 @@ from math import sqrt
 def setup_seed(seed=1234):
     random.seed(seed)
     np.random.seed(seed)
-    
+
+def read_json(json_path):
+    data = json.load(open(json_path, 'r', encoding='utf-8'))
+    return data
+
+def write_json(json_path, data):
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def remove_duplicates(lst):
     seen = {}

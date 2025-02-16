@@ -83,7 +83,7 @@ def get_points_num(clause):
         points = sum((list(set(item)) for item in items), [])
     return len(points)
 
-def replace_points(predicate, pred_info, new_points, mapping=None):
+def replace_points(predicate, pred_info=None, new_points=None, mapping=None):
     # Predicate(* Points) -> Predicate(* New Points) 
     # Given point mapping: do not use new_points
     if mapping == None:
@@ -109,10 +109,11 @@ def replace_points(predicate, pred_info, new_points, mapping=None):
             return f"{name}({letter_part})"
 
     predicate = replace_for_predicate(predicate, mapping)
-    for i, pred_i in enumerate(pred_info['ee_check']):
-        pred_info['ee_check'][i] = replace_for_predicate(pred_i, mapping)
-    for i, pred_i in enumerate(pred_info['extend']):
-        pred_info['extend'][i] = replace_for_predicate(pred_i, mapping)
+    if pred_info is not None:
+        for i, pred_i in enumerate(pred_info['ee_check']):
+            pred_info['ee_check'][i] = replace_for_predicate(pred_i, mapping)
+        for i, pred_i in enumerate(pred_info['extend']):
+            pred_info['extend'][i] = replace_for_predicate(pred_i, mapping)
 
     return predicate, pred_info
 
