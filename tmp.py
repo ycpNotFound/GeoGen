@@ -362,6 +362,15 @@ def test_itertools():
     for b in batches:
         print(list(b))
         
+def test_template():
+    from utils.formulate import clause_to_nature_language
+    from utils.tools import read_json
+    template = read_json('json/predicates_to_nature_language.json')
+    clause = 'Equal(LengthOfLine(AB),RadiusOfCircle(O))'
+    res = clause_to_nature_language(clauses=[clause],
+                                    natural_template=template)
+    print(res)
+        
         
 if __name__ == '__main__':
 
@@ -386,4 +395,5 @@ if __name__ == '__main__':
     # test_func_timeout()
     # test_chat()
     # find_formal_in_problem_text()
-    test_itertools()
+    # test_itertools()
+    test_template()

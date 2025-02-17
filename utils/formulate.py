@@ -218,6 +218,17 @@ def find_minimal_equation_subset(eq_list, idx_list, target_symbol):
                     return idx_subset
     return []
 
+
+def to_lower_with_spaces(s):
+    result = ""
+    for char in s:
+        # 如果字符是大写且不是第一个字符，则在前面加空格
+        if char.isupper() and result:
+            result += " "
+        result += char.lower()
+    return result
+
+
 def clause_to_nature_language(clauses, 
                               natural_template, 
                               upper=True, 
@@ -305,21 +316,34 @@ def clause_to_nature_language(clauses,
                 condition_i = f"ratio of \\arc {arc_1} and {arc_2} = {items[1]}"
             elif pred == "AreaOfSector":
                 condition_i = f"area of sector {items[0]} = {items[1]}"
-            elif pred == 'Equal':
+            elif pred == 'Equal': # fail to parse
                 condition_dict = {
                     "LengthOfLine": "{item}",
                     "MeasureOfAngle": "\\angle {item}",
                     "RadiusOfCircle": "radius of \\odot {item}",
                     "MeasureOfArc": "\\arc {item}"
                 }
-                if items[0] not in condition_dict: # y = 10
-                    condition_l, condition_r = items[0], items[1]
-                else: # Equal, MeasureOfAngle(..), MeasureOfArc(..)
-                    pred_l, item_l = parse_clause(items[0])
-                    pred_r, item_r = parse_clause(items[1])
-                    condition_l = condition_dict[pred_l].format(item=item_l[0])
-                    condition_r = condition_dict[pred_r].format(item=item_r[0])
-                    
+                
+                clause_l, clause_r = items[0], items[1] 
+                if clause_l.islower() or clause_l.isalnum():
+                    # y = 10
+                    condition_l = clause_l
+                else:
+                    # Equal, MeasureOfAngle(..), MeasureOfArc(..)
+                    pred_l, item_l = parse_clause(clause_l)
+                    if pred_l in condition_dict:
+                        condition_l = condition_dict[pred_l].format(item=item_l[0])
+                    else:
+                        condition_l = to_lower_with_spaces(pred_l) + f" {item_l[0]}"
+                if clause_r.islower() or clause_r.isalnum():
+                    condition_r = clause_r
+                else:
+                    pred_r, item_r = parse_clause(clause_r)
+                    if pred_r in condition_dict:
+                        condition_r = condition_dict[pred_r].format(item=item_r[0])
+                    else:
+                        condition_r = to_lower_with_spaces(pred_r) + f" {item_r[0]}"
+                
                 condition_i = f"{condition_l} = {condition_r}"
             else:
                 raise KeyError(pred)

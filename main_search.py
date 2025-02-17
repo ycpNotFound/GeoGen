@@ -15,7 +15,7 @@ from plotter import Plotter
 from target_finder import TargetFinder
 from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
                           PRESET_COLOR_PROBS, PRESET_COLORS)
-from utils.tools import identify_image, setup_seed
+from utils.tools import identify_image, setup_seed, write_json
 
 
 def generate_one_sample(predicate_GDL, 
@@ -104,6 +104,7 @@ def generate_one_sample(predicate_GDL,
                 "problem_text": info_dict_llm['problem_text'],
                 "problem_answer": info_dict_llm['problem_answer'],
                 "solution_str": info_dict_llm['solution_str'],
+                "solution_dict": info_dict_llm['solution_dict'],
                 "caption_str": plotter.caption_str
             }
         }
@@ -205,84 +206,62 @@ def run_task(seed,
     total_iterations = len(input_args_list)
     result_info = []
     # multiprocess generate
-    pool = Pool(num_process)
-    with tqdm(total=total_iterations, desc="Processing") as pbar:
-        def update(*args, **kwargs):
-            pbar.update()
-        for args in input_args_list:
-            pred_base, pred_rel, n_more_lines, color_config = args
-            result = pool.apply_async(
-                generate_one_sample_with_timeout, 
-                args=(predicate_GDL, theorem_GDL, pred_base, pred_rel, 
-                      n_more_lines, color_config, fig_dir, cnt, info_dir, search_cfg),
-                callback=update)
-            result_info.append(result)
-            cnt += 1
+    with Pool(processes=num_process) as pool:
+        with tqdm(total=total_iterations, desc="Processing") as pbar:
+            def update(*args, **kwargs):
+                pbar.update()
+            for args in input_args_list:
+                pred_base, pred_rel, n_more_lines, color_config = args
+                result = pool.apply_async(
+                    generate_one_sample, 
+                    args=(predicate_GDL, theorem_GDL, pred_base, pred_rel, 
+                        n_more_lines, color_config, fig_dir, cnt, info_dir, search_cfg),
+                    callback=update)
+                result_info.append(result)
+                cnt += 1
 
-        for r in result_info:
-            r.wait()
+            # get results with timeout
+            results_with_timeout = []
+            for i, r in enumerate(result_info):
+                try:
+                    result = r.get(timeout=200)
+                    results_with_timeout.append(result)
+                except TimeoutError:
+                    print(f"Timeout for sub task {i}")
+                    info = {
+                        "key": cnt,
+                        "pred_base": pred_base,
+                        "pred_rel": pred_rel,
+                        "n_more_lines": n_more_lines,
+                        "color_config": color_config,
+                        "error_message": "timeout"
+                    }
+                    results_with_timeout.append((False, info))
+                except Exception as e:
+                    print(f"Error occurred for sub task {i}: {e}")
+                    info = {
+                        "key": cnt,
+                        "pred_base": pred_base,
+                        "pred_rel": pred_rel,
+                        "n_more_lines": n_more_lines,
+                        "color_config": color_config,
+                        "error_message": "timeout"
+                    }
+                    results_with_timeout.append((False, info))
 
     # save success and failure cases
-    result_info = [r.get() for r in result_info]
+    # result_info = [r.get() for r in result_info]
     failure_cases = []
-
-    for success, symbolic_info in result_info:
-        if success:
-            pass
-        else:
+    for success, symbolic_info in results_with_timeout:
+        if not success:
             failure_cases.append(symbolic_info)
-                
+    
+    write_json(failure_cases_path, failure_cases)
+    
     print(f"Success Count: {cnt - len(failure_cases)} / {cnt}")
     print(f"Failure Count: {len(failure_cases)} / {cnt}")
-    print("End for Generation. Re-generate for Failure Cases ...")
-    
-    # re-generate for failure cases
-    failure_count = {}
-    failure_dict = {}
-    
-    with tqdm(total=len(failure_cases), desc="Processing") as pbar:
-        while True:
-            if len(failure_cases) == 0:
-                break
-            init_info = failure_cases.pop(0)
-            predicate_base = init_info['pred_base']
-            predicate_rel = init_info['pred_rel']
-            n_more_lines = init_info['n_more_lines']
-            color_config = init_info['color_config']
-            key = init_info["key"]
-            
-            if key not in failure_count:
-                failure_count[key] = 0
-                
-            result = generate_one_sample_with_timeout(
-                predicate_GDL, theorem_GDL, pred_base, pred_rel, 
-                n_more_lines, color_config, fig_dir, cnt, info_dir, search_cfg
-            )
-            
-            success, symbolic_info = result
-            if success:
-                pbar.update()
-            else: # end if fail accumulated for 3 times
-                if failure_count[key] >= 2:
-                    failure_dict[key] = init_info
-                    print('Fail for 3 times already: ')
-                    print(f'Predicates Base:')
-                    for pred in predicate_base:
-                        print(f"\t\t{pred}")
-                    print(f'Predicates Rel:')
-                    for pred in predicate_rel:
-                        print(f"\t\t{pred}")
-                    pbar.update()
-                else:
-                    failure_cases.append(symbolic_info)
-                    failure_count[key] += 1
-
-
-    with open(failure_cases_path, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(failure_dict, indent=4, ensure_ascii=False))
-    
     print("End for Generation.")
-
+    
 
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
@@ -337,6 +316,46 @@ def task_2():
     print(f'======== Task: {task_name}, Num: {len(input_args_list)} ========')
     return seed, task_name, input_args_list, num_process
 
+def run_task_stage_2():
+    input_args_list = []
+    num_process = 12
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
+    input_args_1 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=0,
+                                    repeat_times=30)
+    task_name_1 = "geo_gen_ENT_1_REL_1_L_0"
+    seed_1 = 114
+    print(f'Task: {task_name_1}', len(input_args_1))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
+    input_args_2 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=30)
+    task_name_2 = "geo_gen_ENT_1_REL_1_L_1"
+    seed_2 = 115
+    print(f'Task: {task_name_2}', len(input_args_2))
+    
+    
+    input_args_list = [
+        input_args_1, input_args_2, 
+    ]
+    task_name_list = [
+        task_name_1, task_name_2, 
+    ]
+    seed_list = [
+        seed_1, seed_2,
+    ]
+    print('Total Num: ', sum([len(args) for args in input_args_list]))
+    for input_args, task_name, seed in zip(input_args_list, task_name_list, seed_list):
+        print(f'======== Task: {task_name}, Num: {len(input_args)} ========')
+        run_task(seed, task_name, input_args, num_process)
+        
+        
 def main():
     # run_task(*task_1())
     run_task(*task_2())

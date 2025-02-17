@@ -8,6 +8,100 @@ from sympy import Add, Float, Mul, Symbol, UnevaluatedExpr, simplify
 from .preset import PREDICATES
 
 
+def parse_expression(expr):
+    expr = expr.strip()
+    if '(' in expr and expr.endswith(')'):
+        name_part, rest = expr.split('(', 1)
+        name = name_part.strip()
+        args_str = rest[:-1]
+        args = split_args(args_str)
+        parsed_args = []
+        for arg in args:
+            parsed_arg = parse_expression(arg)
+            parsed_args.append(parsed_arg)
+        return {'name': name, 'args': parsed_args}
+    else:
+        return list(expr)
+
+def split_args(args_str):
+    args = []
+    current = []
+    stack = []
+    for c in args_str:
+        if c == '(':
+            stack.append('(')
+        elif c == ')':
+            if stack:
+                stack.pop()
+        elif c == ',' and not stack:
+            args.append(''.join(current).strip())
+            current = []
+            continue
+        current.append(c)
+    if current:
+        args.append(''.join(current).strip())
+    return args
+
+def collect_mappings(source, target, mappings):
+    if isinstance(source, dict) and isinstance(target, dict):
+        if source['name'] != target['name']:
+            return False
+        if len(source['args']) != len(target['args']):
+            return False
+        for s_arg, t_arg in zip(source['args'], target['args']):
+            if not collect_mappings(s_arg, t_arg, mappings):
+                return False
+        return True
+    elif isinstance(source, list) and isinstance(target, list):
+        if len(source) != len(target):
+            return False
+        for s_elem, t_elem in zip(source, target):
+            if not collect_mappings(s_elem, t_elem, mappings):
+                return False
+        return True
+    elif isinstance(source, str) and isinstance(target, str):
+        if len(source) != 1 or len(target) != 1:
+            return False
+        t_char = target
+        s_char = source
+        if t_char in mappings:
+            if mappings[t_char] != s_char:
+                return False
+        else:
+            mappings[t_char] = s_char
+        return True
+    else:
+        return False
+
+def build_point_map(source_clause, target_clause):
+    try:
+        source_tree = parse_expression(source_clause)
+        target_tree = parse_expression(target_clause)
+    except:
+        return None
+    
+    mappings = {}
+    if not collect_mappings(source_tree, target_tree, mappings):
+        return None
+    
+    values = list(mappings.values())
+    if len(values) != len(set(values)):
+        return None
+    
+    return mappings
+
+def replace_points_for_clause(clause, p_map):  
+    pattern = r'(?<=[(,])[A-Z]+(?=[,)])'
+    
+    def repl(match):
+        # match.group(0) 获取匹配到的变量（例如 "AC"）
+        var = match.group(0)
+        # 对变量中的每个字母进行替换
+        return ''.join(p_map.get(letter, letter) for letter in var)
+    
+    # 使用 re.sub 进行替换
+    return re.sub(pattern, repl, clause)
+
 def extract_sqrt_terms(expression):
     # 使用 SymPy 的 args 属性，该属性对于加法表达式返回所有加项，
     # 对于乘法表达式返回所有因子。
