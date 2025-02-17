@@ -434,6 +434,7 @@ class TargetFinder():
             else: # using theorem 
                 # find all premise statements grouped by step
                 premise_statements = {}
+                premise_clauses = {}
                 for premise_idx in node.value[2]:
                     if premise_idx not in sub_nodes_idx:
                         continue
@@ -443,16 +444,21 @@ class TargetFinder():
                         continue
                     premise_step = next((k for k, v in sub_nodes_by_step.items() if premise_node in v), None)
                     premise_statement = sub_nodes_statements[sub_nodes_idx.index(premise_idx)]
+                    premise_clause = sub_nodes_clauses[sub_nodes_idx.index(premise_idx)]
                     if premise_step is None:
                         if 'given condition' not in premise_statements:    
                             premise_statements['given condition'] = [premise_statement]
+                            premise_clauses['given condition'] = [premise_clause]
                         else:
                             premise_statements['given condition'].append(premise_statement)
+                            premise_clauses['given condition'].append(premise_clause)
                     else:
                         if f"step {premise_step}" not in premise_statements:
                             premise_statements[f"step {premise_step}"] = [premise_statement]
+                            premise_clauses[f"step {premise_step}"] = [premise_clause]
                         else:
                             premise_statements[f"step {premise_step}"].append(premise_statement)
+                            premise_clauses[f"step {premise_step}"].append(premise_clause)
 
                 # add theorem first
                 # if use the same theorem and same premise condition
@@ -473,7 +479,7 @@ class TargetFinder():
                     solution_str += eq_solution
                     solution_formal_dict[step_count] = {
                         "theorem": "solve_eq",
-                        "condition": [item for sublist in premise_statements.values() for item in sublist]
+                        "condition": [item for sublist in premise_clauses.values() for item in sublist]
                     }
                         
                 elif f1 or (f2 and f3):

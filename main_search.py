@@ -358,8 +358,9 @@ def run_task_stage_2():
         
 def main():
     # run_task(*task_1())
-    run_task(*task_2())
+    # run_task(*task_2())
     # run_task()
+    run_task_stage_2()
 
 def debug_main():
     seed, task_name, input_args_list, num_process = task_1()

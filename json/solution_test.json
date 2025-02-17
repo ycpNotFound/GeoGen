@@ -1,5 +1,5 @@
 {
-    "('IsPerpendicularBisectorOfLine', ('D', 'F', 'C', 'B'), (27, 45, 158), ('circle_property_vertical_radius_mini', '2', ('D', 'F', 'C', 'B')), 36)": [
+    "('IsPerpendicularBisectorOfLine', ('D', 'F', 'C', 'B'), (27, 56, 158), ('circle_property_vertical_radius_mini', '2', ('D', 'F', 'C', 'B')), 36)": [
         "Solution: ",
         "1. <by> circle_property_vertical_radius, <because> D, F, E are aligned in one line, B, F, C are aligned in one line, B, E, C are on circle D, E is the midpoint of ⌒ DBC from given condition, <therefore>",
         "- DF is perpendicular bisector of BC",
@@ -8,18 +8,23 @@
         "2. <by> circle_property_vertical_radius_mini, <because> C, F, B are aligned in one line, C, B are on circle D from given condition, BF = FC from step 1, <therefore>",
         "- DF is perpendicular bisector of CB. "
     ],
-    "('IsBisectorOfAngle', ('F', 'D', 'B', 'F', 'C'), (91, 102, 153, 155), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'D', 'B', 'F', 'C')), 37)": [
+    "('IsBisectorOfAngle', ('F', 'C', 'D', 'F', 'E'), (91, 114, 155, 162), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'C', 'D', 'F', 'E')), 37)": [
         "Solution: ",
-        "1. <by> circle_property_vertical_radius, <because> F is on the line segment DE, B, F, C lie on the same line, B, E, C lie on the same circle centered at D, E is the midpoint of ⌒ DBC from given condition, <therefore>",
-        "- DF is perpendicular bisector of BC",
-        "- CF ⊥ DF",
+        "1. <by> circle_property_vertical_radius, <because> D, F, E are aligned in one line, B, F, C lie on the same line, B, E, C lie on the circle D, E is the midpoint of ⌒ DBC from given condition, <therefore>",
+        "- DF besects BC and DF ⊥ BC",
         "- BF ⊥ DF",
-        "- ∠ DFC = 90°",
-        "- ∠ BFD = 90°. ",
-        "2. <by> bisector_of_angle_judgment_angle_equal, <because> ∠ BFD = 90°, ∠ DFC = 90° from step 1, <therefore>",
-        "- FD is the besector line of ∠ BFC. "
+        "- CF ⊥ DF",
+        "- ∠ BFD = 90°",
+        "- ∠ DFC = 90°. ",
+        "2. <by> vertical_angle, <because> F is on the line segment ED, F lie on line segment CB from given condition, <therefore>",
+        "- ∠ CFE = ∠ BFD. ",
+        "3. Solve equations:",
+        "- <because> ∠ CFE = ∠ BFD from step 2, ∠ BFD = 90° from step 1, <therefore>",
+        "- ∠ CFE = 90°. ",
+        "4. <by> bisector_of_angle_judgment_angle_equal, <because> ∠ DFC = 90° from step 1, ∠ CFE = 90° from step 3, <therefore>",
+        "- FC is the besector line of ∠ DFE. "
     ],
-    "('IsBisectorOfAngle', ('F', 'B', 'E', 'F', 'D'), (102, 115, 153, 161), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'B', 'E', 'F', 'D')), 38)": [
+    "('IsBisectorOfAngle', ('F', 'D', 'B', 'F', 'C'), (91, 102, 153, 155), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'D', 'B', 'F', 'C')), 38)": [
         "Solution: ",
         "1. <by> circle_property_vertical_radius, <because> F is on the line segment DE, B, F, C are collinear, B, E, C lie on the same circle centered at D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
         "- DF is perpendicular bisector of BC",
@@ -27,7 +32,18 @@
         "- DF ⊥ BF",
         "- ∠ DFC = 90°",
         "- ∠ BFD = 90°. ",
-        "2. <by> vertical_angle, <because> E, F, D are aligned in one line, B, F, C are collinear from given condition, <therefore>",
+        "2. <by> bisector_of_angle_judgment_angle_equal, <because> ∠ BFD = 90°, ∠ DFC = 90° from step 1, <therefore>",
+        "- FD is the besector line of ∠ BFC. "
+    ],
+    "('IsBisectorOfAngle', ('F', 'B', 'E', 'F', 'D'), (102, 115, 153, 161), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'B', 'E', 'F', 'D')), 39)": [
+        "Solution: ",
+        "1. <by> circle_property_vertical_radius, <because> F is on the line segment DE, F lie on line segment BC, B, E, C lie on the same circle centered at D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
+        "- DF is perpendicular bisector of BC",
+        "- DF ⊥ CF",
+        "- BF ⊥ DF",
+        "- ∠ DFC = 90°",
+        "- ∠ BFD = 90°. ",
+        "2. <by> vertical_angle, <because> E, F, D are collinear, F lie on line segment BC from given condition, <therefore>",
         "- ∠ EFB = ∠ DFC. ",
         "3. Solve equations:",
         "- <because> ∠ EFB = ∠ DFC from step 2, ∠ DFC = 90° from step 1, <therefore>",
@@ -35,20 +51,20 @@
         "4. <by> bisector_of_angle_judgment_angle_equal, <because> ∠ BFD = 90° from step 1, ∠ EFB = 90° from step 3, <therefore>",
         "- FB is the besector line of ∠ EFD. "
     ],
-    "('IsBisectorOfAngle', ('F', 'E', 'C', 'F', 'B'), (114, 115, 161, 162), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'E', 'C', 'F', 'B')), 39)": [
+    "('IsBisectorOfAngle', ('F', 'E', 'C', 'F', 'B'), (114, 115, 161, 162), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'E', 'C', 'F', 'B')), 40)": [
         "Solution: ",
-        "1. <by> circle_property_vertical_radius, <because> D, F, E lie on the same line, F lie on line segment BC, B, E, C lie on the same circle centered at D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
-        "- DF is perpendicular bisector of BC",
+        "1. <by> circle_property_vertical_radius, <because> F is on the line segment DE, F is on the line segment BC, B, E, C are on circle D, E is the midpoint of ⌒ DBC from given condition, <therefore>",
+        "- DF besects BC and DF ⊥ BC",
         "- BF ⊥ DF",
         "- DF ⊥ CF",
         "- ∠ BFD = 90°",
         "- ∠ DFC = 90°. ",
-        "2. <by> vertical_angle, <because> F is on the line segment ED, F lie on line segment BC from given condition, <therefore>",
+        "2. <by> vertical_angle, <because> E, F, D are collinear, F is on the line segment BC from given condition, <therefore>",
         "- ∠ EFB = ∠ DFC. ",
         "3. Solve equations:",
         "- <because> ∠ EFB = ∠ DFC from step 2, ∠ DFC = 90° from step 1, <therefore>",
         "- ∠ EFB = 90°. ",
-        "4. <by> vertical_angle, <because> F is on the line segment ED, C, F, B are collinear from given condition, <therefore>",
+        "4. <by> vertical_angle, <because> E, F, D are collinear, C, F, B are collinear from given condition, <therefore>",
         "- ∠ CFE = ∠ BFD. ",
         "5. Solve equations:",
         "- <because> ∠ CFE = ∠ BFD from step 4, ∠ BFD = 90° from step 1, <therefore>",
@@ -56,70 +72,54 @@
         "6. <by> bisector_of_angle_judgment_angle_equal, <because> ∠ EFB = 90° from step 3, ∠ CFE = 90° from step 5, <therefore>",
         "- FE is the besector line of ∠ CFB. "
     ],
-    "('IsBisectorOfAngle', ('F', 'C', 'D', 'F', 'E'), (91, 114, 155, 162), ('bisector_of_angle_judgment_angle_equal', '1', ('F', 'C', 'D', 'F', 'E')), 40)": [
+    "('IsPerpendicularBisectorOfLine', ('E', 'F', 'C', 'B'), (27, 114, 158, 162), ('perpendicular_bisector_judgment_per_and_mid', '1', ('E', 'F', 'C', 'B')), 41)": [
         "Solution: ",
-        "1. <by> circle_property_vertical_radius, <because> D, F, E lie on the same line, B, F, C are collinear, B, E, C are on circle D, E is the midpoint of ⌒ DBC from given condition, <therefore>",
+        "1. <by> circle_property_vertical_radius, <because> F is on the line segment DE, B, F, C lie on the same line, B, E, C lie on the circle D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
         "- DF is perpendicular bisector of BC",
-        "- BF ⊥ DF",
-        "- CF ⊥ DF",
+        "- DF ⊥ BF",
+        "- the midpoint of BC is F",
         "- ∠ BFD = 90°",
-        "- ∠ DFC = 90°. ",
-        "2. <by> vertical_angle, <because> E, F, D are aligned in one line, F is on the line segment CB from given condition, <therefore>",
+        "- BF = FC. ",
+        "2. <by> vertical_angle, <because> F is on the line segment ED, F is on the line segment CB from given condition, <therefore>",
         "- ∠ CFE = ∠ BFD. ",
         "3. Solve equations:",
         "- <because> ∠ CFE = ∠ BFD from step 2, ∠ BFD = 90° from step 1, <therefore>",
         "- ∠ CFE = 90°. ",
-        "4. <by> bisector_of_angle_judgment_angle_equal, <because> ∠ DFC = 90° from step 1, ∠ CFE = 90° from step 3, <therefore>",
-        "- FC besects ∠ DFE. "
+        "4. <by> perpendicular_bisector_judgment_per_and_mid, <because> F is on the line segment CB from given condition, BF = FC from step 1, ∠ CFE = 90° from step 3, <therefore>",
+        "- EF is perpendicular bisector of CB. "
     ],
-    "('IsPerpendicularBisectorOfLine', ('E', 'F', 'C', 'B'), (27, 114, 158, 162), ('perpendicular_bisector_judgment_per_and_mid', '1', ('E', 'F', 'C', 'B')), 41)": [
+    "('PerpendicularBetweenLine', ('C', 'F', 'E', 'F'), (192,), ('extended', None, None), 41)": [
         "Solution: ",
         "1. <by> circle_property_vertical_radius, <because> D, F, E lie on the same line, B, F, C are aligned in one line, B, E, C are on circle D, E is the midpoint of ⌒ DBC from given condition, <therefore>",
-        "- DF besects BC and DF ⊥ BC",
-        "- BF ⊥ DF",
-        "- F is the midpoint of BC",
+        "- DF is perpendicular bisector of BC",
+        "- DF ⊥ BF",
+        "- the midpoint of BC is F",
         "- ∠ BFD = 90°",
         "- BF = FC. ",
-        "2. <by> vertical_angle, <because> E, F, D lie on the same line, C, F, B are aligned in one line from given condition, <therefore>",
+        "2. <by> vertical_angle, <because> F is on the line segment ED, C, F, B are aligned in one line from given condition, <therefore>",
         "- ∠ CFE = ∠ BFD. ",
         "3. Solve equations:",
         "- <because> ∠ CFE = ∠ BFD from step 2, ∠ BFD = 90° from step 1, <therefore>",
         "- ∠ CFE = 90°. ",
         "4. <by> perpendicular_bisector_judgment_per_and_mid, <because> C, F, B are aligned in one line from given condition, BF = FC from step 1, ∠ CFE = 90° from step 3, <therefore>",
-        "- EF is perpendicular bisector of CB. "
-    ],
-    "('PerpendicularBetweenLine', ('C', 'F', 'E', 'F'), (192,), ('extended', None, None), 41)": [
-        "Solution: ",
-        "1. <by> circle_property_vertical_radius, <because> D, F, E are aligned in one line, F lie on line segment BC, B, E, C lie on the same circle centered at D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
-        "- DF besects BC and DF ⊥ BC",
-        "- DF ⊥ BF",
-        "- the midpoint of BC is F",
-        "- ∠ BFD = 90°",
-        "- BF = FC. ",
-        "2. <by> vertical_angle, <because> F lie on line segment ED, F lie on line segment CB from given condition, <therefore>",
-        "- ∠ CFE = ∠ BFD. ",
-        "3. Solve equations:",
-        "- <because> ∠ CFE = ∠ BFD from step 2, ∠ BFD = 90° from step 1, <therefore>",
-        "- ∠ CFE = 90°. ",
-        "4. <by> perpendicular_bisector_judgment_per_and_mid, <because> F lie on line segment CB from given condition, BF = FC from step 1, ∠ CFE = 90° from step 3, <therefore>",
         "- EF besects CB and EF ⊥ CB",
-        "- CF ⊥ EF. "
+        "- EF ⊥ CF. "
     ],
     "('PerpendicularBetweenLine', ('E', 'F', 'B', 'F'), (192,), ('extended', None, None), 41)": [
         "Solution: ",
-        "1. <by> circle_property_vertical_radius, <because> F lie on line segment DE, F is on the line segment BC, B, E, C are on circle D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
+        "1. <by> circle_property_vertical_radius, <because> F is on the line segment DE, F is on the line segment BC, B, E, C lie on the same circle centered at D, the midpoint of ⌒ DBC is E from given condition, <therefore>",
         "- DF is perpendicular bisector of BC",
         "- DF ⊥ BF",
         "- F is the midpoint of BC",
         "- ∠ BFD = 90°",
         "- BF = FC. ",
-        "2. <by> vertical_angle, <because> E, F, D are collinear, C, F, B lie on the same line from given condition, <therefore>",
+        "2. <by> vertical_angle, <because> E, F, D are aligned in one line, F is on the line segment CB from given condition, <therefore>",
         "- ∠ CFE = ∠ BFD. ",
         "3. Solve equations:",
         "- <because> ∠ CFE = ∠ BFD from step 2, ∠ BFD = 90° from step 1, <therefore>",
         "- ∠ CFE = 90°. ",
-        "4. <by> perpendicular_bisector_judgment_per_and_mid, <because> C, F, B lie on the same line from given condition, BF = FC from step 1, ∠ CFE = 90° from step 3, <therefore>",
-        "- EF besects CB and EF ⊥ CB",
+        "4. <by> perpendicular_bisector_judgment_per_and_mid, <because> F is on the line segment CB from given condition, BF = FC from step 1, ∠ CFE = 90° from step 3, <therefore>",
+        "- EF is perpendicular bisector of CB",
         "- BF ⊥ EF. "
     ]
 }

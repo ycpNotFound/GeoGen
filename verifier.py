@@ -181,7 +181,7 @@ class Verifier():
     
     
 if __name__ == '__main__':
-    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test.json'
+    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_2.json'
     test_data = read_json(test_solution_path)
     test_solution_dict = test_data['llm_info']['solution_dict']
     
