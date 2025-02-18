@@ -176,14 +176,13 @@ class FormalGeoSolver:
                 expr_2 = l3_sym - sin(rad(special_angle)) * l1_sym
                 expr_3 = l3_sym - tan(rad(special_angle)) * l2_sym
                 premise_expr_1 = angle_sp_sym - special_angle
-                premise_expr_2 = angle_90_sym - 90
+                # premise_expr_2 = angle_90_sym - 90
                 premise = [premise_right_triangle]
                 
                 for i, c in enumerate(self.problem.condition.items):
                     if c[0] == 'Equation':
-                        if c[1] == premise_expr_1 or c[1] == premise_expr_2:
+                        if c[1] == premise_expr_1:
                             premise.append(i)
-                assert len(premise) == 2
                 
                 last_step = len(self.problem.condition.items)
                 self.problem.add('Equation', expr_1, premise, ('cos_of_angle', None, None))
