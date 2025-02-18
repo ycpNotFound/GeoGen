@@ -4,6 +4,7 @@ import json
 import os
 import traceback
 from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor, TimeoutError
 
 import numpy as np
 from func_timeout import FunctionTimedOut, func_timeout
@@ -163,6 +164,21 @@ def generate_one_sample_with_timeout(
             "error_message": "timeout"
         }
         return (False, info)
+    except Exception as e:
+        print(f"===== Error Occured: {fig_idx} =====")
+        tb = traceback.format_exc()
+        print(tb)
+        task_info = {
+            "key": fig_idx,
+            "pred_base": predicate_base,
+            "pred_rel": predicate_rel,
+            "n_more_lines": n_more_lines,
+            "color_config": color_config,
+            "error_message": tb
+        }
+        print('pred_base: ',  predicate_base)
+        print('pred_rel: ', predicate_rel)
+        return (False, task_info)
     # result = generate_one_sample(
     #         predicate_GDL, theorem_GDL, predicate_base, 
     #         predicate_rel, n_more_lines, color_config, 
@@ -207,45 +223,56 @@ def run_task(seed,
     result_info = []
     # multiprocess generate
     with Pool(processes=num_process) as pool:
+    # with ProcessPoolExecutor(max_workers=num_process) as executor:
         with tqdm(total=total_iterations, desc="Processing") as pbar:
+            futures = []
             def update(*args, **kwargs):
                 pbar.update()
             for args in input_args_list:
                 pred_base, pred_rel, n_more_lines, color_config = args
+                current_cnt = cnt  # 保存当前cnt的值
+                # future = executor.submit(
+                #     generate_one_sample, 
+                    
+                # )
                 result = pool.apply_async(
-                    generate_one_sample, 
+                    # generate_one_sample,
+                    generate_one_sample_with_timeout, 
                     args=(predicate_GDL, theorem_GDL, pred_base, pred_rel, 
                         n_more_lines, color_config, fig_dir, cnt, info_dir, search_cfg),
-                    callback=update)
-                result_info.append(result)
+                    callback=update,
+                    error_callback=update)
+                result_info.append((result, args, current_cnt))
                 cnt += 1
 
             # get results with timeout
             results_with_timeout = []
-            for i, r in enumerate(result_info):
+            for r, arg, cnt in enumerate(result_info):
                 try:
                     result = r.get(timeout=200)
                     results_with_timeout.append(result)
                 except TimeoutError:
-                    print(f"Timeout for sub task {i}")
+                    print(f"Timeout for sub task {cnt}")
                     info = {
                         "key": cnt,
-                        "pred_base": pred_base,
-                        "pred_rel": pred_rel,
-                        "n_more_lines": n_more_lines,
-                        "color_config": color_config,
+                        "pred_base": arg[0],
+                        "pred_rel": arg[1],
+                        "n_more_lines": arg[2],
+                        "color_config": arg[3],
                         "error_message": "timeout"
                     }
                     results_with_timeout.append((False, info))
                 except Exception as e:
-                    print(f"Error occurred for sub task {i}: {e}")
+                    print(f"Error occurred for sub task {cnt}: {str(e)}")
+                    tb = traceback.format_exc()
+                    print(tb)
                     info = {
                         "key": cnt,
                         "pred_base": pred_base,
                         "pred_rel": pred_rel,
                         "n_more_lines": n_more_lines,
                         "color_config": color_config,
-                        "error_message": "timeout"
+                        "error_message": f"{type(e).__name__}: {str(e)}"
                     }
                     results_with_timeout.append((False, info))
 

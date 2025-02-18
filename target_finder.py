@@ -23,7 +23,7 @@ from generator import ClauseGenerator
 from graph import (ConditionGraph, ConditionNode, draw_graph, topological_sort,
                    topological_sort_bfs)
 from plotter import Plotter
-from solver import FormalGeoSolver, InterGPSSolver
+from solver import FormalGeoSolver
 from utils.formulate import clause_to_nature_language, formulate_eqs
 from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
                           SYMBOL_MAPPING_2)
@@ -320,7 +320,7 @@ class TargetFinder():
         # random choose target type
         types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
         if len(types_to_choose) == 0:
-            return None, None, None, None, None
+            return None, None, None, None, None, None
         target_type = random.choice(types_to_choose)
         chosen_targets = targets_dict[target_type]
         
