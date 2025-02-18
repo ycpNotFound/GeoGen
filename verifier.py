@@ -2,13 +2,13 @@ import json
 import os
 import itertools
 from copy import deepcopy
-from formalgeo.solver import Interactor
+# from formalgeo.solver import Interactor
 from formalgeo.parse.basic import parse_geo_predicate, parse_equal_predicate, get_equation_from_tree
-
+from solver import Interactor
 from utils.tools import read_json
 from utils.symbolic import parse_clause, build_point_map, replace_points_for_clause
 from utils.formulate import clause_to_nature_language
-from sympy import simplify
+from sympy import simplify, solve, Eq, sin, cos, tan, rad
 
 def rotate_combinations(lst):
     n = len(lst)
@@ -92,41 +92,55 @@ class Verifier():
 
         return False
     
+    def clause_to_expr_str(self, clause):
+        name = clause.split('(')[0]
+        assert name in ['Value', 'Equal', 'Equation']
+        if name in ['Value', 'Equal']:
+            clause = clause.replace('Value', 'Equal')
+            eq_tree, attrs = parse_equal_predicate(clause)
+            eq_expr = get_equation_from_tree(self.solver.problem, eq_tree[1])
+        elif name == 'Equation':
+            eq_expr = clause.replace('Equation(', '').rstrip(')')
+            
+        return str(eq_expr)
+    
     def verify_existance(self, conditions):
-        for clause in conditions:
+        statements = clause_to_nature_language(
+            conditions, 
+            natural_template=self.natural_template
+        )
+        for clause, statement in zip(conditions, statements):
             name = clause.split('(')[0]
             if name in self.predicate_names:
                 items = self.solver.problem.condition.get_items_by_predicate(name)
                 _, para, _ = parse_geo_predicate(clause)
                 if not self.check_paras(name, para, items):
-                    statement = clause_to_nature_language(
-                        [clause], 
-                        natural_template=self.natural_template
-                    )[0]
-                    msg = f"Relation {statement} doesn't exist."
+                    msg = f"Relation: {statement} doesn't exist."
                     return False, msg
                 
-            elif name in ['Value', 'Equal']:
-                clause = clause.replace('Value', 'Equal')
-                eq_tree, attrs = parse_equal_predicate(clause)
-                eq_expr = get_equation_from_tree(self.solver.problem, eq_tree[1])
+            elif name in ['Value', 'Equal', 'Equation']:
+                eq_str = self.clause_to_expr_str(clause)
                 equations = [item[1] for item in self.solver.problem.condition.items if item[0] == 'Equation']
-                if not self.check_equations(eq_expr, equations):
-                    msg = f"Relation {clause} doesn't exist."
+                if not self.check_equations(eq_str, equations):
+                    msg = f"Relation: {statement} doesn't exist."
                     return False, msg
                 
-            elif name == 'Equation':
-                eq = clause.replace('Equation(', '').replace(')', '')
-                equations = [item[1] for item in self.solver.problem.condition.items if item[0] == 'Equation']
-                if not self.check_equations(eq, equations):
-                    msg = f"There's no equation {eq}"
-                    return False, msg
+            else:
+                raise KeyError(name)
             
         return True, None
     
     def verify_theorem(self, theorem, conditions, conclusions):
+        cdtn_statements = clause_to_nature_language(
+            conditions, 
+            natural_template=self.natural_template
+        )
+        cclsn_statements = clause_to_nature_language(
+            conclusions, 
+            natural_template=self.natural_template
+        )
         if theorem is None:
-            # extend all conclusions first
+            # extend all conclusions first (recursion)
             conclusions_total = []
             for clause in conditions:
                 name = clause.split('(')[0]
@@ -141,18 +155,98 @@ class Verifier():
                 else:
                     raise KeyError(name)
             # then check conclusion existance
-            for cclsn in conclusions:
+            for cclsn, statement in zip(conclusions, cclsn_statements):
                 cclsn = cclsn.replace('Value', 'Equal')
                 if cclsn not in conclusions_total:
-                    msg = f"Conclusion {clause} can't be inferred."
+                    msg = f"Conclusion {statement} can't be inferred through conditions:\n{','.join(cdtn_statements)}."
                     return False, msg
                 
+        elif theorem == 'solve_eq':
+            eq_expr_lst, cclsn_expr_lst = [], []
+            for clause in conditions:
+                name = clause.split('(')[0]
+                if name in ['Value', 'Equal', 'Equation']: 
+                    eq_str = self.clause_to_expr_str(clause)
+                    eq_expr_lst.append(eq_str)
+                else:
+                    raise KeyError(name)
+                
+            for clause in conclusions:
+                name = clause.split('(')[0]
+                if name in ['Value', 'Equal', 'Equation']: 
+                    eq_str = self.clause_to_expr_str(clause)
+                    cclsn_expr_lst.append(eq_str)
+                else:
+                    raise KeyError(name)
+                
+            eqs = [Eq(simplify(expr), 0) for expr in eq_expr_lst]
+            solution = solve(eqs, dict=True)
+            if len(solution) == 0:
+                # equation group can't be solved
+                eq_str = '\n .'.join(cdtn_statements)
+                verify_msg = f"Equations group:\n{eq_str}\ncan't be solved."
+                return False, verify_msg
+            
+            else:
+                if isinstance(solution, list):
+                    solution = solution[0]
+                result_eqs = [sym - value for sym, value in solution.items()]
+                # check conclusion in solved results
+                for expr, statement in zip(cclsn_expr_lst, cclsn_statements):
+                    if not self.check_equations(expr, result_eqs):
+                        condition_eq_str = '\n.'.join(cdtn_statements)
+                        verify_msg = f"Conclusion {statement} can't be solved from equations group:\n{condition_eq_str}"
+                        return False, verify_msg
+                    
+        elif theorem not in self.solver.parsed_theorem_GDL:
+            added_theorems = ['cos_of_angle', 'sin_of_angle', 'tan_of_angle']
+            # 需要往solver / interactor中添加额外的规则（在ForwardSearcher中）
+            # 不然有的题解不出来
+            self.solver.solve_special_angles()
+            if theorem in added_theorems:
+                angle_chars = [parse_clause(c)[1][0] for c in conditions]
+                angle_values = [int(parse_clause(c)[1][1]) for c in conditions]
+                special_angle = None
+                if 60 in angle_values and 90 in angle_values:
+                    special_angle = 60
+                elif 30 in angle_values and 90 in angle_values:
+                    special_angle = 30
+                elif 45 in angle_values and 90 in angle_values:
+                    special_angle = 45
+                
+                if special_angle is not None:
+                    angle_sp = angle_chars[angle_values.index(special_angle)]
+                    angle_90 = angle_chars[angle_values.index(90)]
+                    # l2 = cos(a) * l1
+                    # l3 = sin(a) * l1
+                    # l3 = tan(a) * l2
+                    l1 = (angle_sp[0], angle_sp[1])
+                    l2 = (angle_sp[1], angle_sp[2])
+                    l3 = (angle_sp[2], angle_sp[0])
+                    if angle_sp[0] == angle_90[1]:
+                        l1, l2 = l2, l1
+                    l1_sym = self.solver.problem.get_sym_of_attr('LengthOfLine', l1)
+                    l2_sym = self.solver.problem.get_sym_of_attr('LengthOfLine', l2)
+                    l3_sym = self.solver.problem.get_sym_of_attr('LengthOfLine', l3)
+                    
+                    expr_1 = l2_sym - cos(rad(special_angle)) * l1_sym
+                    expr_2 = l3_sym - sin(rad(special_angle)) * l1_sym
+                    expr_3 = l3_sym - tan(rad(special_angle)) * l2_sym
+                    expr_lst = [expr_1, expr_2, expr_3]
+                    expr = expr_lst[added_theorems.index(theorem)]
+                    
+                    eq_str = self.clause_to_expr_str(conclusions[0])
+                    if not self.check_equations(eq_str, [expr]):
+                        verify_msg = f"Conclusion {cclsn_statements[0]} can't be solved from {theorem}, {', '.join(cdtn_statements)}"
+                        return False, verify_msg
+            else:
+                raise KeyError(theorem)
         else:
             # apply solver directly
             update = self.solver.apply_theorem_by_name(theorem)
             if not update:
-                vecify_msg = f"Theorem {theorem} can't be applied."
-                return False, vecify_msg
+                verify_msg = f"Theorem {theorem} can't be applied."
+                return False, verify_msg
             
         return True, None
     
@@ -163,25 +257,25 @@ class Verifier():
             conclusions = info['conclusion']
             
             # check condition existance
-            verify_flag, vecify_msg = self.verify_existance(conditions)
+            verify_flag, verify_msg = self.verify_existance(conditions)
             if not verify_flag:
-                return False, vecify_msg
+                return False, verify_msg
             
             # check application of theorem
-            verify_flag, vecify_msg = self.verify_theorem(theorem, conditions, conclusions)
+            verify_flag, verify_msg = self.verify_theorem(theorem, conditions, conclusions)
             if not verify_flag:
-                return False, vecify_msg
+                return False, verify_msg
                 
             # check conclustion existance
-            verify_flag, vecify_msg = self.verify_existance(conclusions)
+            verify_flag, verify_msg = self.verify_existance(conclusions)
             if not verify_flag:
-                return False, vecify_msg
+                return False, verify_msg
             
         return True, None
     
     
 if __name__ == '__main__':
-    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_2.json'
+    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_1.json'
     test_data = read_json(test_solution_path)
     test_solution_dict = test_data['llm_info']['solution_dict']
     

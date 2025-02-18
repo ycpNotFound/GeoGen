@@ -138,7 +138,9 @@ class FormalGeoSolver:
         
     def solve_special_angles(self):
         right_triangles = self.problem.condition.get_items_by_predicate('RightTriangle')
+        
         for tri in right_triangles:
+            premise_right_triangle = self.problem.condition.get_id_by_predicate_and_item('RightTriangle', tri)
             angle_chars = [tri, 
                            (tri[1], tri[2], tri[0]), 
                            (tri[2], tri[0], tri[1])]
@@ -175,7 +177,8 @@ class FormalGeoSolver:
                 expr_3 = l3_sym - tan(rad(special_angle)) * l2_sym
                 premise_expr_1 = angle_sp_sym - special_angle
                 premise_expr_2 = angle_90_sym - 90
-                premise = []
+                premise = [premise_right_triangle]
+                
                 for i, c in enumerate(self.problem.condition.items):
                     if c[0] == 'Equation':
                         if c[1] == premise_expr_1 or c[1] == premise_expr_2:
@@ -309,8 +312,6 @@ class FormalGeoSolver:
         eq_sym_groups = [] # list of set (symbols)
         eq_groups_to_ids = {} # dict: tuple (symbols) -> id set (premise)
 
-        
-        
         # find equivalent class (symbols group)
         for expr in expr_list:
             var_a, var_b = list(expr.free_symbols)
@@ -856,92 +857,382 @@ class FormalGeoSolver:
 
 
 
-class InterGPSSolver:
-    def __init__(self,
-                 debug=True):
-        self.debug = debug
-        self.logic = None
-        
-    def prepare_for_intergps(self, problem_CDL):
-        text_logic_forms = []
-        for c in problem_CDL['text_cdl']:
-            text_logic_forms += formalgeo_to_intergps(c)
-           
-        diagram_logic_forms = []
-        for c in problem_CDL['construction_cdl'] + problem_CDL['image_cdl']:
-            diagram_logic_forms += formalgeo_to_intergps(c)
+class Interactor:
 
-        text_parser = {
-            "text_logic_forms": text_logic_forms
-        }
-        lines = []
-        for l in problem_CDL['line_instances']:
-            if len(l) > 2:
-                l = (l[0], l[-1])
-            lines.append(''.join(l))
-        diagram_parser = {
-            "point_positions": problem_CDL['point_positions'],
-            "line_instances": lines,
-            "circle_instances": problem_CDL['circle_instances'],
-            "diagram_logic_forms": diagram_logic_forms
-        }
-        return text_parser, diagram_parser
+    def __init__(self, predicate_GDL, theorem_GDL, t_info=None, debug=False):
+        """
+        Initialize Interactor.
+        :param predicate_GDL: predicate GDL.
+        :param theorem_GDL: theorem GDL.
+        """
+        self.parsed_predicate_GDL = parse_predicate_gdl(predicate_GDL)
+        self.parsed_theorem_GDL = parse_theorem_gdl(theorem_GDL, self.parsed_predicate_GDL)
+        self.problem = None
+        
+        self.debug = debug
+        self.last_step = 0
+        self.p2t_map = get_p2t_map_fw(t_info, self.parsed_theorem_GDL)
+        
+        self.problem_p_paras = set()  # Perimeter
+        self.problem_a_paras = set()  # Area
+        self.ignore_ops = ['Angle', 'Line', 'Point', 'Shape', 'Polygon', 'Triangle', 'Arc']
+
+    def load_problem(self, problem_CDL):
+        """Load problem through problem_CDL."""
+        start_time = time.time()
+        self.problem = Problem()
+        self.problem.load_problem_by_fl(self.parsed_predicate_GDL,
+                                        self.parsed_theorem_GDL,
+                                        parse_problem_cdl(problem_CDL))  # load problem
+        EqKiller.solve_equations(self.problem)  # Solve the equations after initialization
+        self.problem.step("init_problem", time.time() - start_time)  # save applied theorem and update step
+
+    def apply_theorem(self, t_name, t_branch=None, t_para=None):
+        """
+        Apply a theorem and return whether it is successfully applied.
+        :param t_name: <str>.
+        :param t_branch: <str>.
+        :param t_para: tuple of <str>.
+        :return update: <bool>, Whether the question condition updated or not.
+        """
+        # self.last_step = self.problem.condition.step_count
+        
+        if self.problem is None:
+            e_msg = "Problem not loaded. Please run <load_problem> before run <apply_theorem>."
+            raise Exception(e_msg)
+        if t_name not in self.parsed_theorem_GDL:
+            e_msg = "Theorem {} not defined in current GDL.".format(t_name)
+            raise Exception(e_msg)
+        if t_name.endswith("definition"):
+            e_msg = "Theorem {} only used for backward reason.".format(t_name)
+            raise Exception(e_msg)
+        if t_para is not None and len(t_para) != len(self.parsed_theorem_GDL[t_name]["vars"]):
+            e_msg = "Theorem <{}> para length error. Expected {} but got {}.".format(
+                t_name, len(self.parsed_theorem_GDL[t_name]["vars"]), t_para)
+            raise Exception(e_msg)
+        if t_branch is not None and t_branch not in self.parsed_theorem_GDL[t_name]["body"]:
+            e_msg = "Theorem <{}> branch error. Expected {} but got {}.".format(
+                t_name, self.parsed_theorem_GDL[t_name]["body"].keys(), t_branch)
+            raise Exception(e_msg)
+
+
+        update = self.apply_theorem_by_name(t_name)
+
+        if not update:
+            w_msg = "Theorem <{},{},{}> not applied. Please check your theorem or prerequisite.".format(
+                t_name, t_branch, t_para)
+
+        return update
+
+    def apply_theorem_by_name(self, t_name):
+        """
+        Apply a theorem with t_name.
+        :param t_name: <str>.
+        :return update: <bool>, Whether the problem condition updated or not.
+        """
+        update = False
+
+        for branch in self.parsed_theorem_GDL[t_name]["body"]:
+            timing = time.time()  # timing
+            gpl = self.parsed_theorem_GDL[t_name]["body"][branch]
+
+            conclusions = GPLExecutor.run(gpl, self.problem)  # get gpl reasoned result
+            if len(conclusions) == 0:
+                theorem = (t_name, branch, None)
+                self.problem.step(theorem, time.time() - timing)
+                continue
+            avg_timing = (time.time() - timing) / len(conclusions)
+            for letters, premise, conclusion in conclusions:
+                t_para = [letters[i] for i in self.parsed_theorem_GDL[t_name]["vars"]]
+                theorem = (t_name, branch, tuple(t_para))
+                for predicate, item in conclusion:  # add conclusion
+                    update = self.problem.add(predicate, item, premise, theorem) or update
+                self.problem.step(theorem, avg_timing)
+
+        timing = time.time()  # timing
+        self.solve_special_angles()
+        self.solve_equations()
+        self.solve_equation_groups()
+        self.solve_equivalence_relation()
+        EqKiller.solve_equations(self.problem)
+        self.problem.step("solve_equations", time.time() - timing)
+
+        return update
+    
+    def solve_special_angles(self):
+        right_triangles = self.problem.condition.get_items_by_predicate('RightTriangle')
+        for tri in right_triangles:
+            angle_chars = [tri, 
+                           (tri[1], tri[2], tri[0]), 
+                           (tri[2], tri[0], tri[1])]
+            angle_syms = [self.problem.get_sym_of_attr('MeasureOfAngle', angle) for angle in angle_chars]
+            angle_values = [self.problem.condition.value_of_sym[sym] for sym in angle_syms]
+            
+            special_angle = None
+            if 60 in angle_values and 90 in angle_values:
+                special_angle = 60
+            elif 30 in angle_values and 90 in angle_values:
+                special_angle = 30
+            elif 45 in angle_values and 90 in angle_values:
+                special_angle = 45
+            
+            if special_angle is not None:
+                angle_sp = angle_chars[angle_values.index(special_angle)]
+                angle_90 = angle_chars[angle_values.index(90)]
+                angle_sp_sym = angle_syms[angle_values.index(special_angle)]
+                angle_90_sym = angle_syms[angle_values.index(90)]
+                # l2 = cos(a) * l1
+                # l3 = sin(a) * l1
+                # l3 = tan(a) * l2
+                l1 = (angle_sp[0], angle_sp[1])
+                l2 = (angle_sp[1], angle_sp[2])
+                l3 = (angle_sp[2], angle_sp[0])
+                if angle_sp[0] == angle_90[1]:
+                    l1, l2 = l2, l1
+                l1_sym = self.problem.get_sym_of_attr('LengthOfLine', l1)
+                l2_sym = self.problem.get_sym_of_attr('LengthOfLine', l2)
+                l3_sym = self.problem.get_sym_of_attr('LengthOfLine', l3)
+                
+                expr_1 = l2_sym - cos(rad(special_angle)) * l1_sym
+                expr_2 = l3_sym - sin(rad(special_angle)) * l1_sym
+                expr_3 = l3_sym - tan(rad(special_angle)) * l2_sym
+                premise_expr_1 = angle_sp_sym - special_angle
+                premise_expr_2 = angle_90_sym - 90
+                premise = []
+                for i, c in enumerate(self.problem.condition.items):
+                    if c[0] == 'Equation':
+                        if c[1] == premise_expr_1 or c[1] == premise_expr_2:
+                            premise.append(i)
+                assert len(premise) == 2
+                
+                last_step = len(self.problem.condition.items)
+                self.problem.add('Equation', expr_1, premise, ('cos_of_angle', None, None))
+                self.problem.add('Equation', expr_2, premise, ('sin_of_angle', None, None))
+                self.problem.add('Equation', expr_3, premise, ('tan_of_angle', None, None))
+                
+                # add
+                if len(self.problem.condition.items) - last_step > 0:
+                    self.problem.step(('solve_eq', None, None), 0)
+        return
         
     
-    def init_search(self, problem_CDL):
-        text_parser, diagram_parser = self.prepare_for_intergps(problem_CDL)
-        parser = LogicParser(ExtendedDefinition(debug=self.debug))
-        parser.logic.point_positions = diagram_parser['point_positions']
-        isLetter = lambda ch: ch.upper() and len(ch) == 1
-        parser.logic.define_point([_ for _ in parser.logic.point_positions if isLetter(_)])
-        if self.debug:
-            print(parser.logic.point_positions)
-        
-        lines = diagram_parser['line_instances']  # ['AB', 'AC', 'AD', 'BC', 'BD', 'CD']
-        for line in lines:
-            line = line.strip()
-            if len(line) == 2 and isLetter(line[0]) and isLetter(line[1]):
-                parser.logic.define_line(line[0], line[1])
-
-        circles = diagram_parser['circle_instances']  # ['O']
-        for point in circles:
-            parser.logic.define_circle(point)
+    def solve_equations(self):
+        # solve equation, substitute value of syms first
+        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
+        value_of_sym = {
+            k: v for k, v in 
+            self.problem.condition.value_of_sym.items()
+            if v is not None
+        }
+        for expr in eq_exprs:
+            solved = False 
+            eq_idx = eq_exprs[expr][0]
+            premise = [eq_idx]
+            syms_in_expr = list(expr.free_symbols)
+            expr_new = copy(expr)
             
-        # Parse diagram logic forms
-        logic_forms = diagram_parser['diagram_logic_forms']
-        logic_forms = sorted(logic_forms, key=lambda x: x.find("Perpendicular") != -1)  # put 'Perpendicular' to the end
+            for sym, value in value_of_sym.items():
+                if sym in syms_in_expr and value != None:
+                    premise_expr = sym - value
+                    for i, c in enumerate(self.problem.condition.items):
+                        if c[0] == 'Equation' and c[1] == premise_expr:
+                            premise.append(i)
+                    expr_new = expr_new.subs(sym, value)
+            
+            last_step = len(self.problem.condition.items)
+            
+            # can solve to value directly
+            if len(expr_new.free_symbols) == 1 and len(expr.free_symbols) > 1:
+                sym = list(expr_new.free_symbols)[0]
+                eq = Eq(expr_new, 0)
+                results = solve(eq, sym)
 
-        for logic_form in logic_forms:
-            if logic_form.strip() != "":
-                if self.debug:
-                    print("The diagram logic form is", logic_form)
-                try:
-                    parse_tree = parser.parse(logic_form) # ['Equals', ['LengthOf', ['Line', 'A', 'C']], '10']
-                    parser.dfsParseTree(parse_tree)
-                except Exception as e:
-                    if self.debug:
-                        print("\033[0;0;41mError:\033[0m", repr(e))
-                        
-        ## Parse text logic forms
-        target = None
-        text_logic_forms = text_parser["text_logic_forms"]
-        for text in text_logic_forms:
-            if self.debug:
-                print("The text logic form is", text)
-            if text.find('Find') != -1:
-                target = parser.findTarget(parser.parse(text)) # ['Value', 'A', 'C']
+                if self.problem.condition.value_of_sym[sym] is None and len(results) != 0:
+                    solved = True
+                    solved_results = results[0]
+                    self.problem.set_value_of_sym(sym, solved_results, premise)     
+
+            # can get new numerical relation though substitute
+            elif len(expr_new.free_symbols) == 2 and len(expr.free_symbols) > 2:
+                solved = True
+                self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
+                # remove the past equation
+                self.problem.condition.simplified_equation.pop(expr)
+                # add condition idx of new equation
+                self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
+                    
+            if not solved:
+                continue
+            
+            # add condition in `leveled_condition`
+            if len(self.problem.condition.items) - last_step > 0:  
+                self.problem.step(('solve_eq', None, None), 0)
+
+        return 
+    
+    def solve_equivalence_relation(self):
+        def set2key(set_input):
+            res = sorted(set_input, key=lambda x: str(x))
+            return tuple(res)
+        
+        def contains_sqrt(expr):
+            return any(isinstance(term, sp.Pow) and term.exp == sp.S.Half for term in sp.preorder_traversal(expr))
+        
+        def is_equal_expr(expr):
+            f1 = len(expr.free_symbols) == 2
+            f2 = all(abs(v) == 1 for v in expr.as_coefficients_dict().values()) 
+            f3 = not contains_sqrt(expr)
+            return f1 and f2 and f3
+        
+        # expand equivalence relation in equation groups
+        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
+        # split expr like: ll_ab - ll_cd
+        expr_list = [
+            expr for expr in eq_exprs if is_equal_expr(expr)
+        ]
+
+        eq_sym_groups = [] # list of set (symbols)
+        eq_groups_to_ids = {} # dict: tuple (symbols) -> id set (premise)
+
+        # find equivalent class (symbols group)
+        for expr in expr_list:
+            var_a, var_b = list(expr.free_symbols)
+            class_a, class_b = None, None
+            for sym_group in eq_sym_groups:
+                if var_a in sym_group:
+                    class_a = sym_group
+                if var_b in sym_group:
+                    class_b = sym_group
+            
+            # merge symbols group, remove origin and add new
+            if class_a is not None and class_b is not None:
+                if class_a != class_b:
+                    eq_sym_groups.remove(class_a)
+                    eq_sym_groups.remove(class_b)
+                    eq_sym_groups.append(class_a.union(class_b))
+                    id_1 = eq_groups_to_ids.pop(set2key(class_a))
+                    id_2 = eq_groups_to_ids.pop(set2key(class_b))
+                    # premise id from class a, class b, new expr
+                    eq_groups_to_ids[set2key(class_a.union(class_b))] = set(list(id_1) + list(id_2) + eq_exprs[expr])
+            elif class_a is not None:
+                id_1 = eq_groups_to_ids.pop(set2key(class_a))
+                class_a.add(var_b)
+                eq_groups_to_ids[set2key(class_a)] = set(list(id_1) + eq_exprs[expr])
+
+            elif class_b is not None:
+                id_1 = eq_groups_to_ids.pop(set2key(class_b))
+                class_b.add(var_a)
+                eq_groups_to_ids[set2key(class_b)] = set(list(id_1) + eq_exprs[expr])
             else:
-                res = parser.parse(text)
-                parser.dfsParseTree(res)
+                eq_sym_groups.append({var_a, var_b})
+                eq_groups_to_ids[set2key({var_a, var_b})] = set(eq_exprs[expr])
+        
+        # get new expr
+        new_expr_list = []
+        premise_list = []
+        for sym_group_set in eq_sym_groups:
+            sym_group = list(sym_group_set)
+            for i in range(len(sym_group) - 1):
+                for j in range(i + 1, len(sym_group)):
+                    new_expr_1 = sym_group[i] - sym_group[j]
+                    new_expr_2 = sym_group[j] - sym_group[i]
+                    if new_expr_1 not in expr_list and new_expr_2 not in expr_list:
+                        new_expr_list.append(new_expr_1)
+                        premise_list.append(list(eq_groups_to_ids[set2key(sym_group)]))
+        
+        for expr, premise in zip(new_expr_list, premise_list):
+            # add condition in `items`
+            last_step = len(self.problem.condition.items)
+            self.problem.add('Equation', expr, premise, ('solve_eq', None, None))
+            new_condition = deepcopy(self.problem.condition.items[last_step:])
+            
+            if len(new_condition) > 0:
+                self.problem.step(('solve_eq', None, None), 0)
+            
+        return 
 
-        self.logic = parser.logic
+    def solve_equation_groups(self):
+        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
+        eqs = [simplify(Eq(e, 0)) for e in eq_exprs]
+        update = False
+        
+        for i, expr_i in enumerate(eq_exprs):
+            if degree_of_expr(expr_i) >= 2:
+                continue
+            if len(expr_i.free_symbols) != 2:
+                continue
+            # assert expr_i has 2 free symbols
+            related_exprs = [
+                expr for expr in list(eq_exprs.keys())[i+1:]
+                if len(expr_i.free_symbols & expr.free_symbols) == 2
+            ]
+            last_step = len(self.problem.condition.items)
+            
+            for expr_j in related_exprs:
+                premise = eq_exprs[expr_i] + eq_exprs[expr_j]
 
-    def search(self):
-        ## Set up, initialize and run the logic solver
-        if self.logic is None:
-            raise ValueError(self.logic)
-        solver = LogicSolver(self.logic)
-        solver.initSearch()
-        answer, steps, step_lst = solver.beamSearch()
-
-        return answer, steps, step_lst
+                # 1. if expr_j is linear, use sympy `solve`
+                # 2. if expr_j's degree == 2, substitute to get new expr
+                if degree_of_expr(expr_j) == 1:
+                    results = solve((expr_i, expr_j), expr_i.free_symbols, dict=True)
+                elif degree_of_expr(expr_j) == 2:
+                    sym_1, sym_2 = list(expr_i.free_symbols)
+                    expr_i_result = solve(expr_i, sym_1, dict=True)
+                    if isinstance(expr_i_result, list):
+                        expr_i_result = expr_i_result[0]
+                    expr_new = expr_j.subs(expr_i_result)
+                    results = solve(expr_new, sym_2, dict=True)
+                else:
+                    continue
+                
+                if len(results) == 0:
+                    continue
+                if isinstance(results, list):
+                    results = results[0]
+                    
+                # add conditions
+                for k, v in results.items():
+                    expr_new = k - v
+                    # check if already in equations
+                    if simplify(Eq(expr_new, 0)) in eqs:
+                        continue
+                    self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
+                    self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
+                    
+            
+            # add condition
+            if len(self.problem.condition.items) - last_step > 0:
+                update = True
+        if update:
+            self.problem.step(('solve_eq', None, None), 0)
+        return 
+    
+    
+if __name__ == '__main__':
+    from utils.tools import read_json
+    predicate_GDL = read_json('json/predicate_GDL_for_search.json')
+    theorem_GDL = read_json('json/theorem_GDL_for_search.json')
+    t_info = read_json('json/t_info_new.json')
+    t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
+    t_freq_info = {k: t_info[k][-1] for k in t_names}
+    solver = FormalGeoSolver(
+        predicate_GDL, theorem_GDL, 
+        strategy='bs', max_depth=4, beam_size=12, 
+        t_info=t_info, t_freq_info=t_freq_info, 
+        p_pos=None, debug=False
+    )
+    
+    problem_data = read_json('geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_1.json')
+    problem_CDL = {
+        "problem_id": 0,
+        "construction_cdl": problem_data['construction_cdl'],
+        "text_cdl": problem_data['image_cdl'],
+        "image_cdl": problem_data['text_cdl'],
+        "goal_cdl": problem_data['goal_cdl'],
+        "problem_answer": problem_data['llm_info']['problem_answer'],
+        "point_positions": problem_data['positions']
+    }
+    
+    solver.init_search(problem_CDL)
+    solver.search()
+    print(solver.problem.condition.items)
