@@ -325,7 +325,7 @@ def task_1():
     seed = 1234
     task_name = "geosynth_ENT_1_REL_1"
     input_args_list = []
-    num_process = 1
+    num_process = 9
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
@@ -344,14 +344,14 @@ def task_2():
     seed = 1234
     task_name = "geosynth_ENT_1_REL_2"
     input_args_list = []
-    num_process = 6
+    num_process = 9
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=3)
+                                    repeat_times=2)
     print('Num: ', len(input_args_1))
 
     
@@ -400,8 +400,8 @@ def run_task_stage_2():
         
         
 def main():
-    run_task(*task_1())
-    # run_task(*task_2())
+    # run_task(*task_1())
+    run_task(*task_2())
     # run_task()
     # run_task_stage_2()
 

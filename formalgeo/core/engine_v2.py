@@ -948,7 +948,7 @@ class EquationKiller:
                         "Equation", sym - problem.condition.value_of_sym[sym]))
                     
                 if len(new_expr.free_symbols) == 0:
-                    return target_expr, premise_ids
+                    return new_expr, premise_ids
 
         return None, []
         # linear_exprs = []
@@ -1337,10 +1337,14 @@ class GeometryPredicateLogicExecutor:
                     msg = "Timeout when solve target: {}".format(str(eq))
                     # warnings.warn(msg)
                 else:
-                    if result is not None and rough_equal(result, 0):  # meet constraints
-                        r_id = tuple(set(premise + list(r1_ids[i])))
-                        r_ids.append(r_id)
-                        r_items.append(r1_items[i])
+                    try:
+                        if result is not None and rough_equal(result, 0):  # meet constraints
+                            r_id = tuple(set(premise + list(r1_ids[i])))
+                            r_ids.append(r_id)
+                            r_items.append(r1_items[i])
+                    except Exception as e:
+                        print(e)
+                        print(result, type(result))
 
         else:  # &~
             for i in range(len(r1_items)):
