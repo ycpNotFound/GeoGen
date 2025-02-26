@@ -6,7 +6,7 @@ import string
 import time
 from collections import defaultdict, deque
 from typing import Dict, Tuple
-
+from tqdm import tqdm
 import numpy as np
 from sympy import (Eq, Float, Integer, Rational, Symbol, simplify, solve, sqrt,
                    total_degree)
@@ -88,10 +88,7 @@ class TargetFinder():
                 p_pos=self.p_pos,
                 debug=debug
             )
-        elif solver_type == 'intergps':
-            self.solver = InterGPSSolver(
-                debug=debug
-            )
+        
         self.problem_CDL = {
             "problem_id": problem_id,
             "construction_cdl": self.constr_cdls,
@@ -150,26 +147,28 @@ class TargetFinder():
     
     @staticmethod
     def targets_filter_1(conditions_to_sample, value_of_sym):
-        # the first filter: 
         # for potential calculation target: 
         # 1. only has <= 2 vars (<=3 for lines)
         # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
         # 4. only has symbols begin with 'll_' or 'ma_'
-        # 5. remove angle measure that >= 180
+        # 5. if has 2 vars: must have one same point for line, two for angle
+        # 6. remove angle measure that >= 180
+        # 7. if has 1 var and has no constant term, remove
+        # reserve all proving targets.
         new_targets = []
         for condition in conditions_to_sample:
             if condition[0] == 'Equation':
                 syms = [str(x) for x in list(condition[1].free_symbols)]
-                f1 = len(condition[1].free_symbols) <= 2 or \
-                    (len(condition[1].free_symbols) <= 3 and \
+                f1 = len(syms) <= 2 or \
+                    (len(syms) <= 3 and \
                     all(['ll_' in sym for sym in syms]))
                 try:
                     f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() <= 2
                 except:
                     f2 = False
                 f3 = True
-                if len(condition[1].free_symbols) == 2:
+                if len(syms) == 2:
                     if all([
                         value_of_sym[sym] is not None 
                         for sym in list(condition[1].free_symbols)
@@ -177,11 +176,29 @@ class TargetFinder():
                         f3 = False
                         
                 f4 = all(['ll_' in sym or 'ma_' in sym for sym in syms])
+
                 f5 = True
+                if len(syms) == 2:
+                    if all(['ll_' in sym for sym in syms]):
+                        chars_1 = syms[0].split('_')[-1]
+                        chars_2 = syms[1].split('_')[-1]
+                        if len(set(chars_1) & set(chars_2)) != 1:
+                            f5 = False
+                    elif all(['ma_' in sym for sym in syms]):
+                        chars_1 = syms[0].split('_')[-1]
+                        chars_2 = syms[1].split('_')[-1]
+                        if len(set(chars_1) & set(chars_2)) != 2:
+                            f5 = False
+                f6 = True
                 if all(['ma_' in sym for sym in syms]):
                     if len(syms) == 1:
-                        f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
-                if all([f1, f2, f3, f4, f5]):
+                        f6 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
+                f7 = True
+                if len(syms) == 1:
+                    if condition[1].as_coefficients_dict().get(1, 0) == 0:
+                        f7 = False
+
+                if all([f1, f2, f3, f4, f5, f6, f7]):
                     new_targets.append(condition)
                     
             elif condition[0] in PREDICATES_REL + PREDICATES_REL_2 +  PREDICATES_ENT + ['Collinear', 'Cocircular']:
@@ -190,19 +207,39 @@ class TargetFinder():
         return new_targets
     
     @staticmethod
-    def targets_filter_2(new_targets, theorems_for_targets, level_for_targets):
-        # the second filter: 
-        # 1. sort by len of theorems (more but not too large)
+    def targets_filter_2(new_targets):
+        # 1. if has too many 'solve_eq' targets like 'a+b-90=0', randon sample to 5
+        solve_eq_targets = [
+            t for t in new_targets if t[0] == 'Equation'
+            and len(t[1].free_symbols) >= 1
+            and t[1].as_coefficients_dict().get(1, 0) != 0
+        ]
+        if len(solve_eq_targets) > 5:
+            targets_to_delete = random.sample(solve_eq_targets, len(solve_eq_targets) - 5)
+            for t in targets_to_delete:
+                new_targets.remove(t)
+
+        return new_targets
+
+
+    @staticmethod
+    def targets_filter_3(new_targets, theorems_for_targets, max_depth):
+        # 1. sort by len of theorems (more but can not include too many 'solve_eq')
         # 2. sort by num of unsolved symbols (less)
         # 3. sort by token diversity of theorems (more)
-        def filter_idx(target, theorem_list, level):
+        def filter_idx(target, theorem_list):
             score_1 = len(theorem_list) 
-            if len(theorem_list) >= level + 2:
+            solve_eq_cnt = sum([1 if item == 'solve_eq' else 0 for item in theorem_list])
+            geo_theorem_cnt = len(theorem_list) - solve_eq_cnt
+            if solve_eq_cnt >= 4 or len(theorem_list) >= max_depth + 2 or solve_eq_cnt >= geo_theorem_cnt + 2:
                 score_1 = 0
                 
             score_2 = -1
             if target[0] == 'Equation':
                 score_2 = - len(target[1].free_symbols)
+                # treat constant term as symbols
+                if target[1].as_coefficients_dict().get(1, 0) != 0:
+                    score_2 -= 1
                 
             token_set = set()
             for item in theorem_list:
@@ -216,15 +253,14 @@ class TargetFinder():
             key=lambda k: filter_idx(
                 k, 
                 theorems_for_targets[k],
-                level_for_targets[k]
             ), 
             reverse=True
         )
-        idx_for_targets = [filter_idx(k, theorems_for_targets[k], level_for_targets[k]) for k in new_targets]
+        idx_for_targets = [filter_idx(k, theorems_for_targets[k]) for k in new_targets]
         return new_targets, idx_for_targets
     
     @staticmethod
-    def targets_filter_3(new_targets):
+    def targets_into_groups(new_targets):
         # the third filter: 
         # classified into groups according to target type
         # choose only 2 targets for each 'prove' predicate name
@@ -249,35 +285,52 @@ class TargetFinder():
         }
         return targets_dict
     
-    def find_target_and_solution(self, condition_graph: ConditionGraph):
-        max_depth = max([len(k) for k in self.solver.leveled_condition])
+    def get_conditions_to_sample(self):
+        # determine the min / max depth of conditions to sample
+        max_depth = max([k for k, v in self.solver.leveled_condition.items() if len(v) != 0])
         max_depth = min([max_depth, self.max_depth])
-        conditions_to_sample = []
+        min_depth = max(self.min_depth, max_depth - 2)
+        start_idx = len(self.solver.problem.condition.items)
+        end_idx = len(self.solver.problem.condition.items)
+
+        # determine the range of conditions to sample
         for k, v in self.solver.leveled_condition.items():
-            if len(k) < self.min_depth or len(k) > self.max_depth:
-                continue
-            if len(k) == max_depth:
-                conditions_to_sample += list(v.values())
+            if k == min_depth:
+                idx_list = list(v.keys())
+                start_idx = min(min(idx_list), start_idx)
+            elif k == max_depth:
+                idx_list = list(v.keys())
+                end_idx = min(max(idx_list), end_idx)
+        
+        # if too few conditions, decrease min_depth
+        if end_idx - start_idx < 10 and max_depth > 3:
+            min_depth = max(self.min_depth, max_depth - 1) 
+            for k, v in self.solver.leveled_condition.items():
+                if k == min_depth:
+                    idx_list = list(v.keys())
+                    start_idx = min(min(idx_list), start_idx)
+                elif k == max_depth:
+                    idx_list = list(v.keys())
+                    end_idx = min(max(idx_list), end_idx)
             
-        # filter 1, if only have few targets, decrease max_depth
+        conditions_to_sample = self.solver.problem.condition.items[start_idx:end_idx]
+        return conditions_to_sample
+    
+    def find_target_and_solution(self, condition_graph: ConditionGraph):
+        conditions_to_sample = self.get_conditions_to_sample()
+        # filter 1
         new_targets = self.targets_filter_1(
             conditions_to_sample,
             self.solver.problem.condition.value_of_sym
         )
-        if len(new_targets) < 8:
-            for k, v in self.solver.leveled_condition.items():
-                if max_depth > 1 and len(k) == max_depth - 1:
-                    conditions_to_sample += list(v.values())
-            new_targets = self.targets_filter_1(
-                conditions_to_sample,
-                self.solver.problem.condition.value_of_sym
-            )
+        # filter 2, if has too many targets, filter by more strict rules
+        new_targets = self.targets_filter_2(new_targets)
             
         # find solution / theorems for each target
         theorems_for_targets = {}
         solution_for_targets = {}
         solution_dict_for_targets = {}
-        level_for_targets = {}
+        # draw_graph(condition_graph, 'test', new_targets[11], img_dir='imgs_test')
         for target in new_targets:
             (
                 solution_str,
@@ -294,15 +347,12 @@ class TargetFinder():
             )
             if too_complex_flag:
                 continue
-            level = max_depth
-            for key, value in self.solver.leveled_condition.items():
-                if target in list(value.values()):
-                    level = len(key)
-                    break
-            theorems_for_targets[target] = theorems
+
+            theorems_for_targets[target] = [item['theorem'] for item in solution_formal_dict.values() if item['theorem'] is not None]
             solution_for_targets[target] = solution_str
             solution_dict_for_targets[target] = solution_formal_dict
-            level_for_targets[target] = level
+
+            # level = sum([1 if item['theorem'] is not None else 0 for item in solution_formal_dict.values()])
 
         if self.debug:
             _solution_for_targets = {
@@ -311,17 +361,21 @@ class TargetFinder():
             }
             with open('json/solution_test.json', 'w', encoding='utf-8') as f:
                 json.dump(_solution_for_targets, f, indent=4, ensure_ascii=False)
-        # filter 2
-        new_targets, _ = self.targets_filter_2(
-            new_targets, theorems_for_targets, level_for_targets
+        
+        # filter 3, sort by rules
+        new_targets, idx_for_targets = self.targets_filter_3(
+            new_targets, theorems_for_targets, self.max_depth
         )
-        # filter 3
-        targets_dict = self.targets_filter_3(new_targets)
-        # random choose target type
+        # formulate into groups by target type
+        targets_dict = self.targets_into_groups(new_targets)
         types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
         if len(types_to_choose) == 0:
-            return None, None, None, None, None, None
-        target_type = random.choice(types_to_choose)
+            return None, None, None, None, None, None, None
+        
+        # random choose target type
+        weight_on_types = [np.log(2*len(targets_dict[t])) for t in types_to_choose]
+        prob_on_types = [w / sum(weight_on_types) for w in weight_on_types]
+        target_type = random.choices(types_to_choose, weights=prob_on_types, k=1)[0]
         chosen_targets = targets_dict[target_type]
         
         # random choose target (from top-5)
@@ -329,7 +383,7 @@ class TargetFinder():
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
         chosen_solution_dict = solution_dict_for_targets[chosen_target]
-        # problem_level = level_for_targets[chosen_target]
+        # problem_level = depth_for_targets[chosen_target]
         problem_level = len(chosen_thoerems)
         _ = self.find_solution_for_target(
             self.solver.problem,
@@ -338,7 +392,13 @@ class TargetFinder():
             self.natural_template,
             self.solver.parsed_theorem_GDL
         )
-        return target_type, chosen_target, problem_level, chosen_solution, chosen_solution_dict, chosen_thoerems
+        available_targets = []
+        for k, v in targets_dict.items():
+            for t in v:
+                available_targets.append(t)
+        available_num = len(available_targets)
+        
+        return target_type, chosen_target, problem_level, chosen_solution, chosen_solution_dict, chosen_thoerems, available_num
     
     @staticmethod
     def find_solution_for_target(
@@ -470,7 +530,7 @@ class TargetFinder():
                 if f4:
                     step_count += 1
                     solution_str += f'\n{step_count}. Solve equations:\n'
-                    eq_solution = formulate_eqs(premise_statements, statement, problem, expand_flag=expand_flag)
+                    eq_solution = formulate_eqs(premise_statements, statement, problem)
                     
                     # check if solve too many eqs in one step
                     if eq_solution is None: 
@@ -541,6 +601,7 @@ class TargetFinder():
                 last_premise_ids = node.value[2]
             
         return solution_str, solution_formal_dict, theorems_formal, sub_nodes, too_complex
+    
     
     def distance(self, line):
         p1, p2 = line
@@ -842,13 +903,24 @@ class TargetFinder():
             add_conditions = [c.replace(k, v) for c in add_conditions]
             
         # conditions += add_conditions
-        problem_text += ', '.join(conditions)
-        if len(add_conditions) > 0:
-            problem_text += f". Given {', '.join(add_conditions)}, {target_str}."
-        else:
-            problem_text += f". {target_str[0].upper() + target_str[1:]}."
+        problem_text_type = random.choice([
+            'text_based', 'image_based'
+        ])
+        if problem_text_type == 'text_based':
+            problem_text += ', '.join(conditions)
 
-        return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text
+        if len(add_conditions) > 0:
+            if problem_text.endswith(', '):
+                problem_text += f"given {', '.join(add_conditions)}, {target_str}."
+            else:
+                problem_text += f". Given {', '.join(add_conditions)}, {target_str}."
+        else:
+            if problem_text.endswith(', '):
+                problem_text += f"{target_str}."
+            else:
+                problem_text += f". {target_str[0].upper() + target_str[1:]}."
+
+        return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text, problem_text_type
     
     def target_tuple_to_clause(self, target):
         keys = list(self.predicate_GDL['Relation'].keys())
@@ -883,7 +955,8 @@ class TargetFinder():
             problem_level, 
             solution_str, 
             solution_dict,
-            theorems
+            theorems,
+            available_num
         ) = self.find_target_and_solution(condition_graph)
 
         if target is None:
@@ -895,7 +968,8 @@ class TargetFinder():
             add_conditions,
             target_value, 
             target_cdl, 
-            problem_text
+            problem_text,
+            problem_text_type
         ) = self.create_question(target)
         self.text_cdls += add_cdls
         self.image_cdls += add_cdls
@@ -914,19 +988,31 @@ class TargetFinder():
             "goal_cdl": target_cdl,
             "problem_answer": str(target_value),
             "theorems": theorems,
-            "time": round(cost_time, 3)
+            "time": round(cost_time, 3),
+            "available_targets_num": available_num
         }
         info_dict_for_llm = {
             "problem_type": target_type,
             "problem_level": problem_level,
             "problem_text": problem_text,
+            "problem_text_type": problem_text_type,
             "problem_answer": str(target_value),
             "solution_str": solution_str,
             "solution_dict": solution_dict
         }
             
         return info_dict_for_symbolic, info_dict_for_llm
-            
+
+
+def check_predicate_combs(pred_base_combs, pred_rel_combs):
+    # filter all 'IsMidsegmentOfQuadrilateral' if pred_base not in 
+    predicates_1 = ['Square', 'Rectangle', 'Rhombus', 'Parallelogram', 'Trapezoid', 'IsoscelesTrapezoid', 'RightTrapezoid', 'Kite']
+    if 'IsMidsegmentOfQuadrilateral' in pred_rel_combs:
+        if pred_base_combs[0] not in predicates_1:
+            return False
+        
+    return True 
+
             
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
@@ -936,6 +1022,9 @@ def build_input_args(pred_base_combs,
     for predicate_base in pred_base_combs:
         for predicate_rel in pred_rel_combs:
             for _ in range(repeat_times):
+                res = check_predicate_combs(predicate_base, predicate_rel)
+                if not res:
+                    continue
                 input_args.append(
                     (predicate_base, predicate_rel, n_more_lines, None)
                 )
@@ -947,48 +1036,50 @@ if __name__ == '__main__':
     predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
     theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
     # for i in range(10):
-        # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
+        # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=19
     cnt = 0
     # total_len = len(list(itertools.product(PREDICATES_ENT, PREDICATES_REL)))
     # for clauses_base, clauses_rel in itertools.product(PREDICATES_ENT, PREDICATES_REL):
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
-    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=10)
+                                    repeat_times=1)
     total_len = len(input_args_1)
     for predicate_base, predicate_rel, n_more_lines, color_config in input_args_1:
         cnt += 1
-        if cnt < 44:
+        if cnt < 167:
             continue
 
         # predicate_base = random.choices(PREDICATES_ENT, k=1)
         # predicate_rel = random.choices(PREDICATES_REL, k=1)
-        predicate_base = [
-            "Triangle",
-        ]
-        predicate_rel = [
-            'IsMidpointOfArc', 
-            # 'IsDiameterOfCircle'
-        ]
+        # predicate_base = [
+        #     # "Square",
+        #     "RightTriangle"
+        # ]
+        # predicate_rel = [
+        #     # 'IsMidpointOfLine', 
+        #     "IsMidpointOfArc"
+        #     # 'IsDiameterOfCircle'
+        # ]
         cg = ClauseGenerator(predicate_GDL, theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
             predicate_base, 
             predicate_rel, 
-            n_more_lines=1
+            n_more_lines=0
         )
         states = cg.states
         
-        # states = {'points': ['a', 'b', 'c', 'd', 'e', 'f'], 'lines': [('b', 'c'), ('a', 'c'), ('d', 'e', 'f'), ('a', 'b', 'f'), ('b', 'e')], 'circles': ['d'], 'polygons': [('a', 'b', 'c'), ('b', 'e', 'f')], 'constraints': ['Triangle(abc)', 'Equal(LengthOfArc(dae),LengthOfArc(deb))', 'Cocircular(d,abc)', 'Cocircular(d,aeb)'], 'constraints_base': ['Triangle(abc)'], 'points_on_circle': {'d': ['a', 'b', 'c', 'e']}}
-        # c_cdls = ['Shape(ab,bc,ca)', 'Cocircular(d,abc)', 'Cocircular(d,aeb)', 'Collinear(dfe)', 'Collinear(afb)']
-        # t_cdls = ['Triangle(abc)', 'IsMidpointOfArc(e,dab)']
+        # states =  {'points': ['a', 'b', 'c', 'd', 'e'], 'lines': [('a', 'b'), ('b', 'c'), ('c', 'd'), ('a', 'd'), ('c', 'e'), ('b', 'e')], 'circles': [], 'polygons': [('a', 'b', 'c', 'd'), ('b', 'c', 'e')], 'constraints': ['ParallelBetweenLine(ad,bc)', 'ParallelBetweenLine(ba,cd)', 'Equal(MeasureOfAngle(bce),MeasureOfAngle(ecd))'], 'constraints_base': ['ParallelBetweenLine(ad,bc)', 'ParallelBetweenLine(ba,cd)'], 'points_on_circle': {}}
+        # c_cdls =  ['Shape(ab,bc,cd,da)', 'Shape(ce)']
+        # t_cdls =  ['Parallelogram(abcd)', 'IsBisectorOfAngle(ce,bcd)'] 
         
         print(f'------- {cnt} / {total_len} Allocator Inputs -------')
-        print(states)
-        print('c_cdls: ', c_cdls)
-        print('t_cdls: ', t_cdls)
+        print('states = ', states)
+        print('c_cdls = ', c_cdls)
+        print('t_cdls = ', t_cdls)
 
         allocator = Allocator(states, c_cdls, t_cdls, replace_chars=False)
         allocator.allocate()

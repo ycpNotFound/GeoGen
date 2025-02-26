@@ -770,7 +770,7 @@ class Allocator():
         xb, yb = self.p_pos[B]
         if self.p_pos[C] is None or type(self.p_pos[C][0]) in [Expr, Symbol]:
             # 使用cv2绘图，逆时针布局需要顺时针旋转
-            mode = random.choice([0, 1, 2])
+            mode = random.choice([0, 1, 2, 3])
             if mode == 0:
                 top_angle = - math.radians(random.uniform(45, 75)) 
             elif mode == 1:
@@ -782,6 +782,11 @@ class Allocator():
             elif mode == 2:
                 top_angle = - math.radians(60) 
                 new_cdl = f"Equal(MeasureOfAngle({''.join([C,A,B])}),60)"
+                self.image_cdls.append(new_cdl)
+                self.text_cdls.append(new_cdl)
+            elif mode == 3:
+                top_angle = - math.radians(45) 
+                new_cdl = f"Equal(MeasureOfAngle({''.join([C,A,B])}),45)"
                 self.image_cdls.append(new_cdl)
                 self.text_cdls.append(new_cdl)
             interval = random.choice([(0.7, 0.9), (1.1, 1.5)])
@@ -848,7 +853,7 @@ class Allocator():
                 new_clause = f"Equal(MeasureOfAngle({''.join(angle)}),90)"
                 new_text_clause = f"PerpendicularBetweenLine({''.join([angle[0], angle[1]])},{''.join([angle[2], angle[1]])})"
                 self.text_cdls.append(new_text_clause)
-                
+                self.image_cdls.append(new_text_clause)
                 self.allocate_equal(new_clause)
 
                 # AC x AD must > 0 (for cv2, AC x AD < 0)
@@ -887,8 +892,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(85, 95)) 
@@ -911,8 +916,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(130, 140)) 
@@ -934,8 +939,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(130, 140)) 
@@ -1005,8 +1010,22 @@ class Allocator():
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
-        interval = random.choice([(45, 80), (100, 135)])
-        top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
+        mode = random.choice([0, 1, 2])
+        if mode == 0:
+            interval = random.choice([(45, 80), (100, 135)])
+            top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
+            
+        elif mode == 1:
+            top_angle = -math.radians(120)
+            new_cdl = f"Equal(MeasureOfAngle({''.join([D,A,B])}),120)"
+            self.image_cdls.append(new_cdl)
+            self.text_cdls.append(new_cdl)
+        else:
+            top_angle = -math.radians(60)
+            new_cdl = f"Equal(MeasureOfAngle({''.join([D,A,B])}),60)"
+            self.image_cdls.append(new_cdl)
+            self.text_cdls.append(new_cdl)
+
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
         
@@ -1028,8 +1047,22 @@ class Allocator():
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
-        interval = random.choice([(45, 80), (100, 135)])
-        top_angle = - math.radians(random.uniform(interval[0], interval[1]))
+        mode = random.choice([0, 1, 2])
+        if mode == 0:
+            interval = random.choice([(45, 80), (100, 135)])
+            top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
+            
+        elif mode == 1:
+            top_angle = -math.radians(120)
+            new_cdl = f"Equal(MeasureOfAngle({''.join([D,A,B])}),120)"
+            self.image_cdls.append(new_cdl)
+            self.text_cdls.append(new_cdl)
+        else:
+            top_angle = -math.radians(60)
+            new_cdl = f"Equal(MeasureOfAngle({''.join([D,A,B])}),60)"
+            self.image_cdls.append(new_cdl)
+            self.text_cdls.append(new_cdl)
+
         cos_val = math.cos(top_angle)
         sin_val = math.sin(top_angle)
         
@@ -1048,8 +1081,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(85, 95)) 
@@ -1075,8 +1108,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(85, 95)) 
@@ -1102,8 +1135,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(90, 120)) 
@@ -1134,8 +1167,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(90, 120)) 
@@ -1168,8 +1201,8 @@ class Allocator():
         predicate, items = parse_clause(clause)
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
-        type_flag = random.choice([0, 1])
-        if type_flag == 0:
+        mode = random.choice([0, 1])
+        if mode == 0:
             xb, yb = self.random_allocate_position()
         else:
             theta = math.radians(random.uniform(85, 95)) 
@@ -1255,7 +1288,15 @@ class Allocator():
         eq = Eq(expr, 0)
         char, target, expand_eq = self.find_target(points)
         solution = solve((eq, ) + expand_eq, target)
-        self.update_symbol(solution, char)
+        # p1-p2, p3-p4 is same direction
+        solution_0 = solve((x2 - x1) * (x4 - x3) > 0 , target[0])
+        solution_1 = solve((y2 - y1) * (y4 - y3) > 0 , target[1])
+        target_sym = list(solution.values())[0].free_symbols.pop()
+        if target_sym == target[0]:
+            solution_inequal = [solution_0]
+        else:
+            solution_inequal = [solution_1]
+        self.update_symbol(solution, char, constraint=solution_inequal)
         
         return 
     
@@ -1973,8 +2014,8 @@ class Allocator():
                             bound_2 = float(constraint.args[1].lhs)
                     except Exception as e:
                         print(e)
-                    inf = max([min([bound_1, bound_2]), -10])
-                    sup = min([max([bound_1, bound_2]), 10])
+                    inf = max([min([bound_1, bound_2]), -20])
+                    sup = min([max([bound_1, bound_2]), 20])
                     val = (sup - inf) / n
                     interval_of_random = [(inf + i*val, inf + (i+1)*val) for i in range(n)]
 

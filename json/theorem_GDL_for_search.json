@@ -7,11 +7,33 @@
       ]
     }
   },
-  "collinear_judgement_angle(ABCD)": {
+  "collinear_judgement_angle_extend(ABCD)": {
     "1": {
       "premise": "Angle(ABC)&Angle(DBC)&Equal(MeasureOfAngle(ABC),MeasureOfAngle(DBC))",
       "conclusion": [
         "Collinear(ADB)"
+      ]
+    }
+  },
+  "collinear_judgement_flat_angle(ABC)": {
+    "1": {
+      "premise": "Angle(ABC)&Equal(MeasureOfAngle(ABC),180)",
+      "conclusion": [
+        "Collinear(ABC)"
+      ]
+    }
+  },
+  "collinear_judgement_parallel_extend(ABCDE)": {
+    "1": {
+      "premise": "ParallelBetweenLine(AB,CD)&ParallelBetweenLine(AB,CE)",
+      "conclusion": [
+        "Collinear(CDE)"
+      ]
+    },
+    "2": {
+      "premise": "ParallelBetweenLine(AB,CD)&ParallelBetweenLine(AB,ED)",
+      "conclusion": [
+        "Collinear(ECD)"
       ]
     }
   },
@@ -1843,17 +1865,17 @@
       ]
     }
   },
-  "circle_property_angle_of_alternate_segment(OABD,P)": {
+  "circle_property_angle_of_alternate_segment(OABC,P)": {
     "1": {
-      "premise": "Cocircular(O,ABD)&Arc(OAB)&Angle(BAP)&Angle(BDA)&IsTangentOfCircle(PA,O)",
+      "premise": "Cocircular(O,ABC)&Angle(OAP)&Angle(BAP)&Angle(BCA)&IsTangentOfCircle(PA,O)",
       "conclusion": [
-        "Equal(MeasureOfAngle(BAP),MeasureOfAngle(BDA))"
+        "Equal(MeasureOfAngle(BAP),MeasureOfAngle(BCA))"
       ]
     },
     "2": {
-      "premise": "Cocircular(O,ABD)&Arc(OAB)&Angle(PBA)&Angle(BOA)&IsTangentOfCircle(PB,O)",
+      "premise": "Cocircular(O,ABC)&Angle(PAO)&Angle(PAC)&Angle(ABC)&IsTangentOfCircle(PA,O)",
       "conclusion": [
-        "Equal(MeasureOfAngle(PBA),MeasureOfAngle(BDA))"
+        "Equal(MeasureOfAngle(PAC),MeasureOfAngle(ABC))"
       ]
     }
   },

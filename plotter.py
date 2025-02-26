@@ -516,7 +516,7 @@ class Plotter():
             BD_vec = (BA_unit[0] + BC_unit[0], BA_unit[1] + BC_unit[1])
             
             # base position at angle bisector
-            dist = min(min(self.fig_size) / 15, 40)
+            dist = min(min(self.fig_size) / 15, 45)
             xd = xb + BD_vec[0] * dist
             yd = yb + BD_vec[1] * dist
             

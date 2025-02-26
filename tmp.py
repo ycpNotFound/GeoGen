@@ -348,19 +348,31 @@ def find_formal_in_problem_text():
     
 
 def test_itertools():
-    import itertools
-    iter_cnt = 100
-    num_process = 10
-    iter_test = range(iter_cnt)
-    batch_size = iter_cnt // num_process
+    """测试使用itertools进行数据批处理。
     
+    将一个迭代器按照指定进程数均匀分割成多个批次。
+    """
+    import itertools
+
+    # 定义常量
+    TOTAL_ITEMS = 100
+    NUM_PROCESSES = 10
+    
+    # 创建测试数据
+    test_iterator = range(TOTAL_ITEMS)
+    batch_size = TOTAL_ITEMS // NUM_PROCESSES
+    
+    # 按批次分割数据
     batches = []
-    for i in range(num_process):
-        batch = itertools.islice(iter_test, i*batch_size, (i+1)*batch_size)
+    for process_id in range(NUM_PROCESSES):
+        start_idx = process_id * batch_size
+        end_idx = (process_id + 1) * batch_size
+        batch = itertools.islice(test_iterator, start_idx, end_idx)
         batches.append(batch)
-        
-    for b in batches:
-        print(list(b))
+    
+    # 打印每个批次的内容
+    for batch in batches:
+        print(list(batch))
         
 def test_template():
     from utils.formulate import clause_to_nature_language
@@ -371,29 +383,136 @@ def test_template():
                                     natural_template=template)
     print(res)
         
+def test_subs():
+    from itertools import product
+    def substitude_equivalene(expr, premise_ids, values_dict):
+        variables = list(expr.free_symbols)
+        value_combinations = list(product(*[values_dict[var] for var in variables]))
+        substitude_res = []
+        for values_group in value_combinations:
+            values = [item[0] for item in values_group]
+            premises = sum([item[1] for item in values_group], [])
+            subs_dict = dict(zip(variables, values))
+            new_expr = expr.subs(subs_dict)
+            substitude_res.append((new_expr, premise_ids + premises))
+    
+        return substitude_res
+    
+    from sympy import Symbol
+
+    a, b, c, x, y, p, q, m, n = symbols('a b c x y p q m n')
+    expr = a + b + c
+    premise_ids = [0]
+    values_dict = {
+        a: [(x, [1]), (y, [2])],
+        b: [(p, [3]), (q, [4])],
+        c: [(m, [5]), (n, [6])]
+    }
+    res = substitude_equivalene(expr, premise_ids, values_dict)
+    print(res)
+
+def test_adjust_coef():
+    from sympy import Add, Mul, Number, symbols
+    def adjust_first_variable_coefficient(expr):
+        """首先获取expr的第一个变量，然后将第一个变量的系数调整为1"""
+        if not isinstance(expr, Add):
+            return expr
+        args = expr.args
+        def index_arg_by_chars(arg):
+            free_symbols = arg.free_symbols
+            if len(free_symbols) == 0:
+                return 'z'
+            else:
+                return str(sorted(free_symbols)[0])
+        sorted_args = sorted(args, key=lambda x: index_arg_by_chars(x))
+        first_expr = sorted_args[0]
+
+        coeff = first_expr.as_coeff_Mul()[0]
+        if coeff is None:
+            coeff = 1
+
+        adjusted_expr = expr * (1 / coeff)
+        return adjusted_expr
+
+    x, y, z = symbols('x y z')
+    expr_1 = x + y + z
+    expr_2 = - x**2 + y**2 + z**2
+    expr_3 = x - 2*y + 1
+    expr_4 = -2* x - 2 * y - 1
+    for expr in [
+        # expr_1, expr_2, 
+        expr_3, expr_4
+    ]:
+        print('=====================')
+        print(adjust_first_variable_coefficient(expr))
+        print(expr)
+
+def test_check_expr():
+    import sympy
+    from sympy import degree, preorder_traversal, Add, Pow, symbols
+    def contains_sqrt_once(expr):
+        """检查表达式中是否仅有一个子表达式包含根号"""
+        sqrt_count = 0
+        for node in preorder_traversal(expr):
+            if isinstance(node, sympy.Pow) and node.exp == sympy.S.Half:
+                sqrt_count += 1
+            # 如果超过一个根号，则直接返回False
+            if sqrt_count > 1:
+                return False
+        return sqrt_count == 1
+    def check_expr(expr, min_symbol_num=2, max_items_num=3):
+        # 筛选符合条件的expr: ax + by + c = 0
+        free_symbols = expr.free_symbols
         
+        # free symbols num最多为2
+        if len(free_symbols) not in list(range(min_symbol_num, 3)):
+            return False
+        
+        # 最大项数为max_items_num
+        terms = expr.args if expr.is_Add else (expr,)
+        if len(terms) > max_items_num:
+            return False
+        
+        # 最大次数为1或2
+        max_degree = 0
+        for symbol in free_symbols:
+            current_degree = degree(expr, symbol)
+            if current_degree > max_degree:
+                max_degree = current_degree
+        if max_degree == 1:
+            # 允许一个根号
+            contain_sqrt = contains_sqrt_once(expr)
+            if contain_sqrt:
+                # 检查根号内的部分是否为常数
+                for node in preorder_traversal(expr):
+                    if isinstance(node, sympy.Pow) and node.exp == sympy.S.Half:
+                        sqrt_base = node.args[0]  # 获取根号内的表达式
+                        if not sqrt_base.is_number:  # 如果根号内的表达式不是常数
+                            return False
+                    
+        # 如果为2则必须类似：ax^2 - by^2, ax^2 - by, ax - by^2
+        elif max_degree == 2:
+            if contains_sqrt_once(expr):
+                return False
+            if not expr.is_Add:
+                return False
+            if len(expr.args) != 2:
+                return False
+            if expr.as_coefficients_dict().get(1, 0) != 0:
+                return False
+        
+        return True
+    
+    x, y = symbols('x y')
+    # expr_1 = x + y
+    expr_2 = x**2 - y**2
+    expr_3 = x**2 - y**2 + 1
+    expr_4 = x**2 - y**2 + x
+    for expr in [expr_2, expr_3, expr_4]:
+        print(check_expr(expr))
+
 if __name__ == '__main__':
 
-    # eq_str_list = [
-    #     '∠ ABC = 90°', 
-    #     '∠ BCD = 90°', 
-    #     '∠ CDA = 90°', 
-    #     '∠ DAB = 90° from step 3', 
-    #     '$ ∠ ABC + ∠ BCA + ∠ CAB = 180 $', 
-    #     '$ ∠ BCD = ∠ ACD + ∠ BCA $ from given condition', 
-    #     '$ ∠ ACD + ∠ CDA + ∠ DAC = 180 $ from step 2', 
-    #     '$ ∠ DAB = ∠ CAB + ∠ DAC $ from step 1', 
-    #     '∠ BCA = ∠ CAB from step 4'
-    # ]
-    # target_str = '∠ BCA = 45°'
-    # formulate_eqs(eq_str_list, target_str)
-    # test_wolframe_alpha()
-    # test_sympy_subs()
-    # filter_no_sqrt()
-    # test_parse()
-    # test_print()
-    # test_func_timeout()
-    # test_chat()
-    # find_formal_in_problem_text()
-    # test_itertools()
-    test_template()
+    # test_subs()
+    # test_adjust_coef()
+    test_check_expr()

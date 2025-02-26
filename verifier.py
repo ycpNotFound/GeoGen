@@ -1,14 +1,19 @@
+import itertools
 import json
 import os
-import itertools
 from copy import deepcopy
+
+from sympy import Eq, cos, rad, simplify, sin, solve, tan
+
 # from formalgeo.solver import Interactor
-from formalgeo.parse.basic import parse_geo_predicate, parse_equal_predicate, get_equation_from_tree
+from formalgeo.parse.basic import (get_equation_from_tree,
+                                   parse_equal_predicate, parse_geo_predicate)
 from solver import Interactor
-from utils.tools import read_json
-from utils.symbolic import parse_clause, build_point_map, replace_points_for_clause
 from utils.formulate import clause_to_nature_language
-from sympy import simplify, solve, Eq, sin, cos, tan, rad
+from utils.symbolic import (build_point_map, parse_clause,
+                            replace_points_for_clause)
+from utils.tools import read_json
+
 
 def rotate_combinations(lst):
     n = len(lst)
@@ -31,18 +36,20 @@ class Verifier():
         self.debug = debug
         
         # build map: predicate to extend conclusions 
-        self.predicate_to_extend = {}
+        self.predicate_to_extend_map = {}
         for template, info in self.predicate_GDL['Entity'].items():
             name = template.split('(')[0]
-            self.predicate_to_extend[name] = {
+            self.predicate_to_extend_map[name] = {
                 'template': template,
-                'extend': info['extend']
+                'extend': info['extend'],
+                'multi': info['multi']
             }
         for template, info in self.predicate_GDL['Relation'].items():
             name = template.split('(')[0]
-            self.predicate_to_extend[name] = {
+            self.predicate_to_extend_map[name] = {
                 'template': template,
-                'extend': info['extend']
+                'extend': info['extend'],
+                'multi': info['multi']
             }
         
     def init_problem(self, text_cdls, constr_cdls, image_cdls):
@@ -130,6 +137,51 @@ class Verifier():
             
         return True, None
     
+    def extend_conditions(self, conditions):
+        conclusions_total = []
+        for clause in conditions:
+            name = clause.split('(')[0]
+            if name in self.predicate_to_extend_map:
+                # extend origin clause
+                conclusions_total += self.extend_one_condition(clause)
+                
+                # extend multiple clause
+                clause_template = self.predicate_to_extend_map[name]['template']
+                p_map = build_point_map(clause, clause_template)
+                # multi: ABCD -> BCDA, CDAB, DABC
+                for para_str in self.predicate_to_extend_map[name]['multi']:
+                    new_clause_template = f"{name}({para_str})"
+                    # two mapping: ori_temp -> new_temp -> new_clause
+                    new_clause = replace_points_for_clause(new_clause_template, p_map)
+                    conclusions_total += self.extend_one_condition(new_clause)
+                    
+            elif name in ['Equal', 'Value', 'Equation']:
+                return []
+            else:
+                raise KeyError(name)
+        return sorted(set(conclusions_total))
+            
+    def extend_one_condition(self, clause):
+        extend_total = []
+        name = clause.split('(')[0]
+        if name in self.predicate_to_extend_map:
+            clause_template = self.predicate_to_extend_map[name]['template']
+            extends_template = self.predicate_to_extend_map[name]['extend']
+            # template -> clause, use recursion
+            p_map = build_point_map(clause, clause_template)
+            for extend_temp in extends_template:
+                extend_clause = replace_points_for_clause(extend_temp, p_map)
+                extend_total.append(extend_clause)
+                extend_total += self.extend_one_condition(extend_clause)
+            
+        elif name in ['Equal', 'Value', 'Equation']:
+            return []
+        else:
+            raise KeyError(name)
+        
+        return extend_total
+
+    
     def verify_theorem(self, theorem, conditions, conclusions):
         cdtn_statements = clause_to_nature_language(
             conditions, 
@@ -140,20 +192,9 @@ class Verifier():
             natural_template=self.natural_template
         )
         if theorem is None:
-            # extend all conclusions first (recursion)
-            conclusions_total = []
-            for clause in conditions:
-                name = clause.split('(')[0]
-                if name in self.predicate_to_extend:
-                    clause_template = self.predicate_to_extend[name]['template']
-                    extends_template = self.predicate_to_extend[name]['extend']
-                    # template -> clause
-                    p_map = build_point_map(clause, clause_template)
-                    for extend_temp in extends_template:
-                        extend_clause = replace_points_for_clause(extend_temp, p_map)
-                        conclusions_total.append(extend_clause)
-                else:
-                    raise KeyError(name)
+            # extend all conclusions first 
+            conclusions_total = self.extend_conditions(conditions)
+
             # then check conclusion existance
             for cclsn, statement in zip(conclusions, cclsn_statements):
                 cclsn = cclsn.replace('Value', 'Equal')
@@ -275,7 +316,7 @@ class Verifier():
     
     
 if __name__ == '__main__':
-    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_1.json'
+    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_3.json'
     test_data = read_json(test_solution_path)
     test_solution_dict = test_data['llm_info']['solution_dict']
     

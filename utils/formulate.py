@@ -111,23 +111,31 @@ def latex_to_sympy(latex_str, problem=None):
     expr = simplify(f"({lhs})-({rhs})")
     return expr
 
-def formulate_eqs_simple(eq_str_dict, target_str, problem):
-    formulated_str = "- <because> " 
-    for k, v in eq_str_dict.items():
-        formulated_str += f"{', '.join(v)} from {k}, "
+def formulate_eqs_simple(eq_str_dict, eq_str_list):
+    
+    long_eqs = [eq for eq in eq_str_list if '+' in eq or '-' in eq]
+    short_eqs = [eq for eq in eq_str_list if eq not in long_eqs]
+    if len(long_eqs) == 0:
+        formulated_str = f"- <because> {', '.join(short_eqs)}, " 
+    else:
+        formulated_str = f"- Substitute: {', '.join(short_eqs)} into equation:\n{long_eqs[0]}." 
+
     return formulated_str
         
 
-def formulate_eqs(eq_str_dict, target_str, problem, expand_flag=False):
-    if len(eq_str_dict) <= 2 or expand_flag:
-        return formulate_eqs_simple(eq_str_dict, target_str, problem)
-
+def formulate_eqs(eq_str_dict, target_str, problem):
     eq_str_list = []
     eq_str_premise_step = []
     for k, v in eq_str_dict.items():
         for eq in v:
             eq_str_list.append(eq)
             eq_str_premise_step.append(k)
+    long_eq_num = sum([1 if '+' in eq or '-' in eq else 0 for eq in eq_str_list])
+
+    if long_eq_num <= 1:
+        return formulate_eqs_simple(eq_str_dict, eq_str_list)
+    if len(eq_str_dict) >= 5:
+        return None
     
     expr_list = []
     for eq in eq_str_list + [target_str]:

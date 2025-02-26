@@ -1,15 +1,18 @@
-import time
-import math
 import copy
-import warnings
-from itertools import combinations
-from sympy import symbols
-from formalgeo.problem.condition import Condition, Goal
-from formalgeo.parse import parse_expr, get_equation_from_tree
-from formalgeo.tools import rough_equal
-from formalgeo.core import EquationKiller as EqKiller
-from copy import deepcopy
 import itertools
+import math
+import time
+import warnings
+from copy import deepcopy
+from itertools import combinations
+
+from sympy import symbols
+
+from formalgeo.core import EquationKiller as EqKiller
+from formalgeo.parse import get_equation_from_tree, parse_expr
+from formalgeo.problem.condition import Condition, Goal
+from formalgeo.tools import rough_equal
+
 
 class Problem:
     def __init__(self, p_pos=None):
@@ -122,7 +125,7 @@ class Problem:
         3.Shape expand. Shape(s1,s2,s3), Shape(s3,s2,s4) ==> Shape(s1,s4).
         4.Angle expand (combination).
         5.Angle expand (collinear).
-        6.Angle expand (vertical angle).
+        6.Angle expand (find possible angle).
         """
         # 0. Add all point and line instances.
         for line in self.parsed_problem_CDL['lines']:
@@ -155,6 +158,10 @@ class Problem:
                 self.condition.add("Collinear", extended_item[::-1], (_id,), ("extended", None, None))
                 self.add("Angle", extended_item, (_id,), ("extended", None, None))
                 self.add("Angle", extended_item[::-1], (_id,), ("extended", None, None))
+                angle_sym_1 = self.get_sym_of_attr('MeasureOfAngle', extended_item)
+                angle_sym_2 = self.get_sym_of_attr('MeasureOfAngle', extended_item[::-1])
+                self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
+                self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
 
         # 2.Cocircular expand.
         for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
@@ -345,31 +352,61 @@ class Problem:
         # for angle in self.condition.get_items_by_predicate("Angle"):
         #     premise = (self.condition.get_id_by_predicate_and_item("Angle", angle),)
         #     self.add("Angle", (angle[2], angle[1], angle[0]), premise, ("extended", None, None))
+
+        # 6.Angle expand (find possible angle).
+        def collinear(p1, p2, p3):
+            collinear_ls = self.condition.get_items_by_predicate("Collinear")
+            for l in collinear_ls:
+                if len(set(l) & set((p1, p2, p3))) == 3:
+                    return True
+            if self.p_pos is not None:
+                pos_1 = self.p_pos[p1]
+                pos_2 = self.p_pos[p2]
+                pos_3 = self.p_pos[p3]
+                AB = (pos_2[0] - pos_1[0], pos_2[1] - pos_1[1])
+                AC = (pos_3[0] - pos_1[0], pos_3[1] - pos_1[1])
+                cross_product = AB[0] * AC[1] - AB[1] * AC[0]
+                if abs(cross_product) < 1e-5:
+                    return True
+            return False
         
+        for line in self.condition.get_items_by_predicate("Line"):
+            # AB is line, find other lines starts with B (BC, BD, ...)
+            other_lines = [
+                l for l in self.condition.get_items_by_predicate("Line")
+                if len(set(l) & set(line)) != 2 and l[0] == line[1]
+                and not collinear(line[0], l[0], l[1])
+            ]
+            for l in other_lines:
+                new_angle = (line[0], l[0], l[1])
+                premise = (self.condition.get_id_by_predicate_and_item("Line", line),
+                           self.condition.get_id_by_predicate_and_item("Line", l))
+                self.add("Angle", new_angle, premise, ("extended", None, None))
+
         # 6.Cocircular radius equal (new added).
-        for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
-            if predicate != "Cocircular":
-                continue
-            if not self.fv_check("Cocircular", item):  # FV check
-                w_msg = "FV check not passed: [{}, {}]".format(predicate, item)
-                warnings.warn(w_msg)
-                continue
-            radius = []
-            for p in item[1:]:
-                line = (item[0], p)
-                if line in self.condition.items_group['Line']:
-                    radius.append(line)
+        # for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
+        #     if predicate != "Cocircular":
+        #         continue
+        #     if not self.fv_check("Cocircular", item):  # FV check
+        #         w_msg = "FV check not passed: [{}, {}]".format(predicate, item)
+        #         warnings.warn(w_msg)
+        #         continue
+        #     radius = []
+        #     for p in item[1:]:
+        #         line = (item[0], p)
+        #         if line in self.condition.items_group['Line']:
+        #             radius.append(line)
             
-            for i in range(len(radius)-1):
-                l1, l2 = radius[i], radius[i+1]
-                l1_sym = self.get_sym_of_attr('LengthOfLine', l1)
-                l2_sym = self.get_sym_of_attr('LengthOfLine', l2)
-                premise = [
-                    self.condition.get_id_by_predicate_and_item(predicate, tuple(item)),
-                    self.condition.get_id_by_predicate_and_item("Line", l1),
-                    self.condition.get_id_by_predicate_and_item("Line", l2),
-                ]
-                self.add("Equation", l1_sym - l2_sym, premise, ("extended", None, None))
+        #     for i in range(len(radius)-1):
+        #         l1, l2 = radius[i], radius[i+1]
+        #         l1_sym = self.get_sym_of_attr('LengthOfLine', l1)
+        #         l2_sym = self.get_sym_of_attr('LengthOfLine', l2)
+        #         premise = [
+        #             self.condition.get_id_by_predicate_and_item(predicate, tuple(item)),
+        #             self.condition.get_id_by_predicate_and_item("Line", l1),
+        #             self.condition.get_id_by_predicate_and_item("Line", l2),
+        #         ]
+        #         self.add("Equation", l1_sym - l2_sym, premise, ("extended", None, None))
         return 
 
 
@@ -582,6 +619,22 @@ class Problem:
                     return False
         elif predicate == 'Collinear':
             item = self.sort_by_x_collinear(item)
+        elif predicate == 'Angle':
+            if self.p_pos is not None:
+                # check the points in angle are counter clockwise
+                # self.p_pos: {'p': [x, y]}
+                p1, p2, p3 = item
+                p1_pos = self.p_pos[p1]
+                p2_pos = self.p_pos[p2]
+                p3_pos = self.p_pos[p3]
+                # Calculate the vectors
+                v1 = (p2_pos[0] - p1_pos[0], p2_pos[1] - p1_pos[1])
+                v2 = (p3_pos[0] - p1_pos[0], p3_pos[1] - p1_pos[1])
+                # Calculate the cross product: p2-p1 x p3-p1 > 0 (in cv2 < 0) is ccw
+                cross = v1[0] * v2[1] - v1[1] * v2[0]
+                if cross > 1e-5: # if cross > 0, is not ccw
+                    return False
+                
 
         added, _id = self.condition.add(predicate, item, premise, theorem)
         if added:
@@ -601,6 +654,9 @@ class Problem:
                              (_id,), ("extended", None, None), skip_check=True)
                     self.add("Line", (item[1], item[2]),
                              (_id,), ("extended", None, None), skip_check=True)
+                    # define symbol for angle
+                    sym = self.get_sym_of_attr('MeasureOfAngle', item)
+                    a = 1
                 elif predicate == "Polygon":
                     l = len(item)
                     for bias in range(1, l):  # all forms
@@ -824,15 +880,44 @@ class Problem:
             self.condition.sym_of_attr[(attr, item)] = sym  # add sym
             self.condition.value_of_sym[sym] = None  # init symbol's value
             self.condition.attr_of_sym[sym] = (attr, (item,))  # add attr
+            self.condition.equivalence_of_sym[sym] = []
             return sym
 
         if attr == "MeasureOfAngle":  # align angle's sym
             sym = symbols("ma_" + "".join(item).lower(), positive=True)  # init sym
             self.condition.value_of_sym[sym] = None  # init symbol's value
+            self.condition.sym_of_attr[("MeasureOfAngle", item)] = sym
+            self.condition.attr_of_sym[sym] = ("MeasureOfAngle", (item,))
+            self.condition.equivalence_of_sym[sym] = []
+            # define same angle
             same_angles = self._get_same_angles(item)
             for same_angle in same_angles:
-                self.condition.sym_of_attr[("MeasureOfAngle", same_angle)] = sym
-            self.condition.attr_of_sym[sym] = ("MeasureOfAngle", tuple(same_angles))
+                if same_angle == item: 
+                    continue
+                
+                # define angle
+                if ("MeasureOfAngle", same_angle) not in self.condition.sym_of_attr:
+                    same_angle_sym = symbols("ma_" + "".join(same_angle).lower(), positive=True)
+                    self.condition.sym_of_attr[("MeasureOfAngle", same_angle)] = same_angle_sym
+                    self.condition.attr_of_sym[same_angle_sym] = ("MeasureOfAngle", (same_angle,))
+                    self.condition.value_of_sym[same_angle_sym] = None
+                    self.condition.equivalence_of_sym[same_angle_sym] = []
+                
+                same_angle_sym = self.condition.sym_of_attr[("MeasureOfAngle", same_angle)]
+                
+                # find premise of collinear
+                collinear_ps = tuple(set(item[1:] + same_angle[1:]))
+                collinear_total = self.condition.get_items_by_predicate('Collinear')
+                for ps in collinear_total:
+                    if set(collinear_ps) == set(ps):
+                        break
+                collinear_premise = self.condition.get_id_by_predicate_and_item('Collinear', ps)
+                
+                # add equality relation
+                self.condition.add('Equation', same_angle_sym - sym, [collinear_premise], ('extended', None, None))
+                # self.condition.sym_of_attr[("MeasureOfAngle", same_angle)] = sym
+            # self.condition.attr_of_sym[sym] = ("MeasureOfAngle", tuple(same_angles))
+            
             return sym
 
         attr_GDL = self.parsed_predicate_GDL["Attribution"][attr]
@@ -853,6 +938,7 @@ class Problem:
                 extend_items.append(tuple(extended_item))
 
             self.condition.attr_of_sym[sym] = (attr, tuple(extend_items))  # add attr
+            self.condition.equivalence_of_sym[sym] = []
             return sym
 
     def set_value_of_sym(self, sym, value, premise):
@@ -866,7 +952,9 @@ class Problem:
 
         if self.condition.value_of_sym[sym] is None:
             self.condition.value_of_sym[sym] = value
-            added, _id = self.condition.add("Equation", sym - value, premise, ("solve_eq", None, None))
+            if 'ma_eac' in str(sym):
+                a = 1 # debug
+            added, _id = self.condition.add("Equation", sym - value, premise, ("solve_eq", 'set_value', None))
             return added
         return False
 

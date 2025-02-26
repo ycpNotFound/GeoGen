@@ -192,7 +192,7 @@ class ClauseGenerator():
             constr_cdl, text_cdl = self.define_relation(name)
             constr_cdls += constr_cdl
             text_cdls += text_cdl
-            self.find_collinear_from_para_perp()
+            constr_cdls += self.find_collinear_from_para_perp()
             self.find_triangles()
             
         
@@ -294,7 +294,7 @@ class ClauseGenerator():
             AB \perp BC, BE \perp BC => E B C collinear
             得到的collinear关系是推论，不参与constraint的计算
         '''
-        
+        constr_clauses_to_add = []
         # Parallel lines
         parallel_clauses = [c for c in self.constraints if 'ParallelBetweenLine' in c]
         G_para = nx.Graph()
@@ -322,6 +322,10 @@ class ClauseGenerator():
                     p1 = list(set(collinear_1) - set([same_p]))[0]
                     p2 = list(set(collinear_2) - set([same_p]))[0]
                     self.add_new_line([min(p1, p2), same_p, max(p1, p2)])
+                    constr_clauses_to_add.append(
+                        f"Collinear({''.join([min(p1, p2), same_p, max(p1, p2)])})"
+                    )
+                    
         
         
         # Perp lines
@@ -351,6 +355,10 @@ class ClauseGenerator():
                         p1 = list(set(l1) - set([same_p]))[0]
                         p2 = list(set(l2) - set([same_p]))[0]
                         self.add_new_line([min(p1, p2), same_p, max(p1, p2)])
+                        constr_clauses_to_add.append(
+                            f"Collinear({''.join([min(p1, p2), same_p, max(p1, p2)])})"
+                        )
+        return constr_clauses_to_add
                         
     
     def define_base(self, pred_name, pred_type):

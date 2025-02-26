@@ -22,6 +22,8 @@ class Condition:
         self.value_of_sym = {}  # <dict>, {sym: value}, such as {l_ab: 3}
         self.simplified_equation = {}  # <dict>, {simplified_equation: premises}, such as {a + b - 2: [1, 2, 3]}
         self.eq_solved = True  # <bool>, record whether the equation is solved
+        
+        self.equivalence_of_sym = {} # <dict>, {sym: [(equivalent exprs or syms, premise_ids)]}
 
     def init_by_fl(self, fix_length_predicates, variable_length_predicates):
         """
@@ -104,8 +106,14 @@ class Condition:
 
     def get_id_by_predicate_and_item(self, predicate, item):
         if predicate == "Equation":
-            item = str(item)
-        return self.id_of_item[(predicate, item)]
+            if (predicate, str(item)) in self.id_of_item:
+                return self.id_of_item[(predicate, str(item))]
+            elif (predicate, str(-item)) in self.id_of_item:
+                return self.id_of_item[(predicate, str(-item))]
+            else:
+                raise KeyError((predicate, str(item)))
+        else:
+            return self.id_of_item[(predicate, item)]
 
     def get_items_by_predicate(self, predicate):
         return copy.copy(self.items_group[predicate])

@@ -247,7 +247,7 @@ def run_task(seed,
 
             # get results with timeout
             results_with_timeout = []
-            for r, arg, cnt in enumerate(result_info):
+            for r, arg, cnt in result_info:
                 try:
                     result = r.get(timeout=200)
                     results_with_timeout.append(result)
