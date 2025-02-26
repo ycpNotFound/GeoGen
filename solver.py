@@ -66,7 +66,7 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
 
 
 class FormalGeoSolver:
-    def __init__(self, predicate_GDL, theorem_GDL, strategy, max_depth, beam_size, t_info, t_freq_info, p_pos=None, debug=False):
+    def __init__(self, predicate_GDL, theorem_GDL, strategy='auto', max_depth=3, beam_size=6, t_info=None, t_freq_info=None, p_pos=None, debug=False):
         """
         Initialize Forward Searcher.
         :param predicate_GDL: predicate GDL.
@@ -109,7 +109,7 @@ class FormalGeoSolver:
         self.problem = Problem(p_pos=self.p_pos)  # init problem
         self.problem.load_problem_by_fl(
             self.parsed_predicate_GDL, self.parsed_theorem_GDL, parse_problem_cdl(problem_CDL))
-        EqKiller.solve_equations(self.problem)
+        # EqKiller.solve_equations(self.problem)
         self.problem.step("init_problem", 0)
 
         self.stack = []
@@ -454,12 +454,15 @@ class FormalGeoSolver:
         end_step = len(self.problem.condition.items)
         for depth_i in range(1, self.max_depth+1):
             beam_count = len(self.stack)
-            if depth_i == 0 or depth_i == 1:
-                beam_count = 200
-            elif depth_i == 2:
-                beam_count = 100
-            elif depth_i == 3:
-                beam_count = 50
+            if self.strategy == 'auto':
+                if depth_i == 0 or depth_i == 1:
+                    beam_count = 200
+                elif depth_i == 2:
+                    beam_count = 100
+                elif depth_i == 3:
+                    beam_count = 50
+                else:
+                    beam_count = self.beam_size
             else:
                 beam_count = self.beam_size
                     
@@ -808,6 +811,8 @@ class FormalGeoSolver:
                     selections.append(((t_name, t_branch, t_para), tuple(conclusions)))
 
         if len(related_pres) > 1000 and self.debug:
+            if len(self.problem.condition.items) > 300:
+                related_pres = random.sample(related_pres, 300)
             with tqdm(total=len(related_pres)) as pbar:
                 for t_name, t_branch, t_letters in related_pres:
                     if 'similar_arc' in t_name:
@@ -815,6 +820,8 @@ class FormalGeoSolver:
                     process_related_pres(t_name, t_branch, t_letters)
                     pbar.update(1)
         else:
+            # if len(self.problem.condition.items) > 300 and len(related_pres) > 500:
+            #     related_pres = random.sample(related_pres, 500)
             for t_name, t_branch, t_letters in related_pres:
                 if 'similar_arc' in t_name:
                     continue

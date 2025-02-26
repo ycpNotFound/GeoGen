@@ -12,5 +12,5 @@ __all__ = [
     "GeometryPredicateLogicExecutor", "EquationKiller"
 ]
 
-# from formalgeo.core.engine import (EquationKiller, GeometryPredicateLogicExecutor)
-from formalgeo.core.engine_v2 import (EquationKiller, GeometryPredicateLogicExecutor)
+from formalgeo.core.engine import (EquationKiller, GeometryPredicateLogicExecutor)
+# from formalgeo.core.engine_v2 import (EquationKiller, GeometryPredicateLogicExecutor)

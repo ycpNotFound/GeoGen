@@ -151,7 +151,7 @@ def create_problem_prove(target: Tuple, problem: Problem, natural_template: Dict
     return f'Prove that {target_statement[0]}.'
     
 
-def solve_test():
+def solve_one_test():
 
     # problem_idx = 6981
     # problem_idx = 184
@@ -238,8 +238,35 @@ def expand_one_sample(
     condition_graph = ConditionGraph(solver.problem.condition.items)
     condition_graph.construct_graph()
     
-    # solution to original target
-    solution_str, _, _, _ = TargetFinder.find_solution_for_target(
+    # define target_finder instance
+    t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
+    t_freq_info = {k: t_info[k][-1] for k in t_names}
+    allocater_states = {
+        "p_pos": None,
+        "lines": None,
+        "circles": None,
+        "points_on_circle": None,
+        "clauses": None
+    }
+
+    target_finder = TargetFinder(
+                 dl.predicate_GDL,
+                 dl.theorem_GDL,
+                 t_info,
+                 t_freq_info,
+                 allocater_states, 
+                 problem_CDL['text_cdl'],
+                 problem_CDL['construction_cdl'],
+                 problem_CDL['image_cdl'],
+                 problem_id=0,
+                 replace_characters=False,
+                 solver_type='formalgeo',
+                 predicate_num=2,
+                 debug=False
+    )
+    
+    # solution to original target    
+    res = TargetFinder.find_solution_for_target(
         solver.problem, 
         condition_graph, 
         target, 
@@ -247,6 +274,7 @@ def expand_one_sample(
         solver.parsed_theorem_GDL,
         expand_flag=True
     )
+    solution_str = res[0]
     if not solver.problem.goal.solved:
         print(f'{problem_idx} not solved')
         
@@ -285,7 +313,7 @@ def expand_one_sample(
     solution_for_targets = {}
     level_for_targets = {}
     for target in new_targets:
-        solution_str, theorems, _, _ = TargetFinder.find_solution_for_target(
+        solution_str, theorems, _, _, _ = TargetFinder.find_solution_for_target(
             solver.problem,
             condition_graph, 
             target, 
@@ -297,29 +325,30 @@ def expand_one_sample(
         solution_for_targets[target] = solution_str
         level_for_targets[target] = len(theorems)
     # filter 2
-    new_targets, _ = TargetFinder.targets_filter_2(
-        new_targets, theorems_for_targets, level_for_targets
-    )
+    new_targets = TargetFinder.targets_filter_2(new_targets)
     # filter 3
-    targets_dict = TargetFinder.targets_filter_3(new_targets)
-    types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
-    if len(types_to_choose) == 0:
-        return 
-    elif len(types_to_choose) == 1:
-        # expand 1 target
-        chosen_targets = targets_dict[types_to_choose[0]][:1] 
-    else:
-        # expand 2 target
-        types_to_choose = random.sample(types_to_choose, 2)
-        chosen_targets = [targets_dict[t][0] for t in types_to_choose]
+    targets_dict = TargetFinder.targets_into_groups(new_targets)
+
+    chosen_targets = []
+    for type, targets in targets_dict.items():
+        chosen_targets += targets
     
+    # solution to expanded targets
     for i, chosen_target in enumerate(chosen_targets):
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
-        problem_text = create_problem_prove(
-            chosen_target, solver.problem, natural_template
-        )
-        problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
+
+        (
+            conclusion, 
+            add_cdls,
+            add_conditions, 
+            target_value, 
+            target_cdl, 
+            problem_text, 
+            problem_text_type
+        ) = target_finder.create_question(chosen_target, 'image_based')
+
+        # problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
         data_info = {
             "key": problem_idx,
             "solved": True,
@@ -381,8 +410,23 @@ def solve_main(split="test"):
 
     print("End for expand.")
         
-        
-        
+def solve_test():
+    data_path = f"datasets/processed_data/fgo_train.json"
+    save_dir = f"datasets/processed_data/debug"
+    data = json.load(open(data_path, 'r', encoding='utf-8'))
+    keys = list(data.keys())
+
+    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    
+    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
+ 
+    results = []
+    for problem_idx in tqdm(keys):
+        problem_idx = int(problem_idx)
+        res = expand_one_sample(problem_idx, dl, t_info, natural_template, save_dir)
+        results.append(res)
+ 
 
 def draw_iteration():
     split = "train"
@@ -452,8 +496,8 @@ def setup_seed():
 
 if __name__ == '__main__':
     setup_seed()
-    # solve_test()
+    solve_test()
     # check_type()
     # solve_iteration()
     # draw_iteration()
-    solve_main(split='val')
+    # solve_main(split='val')

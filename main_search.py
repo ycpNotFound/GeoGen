@@ -194,13 +194,14 @@ def generate_one_sample_with_timeout(
 def run_task(seed, 
              task_name, 
              input_args_list,
-             num_process):
+             num_process,
+             base_dir="geo_synth_debug"):
     # seed, task_name, predicate_base_combs, predicate_rel_combs = task_1()
     setup_seed(seed)
     
-    failure_cases_path = f"geo_synth_debug/{task_name}/failure_cases.json"
-    fig_dir = f"geo_synth_debug/{task_name}/imgs"
-    info_dir = f"geo_synth_debug/{task_name}/annotations"
+    failure_cases_path = f"{base_dir}/{task_name}/failure_cases.json"
+    fig_dir = f"{base_dir}/{task_name}/imgs"
+    info_dir = f"{base_dir}/{task_name}/annotations"
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(info_dir, exist_ok=True)
     print("Start Generation ...")

@@ -1,183 +1,206 @@
 {
-    "('Equation', ll_ab**2 + ll_ac**2 - ll_bc**2, (89,), ('right_triangle_property_pythagorean', '1', ('C', 'A', 'B')), 5)": [
+    "('RightTriangle', ('A', 'C', 'K'), (133, 286), ('right_triangle_judgment_angle', '1', ('A', 'C', 'K')), 15)": [
         "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- CAB is a right triangle.",
-        "2. <by> right_triangle_property_pythagorean, <because> CAB is a right triangle from step 1, <therefore>",
-        "- $ AB**2 + AC**2 = BC**2 $. "
+        "1. <because> KC ⊥ HC, <therefore>",
+        "- ∠ HCK = 90°.",
+        "2. Solve equations:",
+        "- <because> ∠ HCK = 90°, <therefore>",
+        "- ∠ ACK = 90°. ",
+        "3. <by> right_triangle_judgment_angle, <because> ∠ ACK = 90° from step 2, <therefore>",
+        "- ACK is a right triangle. "
     ],
-    "('Equation', ma_bce + ma_eab - 180, (0, 2, 6, 8, 15), ('circle_property_diagonal_of_quadrilateral_sum', '1', ('A', 'B', 'C', 'E', 'D')), 8)": [
+    "('PerpendicularBetweenLine', ('A', 'C', 'K', 'C'), (293,), ('extended', None, None), 15)": [
         "Solution: ",
-        "1. <by> circle_property_diagonal_of_quadrilateral_sum, <because> A, B, C, E lie on the circle D from given condition, <therefore>",
-        "- $ \\angle BCE + \\angle EAB = 180 $. "
+        "1. <because> KC ⊥ HC, <therefore>",
+        "- ∠ HCK = 90°.",
+        "2. Solve equations:",
+        "- <because> ∠ HCK = 90°, <therefore>",
+        "- ∠ ACK = 90°. ",
+        "3. <by> right_triangle_judgment_angle, <because> ∠ ACK = 90° from step 2, <therefore>",
+        "- ACK is a right triangle",
+        "- AC ⊥ KC. "
     ],
-    "('IsDiameterOfCircle', ('B', 'C', 'D'), (47, 91), ('diameter_of_circle_judgment_right_angle', '1', ('C', 'A', 'B', 'D')), 23)": [
-        "Solution: ",
-        "1. <because> the shape ABC forms an isosceles right triangle, <therefore>",
-        "- △ CAB has a right angle CAB.",
-        "- CA ⊥ BA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B lie on the same circle centered at D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC. "
-    ],
-    "('IsDiameterOfCircle', ('C', 'B', 'D'), (128,), ('extended', None, None), 23)": [
-        "Solution: ",
-        "1. <because> ABC is an isosceles right triangle, <therefore>",
-        "- CAB is a right triangle.",
-        "- BA ⊥ CA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B are on circle D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- ⊙ CB. "
-    ],
-    "('IsMidpointOfLine', ('D', 'B', 'C'), (128,), ('extended', None, None), 23)": [
-        "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- CAB is a right triangle.",
-        "- BA ⊥ CA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B are on circle D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- the midpoint of BC is D. "
-    ],
-    "('IsMidpointOfLine', ('D', 'C', 'B'), (130,), ('extended', None, None), 23)": [
-        "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- CAB is a right triangle.",
-        "- BA ⊥ CA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B lie on the circle D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- the midpoint of BC is D",
-        "- D is the midpoint of CB. "
-    ],
-    "('Collinear', ('C', 'D', 'B'), (128,), ('extended', None, None), 23)": [
-        "Solution: ",
-        "1. <because> ABC is an isosceles right triangle, <therefore>",
-        "- the shape CAB forms a right triangle.",
-        "- CA ⊥ BA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B are on circle D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- C, D, B are aligned in one line. "
-    ],
-    "('Collinear', ('B', 'D', 'C'), (132,), ('extended', None, None), 23)": [
-        "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- CAB is a right triangle.",
-        "- BA ⊥ CA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B are on circle D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- D is on the line segment CB",
-        "- B, D, C are collinear. "
-    ],
-    "('Equation', ll_ab - sqrt(2)*ll_bc/2, (89, 95), ('cos_of_angle', None, None), 24)": [
-        "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- ∠ ABC = 45°.",
-        "- the shape CAB forms a right triangle.",
-        "2. <by> cos_of_angle, <because> the shape CAB forms a right triangle, ∠ ABC = 45° from step 1, <therefore>",
-        "- $ AB = \\sqrt{2}*BC/2 $. "
-    ],
-    "('Equation', ll_ac - sqrt(2)*ll_bc/2, (89, 95), ('sin_of_angle', None, None), 24)": [
-        "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- ∠ ABC = 45°.",
-        "- △ CAB has a right angle CAB.",
-        "2. <by> sin_of_angle, <because> △ CAB has a right angle CAB, ∠ ABC = 45° from step 1, <therefore>",
-        "- $ AC = \\sqrt{2}*BC/2 $. "
-    ],
-    "('Equation', ll_bc - ll_cd - ll_db, (132,), ('line_addition', '1', ('C', 'D', 'D', 'B')), 25)": [
-        "Solution: ",
-        "1. <because> ABC is an isosceles right triangle, <therefore>",
-        "- CAB is a right triangle.",
-        "- CA ⊥ BA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B lie on the same circle centered at D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- D lie on line segment CB. ",
-        "3. <by> line_addition, <because> D lie on line segment CB from step 2, <therefore>",
-        "- $ BC = CD + DB $. "
-    ],
-    "('Equation', ll_cd - ll_db, (36, 135, 136), ('circle_property_length_of_radius_equal', '1', ('C', 'B', 'D')), 38)": [
-        "Solution: ",
-        "1. <because> right triangle ABC is isosceles, <therefore>",
-        "- the shape CAB forms a right triangle.",
-        "- BA ⊥ CA.",
-        "- ∠ CAB = 90°.",
-        "2. <by> diameter_of_circle_judgment_right_angle, <because> C, A, B are on circle D from given condition, ∠ CAB = 90° from step 1, <therefore>",
-        "- ⊙ BC",
-        "- C, D, B are collinear. ",
-        "3. <by> circle_property_length_of_radius_equal, <because> C, B are on circle D from given condition, <therefore>",
-        "- CD = DB. "
-    ],
-    "('Equation', -ma_ace + ma_bce - 45, (96, 103), ('solve_eq', 'simplify_value_replace', None), 40)": [
+    "('RightTriangle', ('K', 'C', 'F'), (99, 278), ('right_triangle_judgment_angle', '1', ('K', 'C', 'F')), 16)": [
         "Solution: ",
         "1. <by> angle_addition, <therefore>",
-        "- $ \\angle BCE = \\angle ACE + \\angle BCA $. ",
-        "2. <because> the shape ABC forms an isosceles right triangle, <therefore>",
-        "- ∠ BCA = 45°.",
-        "3. Solve equations:",
-        "- Substitute: ∠ BCA = 45° into equation:",
-        "$ \\angle BCE = \\angle ACE + \\angle BCA $.<therefore>",
-        "- $ \\angle BCE = \\angle ACE + 45 $. "
+        "- $ \\angle HCF = \\angle HCK + \\angle KCF $. ",
+        "2. <because> KC ⊥ HC, <therefore>",
+        "- ∠ HCK = 90°.",
+        "3. <because> A, H, C, F are collinear, <therefore>",
+        "- ∠ HCF = 180°.",
+        "4. Solve equations:",
+        "- Substitute ∠ HCF = 180°, ∠ HCK = 90° into equation:",
+        "$ \\angle HCF = \\angle HCK + \\angle KCF $.<therefore>",
+        "- $ 90 = \\angle KCF $. ",
+        "5. <by> right_triangle_judgment_angle, <because> $ 90 = \\angle KCF $ from step 4, <therefore>",
+        "- △ KCF has a right angle KCF. "
     ],
-    "('Equation', ma_eab - ma_eac - 90, (91, 104), ('solve_eq', 'simplify_value_replace', None), 40)": [
+    "('PerpendicularBetweenLine', ('K', 'C', 'F', 'C'), (295,), ('extended', None, None), 16)": [
         "Solution: ",
         "1. <by> angle_addition, <therefore>",
-        "- $ \\angle EAB = \\angle CAB + \\angle EAC $. ",
-        "2. <because> ABC is an isosceles right triangle, <therefore>",
-        "- the shape CAB forms a right triangle.",
-        "- BA ⊥ CA.",
-        "- ∠ CAB = 90°.",
-        "3. Solve equations:",
-        "- Substitute: ∠ CAB = 90° into equation:",
-        "$ \\angle EAB = \\angle CAB + \\angle EAC $.<therefore>",
-        "- $ \\angle EAB = \\angle EAC + 90 $. "
+        "- $ \\angle HCF = \\angle HCK + \\angle KCF $. ",
+        "2. <because> HC ⊥ KC, <therefore>",
+        "- ∠ HCK = 90°.",
+        "3. <because> A, H, C, F are aligned in one line, <therefore>",
+        "- ∠ HCF = 180°.",
+        "4. Solve equations:",
+        "- Substitute ∠ HCF = 180°, ∠ HCK = 90° into equation:",
+        "$ \\angle HCF = \\angle HCK + \\angle KCF $.<therefore>",
+        "- $ 90 = \\angle KCF $. ",
+        "5. <by> right_triangle_judgment_angle, <because> $ 90 = \\angle KCF $ from step 4, <therefore>",
+        "- △ KCF has a right angle KCF",
+        "- FC ⊥ KC. "
     ],
-    "('Equation', ma_ace + ma_eab - 135, (109, 159), ('solve_eq', 'build_equivalence', None), 40)": [
+    "('Collinear', ('C', 'A', 'F'), (93, 96, 170), ('collinear_judgement_angle_extend', '1', ('C', 'F', 'K', 'A')), 19)": [
         "Solution: ",
-        "1. <by> angle_addition, <therefore>",
-        "- $ \\angle BCE = \\angle ACE + \\angle BCA $. ",
-        "2. <because> the shape ABC forms an isosceles right triangle, <therefore>",
-        "- ∠ BCA = 45°.",
-        "3. Solve equations:",
-        "- Substitute: ∠ BCA = 45° into equation:",
-        "$ \\angle BCE = \\angle ACE + \\angle BCA $.<therefore>",
-        "- $ \\angle BCE = \\angle ACE + 45 $. ",
-        "4. <by> circle_property_diagonal_of_quadrilateral_sum, <because> A, B, C, E lie on the circle D from given condition, <therefore>",
-        "- $ \\angle BCE + \\angle EAB = 180 $. ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- A is on the line segment CF. "
+    ],
+    "('Collinear', ('F', 'A', 'C'), (299,), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F are aligned in one line",
+        "- F, A, C are collinear. "
+    ],
+    "('Collinear', ('F', 'A', 'H'), (6, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- A is on the line segment CF",
+        "- A lie on line segment FH. "
+    ],
+    "('Collinear', ('H', 'A', 'F'), (6, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- H, A, F lie on the same line. "
+    ],
+    "('Collinear', ('C', 'A', 'H'), (20, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- A lie on line segment CH. "
+    ],
+    "('Collinear', ('H', 'A', 'C'), (20, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- A is on the line segment HC. "
+    ],
+    "('Collinear', ('C', 'F', 'H'), (20, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- F is on the line segment CH. "
+    ],
+    "('Collinear', ('H', 'F', 'C'), (20, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- H, F, C lie on the same line. "
+    ],
+    "('Collinear', ('A', 'C', 'H'), (40, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F are aligned in one line",
+        "- A, C, H are aligned in one line. "
+    ],
+    "('Collinear', ('H', 'C', 'A'), (40, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- A is on the line segment CF",
+        "- H, C, A lie on the same line. "
+    ],
+    "('Collinear', ('A', 'F', 'H'), (40, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- A lie on line segment CF",
+        "- A, F, H lie on the same line. "
+    ],
+    "('Collinear', ('H', 'F', 'A'), (40, 299), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F are aligned in one line",
+        "- F lie on line segment HA. "
+    ],
+    "('Equation', -ma_fak + ma_hak, (322,), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- H, F, A are aligned in one line",
+        "- ∠ HAK = ∠ FAK. "
+    ],
+    "('Equation', ma_cak - ma_fak, (322,), ('extended', None, None), 19)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F lie on the same line",
+        "- H, F, A are collinear",
+        "- ∠ CAK = ∠ FAK. "
+    ],
+    "('Equation', -ma_kfa + ma_kfh, (20,), ('extended', None, None), 19)": [
+        "Solution: "
+    ],
+    "('Equation', -ma_kfa + ma_kfc, (28,), ('extended', None, None), 19)": [
+        "Solution: "
+    ],
+    "('Equation', ma_cak - ma_hak, (327, 328), ('solve_eq', 'build_equivalence', None), 20)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- A lie on line segment CF",
+        "- H, F, A are aligned in one line",
+        "- ∠ CAK = ∠ FAK",
+        "- ∠ HAK = ∠ FAK. ",
+        "2. Solve equations:",
+        "- <because> ∠ HAK = ∠ FAK, ∠ CAK = ∠ FAK, <therefore>",
+        "- ∠ CAK = ∠ HAK. "
+    ],
+    "('Equation', ma_kfc - ma_kfh, (331, 332), ('solve_eq', 'build_equivalence', None), 20)": [
+        "Solution: ",
+        "1. Solve equations:",
+        "- <because> ∠ KFH = ∠ KFA, ∠ KFC = ∠ KFA, <therefore>",
+        "- ∠ KFC = ∠ KFH. "
+    ],
+    "('Equation', ma_kca - 90, (253, 358), ('solve_eq', 'simplify_value_replace', None), 25)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F are aligned in one line",
+        "- H, C, A lie on the same line. ",
+        "2. <by> adjacent_complementary_angle, <because> H, C, A lie on the same line from step 1, <therefore>",
+        "- $ \\angle HCK + \\angle KCA = 180 $. ",
+        "3. <because> HC ⊥ KC, <therefore>",
+        "- ∠ HCK = 90°.",
+        "4. Solve equations:",
+        "- Substitute ∠ HCK = 90° into equation:",
+        "$ \\angle HCK + \\angle KCA = 180 $.<therefore>",
+        "- ∠ KCA = 90°. "
+    ],
+    "('Equation', -ma_kha - 129, (18, 249, 359), ('solve_eq', 'simplify_value_replace', None), 25)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- C, A, F are collinear. ",
+        "2. <by> angle_addition, <therefore>",
+        "- $ \\angle KHC = \\angle AHC + \\angle KHA $. ",
+        "3. <because> H lie on line segment AC, <therefore>",
+        "- ∠ AHC = 180°.",
+        "4. Solve equations:",
+        "- Substitute ∠ AHC = 180°, ∠ KHC = 51° into equation:",
+        "$ \\angle KHC = \\angle AHC + \\angle KHA $.<therefore>",
+        "- $ 0 = \\angle KHA + 129 $. "
+    ],
+    "('Equation', ma_kch - 90, (360,), ('solve_eq', 'set_value', None), 25)": [
+        "Solution: ",
+        "1. <by> collinear_judgement_angle_extend, <because> ∠ AFK = ∠ CFK from given condition, <therefore>",
+        "- A is on the line segment CF",
+        "- H, C, A are aligned in one line. ",
+        "2. <by> adjacent_complementary_angle, <because> H, C, A are aligned in one line from step 1, <therefore>",
+        "- $ \\angle HCK + \\angle KCA = 180 $. ",
+        "3. <because> HC ⊥ KC, <therefore>",
+        "- ∠ HCK = 90°.",
+        "4. Solve equations:",
+        "- Substitute ∠ HCK = 90° into equation:",
+        "$ \\angle HCK + \\angle KCA = 180 $.<therefore>",
+        "- ∠ KCA = 90°. ",
         "5. Solve equations:",
-        "- From step 4: $ \\angle BCE + \\angle EAB = 180 $.",
-        "- From step 3: $ \\angle BCE = \\angle ACE + 45 $.",
-        "- Solving: ",
-        "\t- $ \\angle BCE + \\angle EAB = 180 $.",
-        "\t- $ \\angle BCE = \\angle ACE + 45 $.",
-        "<therefore>",
-        "- $ \\angle ACE + \\angle EAB = 135 $. "
-    ],
-    "('Equation', ma_bce + ma_eac - 90, (109, 160), ('solve_eq', 'build_equivalence', None), 40)": [
-        "Solution: ",
-        "1. <by> angle_addition, <therefore>",
-        "- $ \\angle EAB = \\angle CAB + \\angle EAC $. ",
-        "2. <because> ABC is an isosceles right triangle, <therefore>",
-        "- △ CAB has a right angle CAB.",
-        "- CA ⊥ BA.",
-        "- ∠ CAB = 90°.",
-        "3. Solve equations:",
-        "- Substitute: ∠ CAB = 90° into equation:",
-        "$ \\angle EAB = \\angle CAB + \\angle EAC $.<therefore>",
-        "- $ \\angle EAB = \\angle EAC + 90 $. ",
-        "4. <by> circle_property_diagonal_of_quadrilateral_sum, <because> A, B, C, E lie on the circle D from given condition, <therefore>",
-        "- $ \\angle BCE + \\angle EAB = 180 $. ",
-        "5. Solve equations:",
-        "- From step 4: $ \\angle BCE + \\angle EAB = 180 $.",
-        "- From step 3: $ \\angle EAB = \\angle EAC + 90 $.",
-        "- Solving: ",
-        "\t- $ \\angle BCE + \\angle EAB = 180 $.",
-        "\t- $ \\angle EAB = \\angle EAC + 90 $.",
-        "<therefore>",
-        "- $ \\angle BCE + \\angle EAC = 90 $. "
+        "- <because> ∠ KCA = 90°, <therefore>",
+        "- ∠ KCH = 90°. "
     ]
 }

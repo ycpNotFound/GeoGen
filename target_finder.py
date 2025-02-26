@@ -24,7 +24,7 @@ from graph import (ConditionGraph, ConditionNode, draw_graph, topological_sort,
                    topological_sort_bfs)
 from plotter import Plotter
 from solver import FormalGeoSolver
-from utils.formulate import clause_to_nature_language, formulate_eqs
+from utils.formulate import clause_to_nature_language, formulate_eqs, sympy_to_latex
 from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
                           SYMBOL_MAPPING_2)
 from utils.symbolic import (get_angle_measure, parse_clause,
@@ -94,13 +94,18 @@ class TargetFinder():
             "construction_cdl": self.constr_cdls,
             "text_cdl": self.text_cdls,
             "image_cdl": self.image_cdls,
-            "goal_cdl": f"Value(LengthOfLine({''.join(self.lines[0])}))",
-            # "goal_cdl": f"Value(MeasureOfAngle(bed))",
+            # "goal_cdl": f"Value(LengthOfLine({''.join(self.lines[0])}))",
+            "goal_cdl": f"Value(x)",
             "problem_answer": "45",
-            "point_positions": self.p_pos,
-            "line_instances": self.lines,
-            "circle_instances": self.circles
         }
+
+        if self.p_pos is not None:
+            self.problem_CDL["point_positions"] = self.p_pos
+        if self.lines is not None:
+            self.problem_CDL["line_instances"] = self.lines
+        if self.circles is not None:
+            self.problem_CDL["circle_instances"] = self.circles
+            
         natural_template_path = "json/predicates_to_nature_language.json"
         self.natural_template = json.load(open(natural_template_path, 'r'))
         self.symbols = []
@@ -151,7 +156,7 @@ class TargetFinder():
         # 1. only has <= 2 vars (<=3 for lines)
         # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
-        # 4. only has symbols begin with 'll_' or 'ma_'
+        # 4. only has symbols begin with 'll_' or 'ma_', or like 'x'
         # 5. if has 2 vars: must have one same point for line, two for angle
         # 6. remove angle measure that >= 180
         # 7. if has 1 var and has no constant term, remove.
@@ -168,14 +173,14 @@ class TargetFinder():
                 except:
                     f2 = False
                 f3 = True
-                if len(syms) == 2:
-                    if all([
-                        value_of_sym[sym] is not None 
-                        for sym in list(condition[1].free_symbols)
-                    ]):
-                        f3 = False
+                # if len(syms) == 2:
+                #     if all([
+                #         value_of_sym[sym] is not None 
+                #         for sym in list(condition[1].free_symbols)
+                #     ]):
+                #         f3 = False
                         
-                f4 = all(['ll_' in sym or 'ma_' in sym for sym in syms])
+                f4 = all(['ll_' in sym or 'ma_' in sym or str(sym) in ['x', 'y', 'z', 'a', 'b', 'c'] for sym in syms])
 
                 f5 = True
                 if len(syms) == 2:
@@ -207,17 +212,28 @@ class TargetFinder():
         return new_targets
     
     @staticmethod
-    def targets_filter_2(new_targets):
+    def targets_filter_2(new_targets, strict=False):
         # 1. if has too many 'solve_eq' targets like 'a+b-90=0', randon sample to 5
         solve_eq_targets = [
             t for t in new_targets if t[0] == 'Equation'
-            and len(t[1].free_symbols) >= 1
+            and len(t[1].free_symbols) >= 2
             and t[1].as_coefficients_dict().get(1, 0) != 0
         ]
-        if len(solve_eq_targets) > 5:
+        if strict:
+            for t in solve_eq_targets:
+                new_targets.remove(t)
+            solve_eq_targets_2 = [
+                t for t in new_targets if t[0] == 'Equation'
+                and len(t[1].free_symbols) >= 3
+            ]
+            for t in solve_eq_targets_2:
+                new_targets.remove(t)
+        
+        elif len(solve_eq_targets) > 5:
             targets_to_delete = random.sample(solve_eq_targets, len(solve_eq_targets) - 5)
             for t in targets_to_delete:
                 new_targets.remove(t)
+        
 
         return new_targets
 
@@ -279,8 +295,8 @@ class TargetFinder():
         targets_prove = _targets_prove
         # return grouped targets
         targets_dict = {
-            "angle": targets_angle,
             "line": targets_line,
+            "angle": targets_angle,
             "prove": targets_prove
         }
         return targets_dict
@@ -298,9 +314,6 @@ class TargetFinder():
             if k == min_depth:
                 idx_list = list(v.keys())
                 start_idx = min(min(idx_list), start_idx)
-            elif k == max_depth:
-                idx_list = list(v.keys())
-                end_idx = min(max(idx_list), end_idx)
         
         # if too few conditions, decrease min_depth
         if end_idx - start_idx < 10 and max_depth > 3:
@@ -309,9 +322,6 @@ class TargetFinder():
                 if k == min_depth:
                     idx_list = list(v.keys())
                     start_idx = min(min(idx_list), start_idx)
-                elif k == max_depth:
-                    idx_list = list(v.keys())
-                    end_idx = min(max(idx_list), end_idx)
             
         conditions_to_sample = self.solver.problem.condition.items[start_idx:end_idx]
         return conditions_to_sample
@@ -378,8 +388,8 @@ class TargetFinder():
         target_type = random.choices(types_to_choose, weights=prob_on_types, k=1)[0]
         chosen_targets = targets_dict[target_type]
         
-        # random choose target (from top-5)
-        chosen_target = random.choice(chosen_targets[:5])
+        # random choose target (from top-8)
+        chosen_target = random.choice(chosen_targets[:8])
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
         chosen_solution_dict = solution_dict_for_targets[chosen_target]
@@ -829,11 +839,18 @@ class TargetFinder():
         elif target[0] == 'Cocircular':
             clause = f"Cocircular({target[1][0]},{''.join(target[1][1:])})"
             conclusion = f"{', '.join(target[1][1:])} is on circle {target[1][0]}"
+        elif target[0] == 'Equation':
+            clause = f"Equation({target[1]})"
+            conclusion = f"{target[1]} = 0"
+            conclusion = sympy_to_latex(conclusion)
         else:
             raise KeyError(target[0])
         
         target_str = f'prove that {conclusion}'
-        target_cdl = f"Relation({clause})"
+        if target[0] == 'Equation':
+            target_cdl = clause
+        else:
+            target_cdl = f"Relation({clause})"
         
         res_info = {
             "conclusion": conclusion,
@@ -845,10 +862,13 @@ class TargetFinder():
         }
         return res_info
     
-    def create_question(self, target: Tuple):
+
+
+    def create_question(self, target: Tuple, problem_text_type=None):
+        assert problem_text_type in ['text_based', 'image_based']
         # create target and added conditions
         problem_text = random.choice([
-            ""
+            "",
             "In this figure, ",
             "As shown in the figure, ",
             "According to the diagram, ",
@@ -869,21 +889,25 @@ class TargetFinder():
         # target_value, target_str, target_cdl
         # target[1] like: - ll_cd + ll_ed, ma_abc + ma_edf - 180
         if target[0] == 'Equation': 
-            if len(target[1].free_symbols) == 3:
-                res_info = self.create_question_three_line_symbols(target)
-            elif len(target[1].free_symbols) == 2:
-                sym_str = str(list(target[1].free_symbols)[0])
-                if 'll' in sym_str:
-                    res_info = self.create_question_two_line_symbols(target)
-                    
-                elif 'ma' in sym_str:
-                    res_info = self.create_question_two_angle_symbols(target)
-                    
-            elif len(target[1].free_symbols) == 1:
-                res_info = self.create_question_one_symbol(target)
-            else:
-                raise ValueError(len(target[1].free_symbols))
-            
+            try:
+                if len(target[1].free_symbols) == 3:
+                    res_info = self.create_question_three_line_symbols(target)
+                elif len(target[1].free_symbols) == 2:
+                    sym_str = str(list(target[1].free_symbols)[0])
+                    if 'll' in sym_str:
+                        res_info = self.create_question_two_line_symbols(target)
+                        
+                    elif 'ma' in sym_str:
+                        res_info = self.create_question_two_angle_symbols(target)
+                    else:
+                        res_info = self.create_question_prove(target)
+                        
+                elif len(target[1].free_symbols) == 1:
+                    res_info = self.create_question_one_symbol(target)
+                else:
+                    raise ValueError(len(target[1].free_symbols))
+            except Exception as e:
+                 res_info = self.create_question_prove(target)
                   
         else: # other predicates
             res_info = self.create_question_prove(target)
@@ -903,9 +927,11 @@ class TargetFinder():
             add_conditions = [c.replace(k, v) for c in add_conditions]
             
         # conditions += add_conditions
-        problem_text_type = random.choice([
-            'text_based', 'image_based'
-        ])
+        if problem_text_type is None:
+            problem_text_type = random.choice([
+                'text_based', 'image_based'
+            ])
+        
         if problem_text_type == 'text_based':
             problem_text += ', '.join(conditions)
 
@@ -923,7 +949,8 @@ class TargetFinder():
                 problem_text += f"{target_str[0].upper() + target_str[1:]}"
             else:
                 problem_text += f". {target_str[0].upper() + target_str[1:]}"
-
+        if not problem_text.endswith('.'):
+            problem_text += '.'
         return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text, problem_text_type
     
     def target_tuple_to_clause(self, target):

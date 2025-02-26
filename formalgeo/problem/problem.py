@@ -160,8 +160,10 @@ class Problem:
                 self.add("Angle", extended_item[::-1], (_id,), ("extended", None, None))
                 angle_sym_1 = self.get_sym_of_attr('MeasureOfAngle', extended_item)
                 angle_sym_2 = self.get_sym_of_attr('MeasureOfAngle', extended_item[::-1])
-                self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
-                self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
+                if angle_sym_1 is not None:
+                    self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
+                if angle_sym_2 is not None:
+                    self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
 
         # 2.Cocircular expand.
         for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
@@ -370,18 +372,19 @@ class Problem:
                     return True
             return False
         
-        for line in self.condition.get_items_by_predicate("Line"):
-            # AB is line, find other lines starts with B (BC, BD, ...)
-            other_lines = [
-                l for l in self.condition.get_items_by_predicate("Line")
-                if len(set(l) & set(line)) != 2 and l[0] == line[1]
-                and not collinear(line[0], l[0], l[1])
-            ]
-            for l in other_lines:
-                new_angle = (line[0], l[0], l[1])
-                premise = (self.condition.get_id_by_predicate_and_item("Line", line),
-                           self.condition.get_id_by_predicate_and_item("Line", l))
-                self.add("Angle", new_angle, premise, ("extended", None, None))
+        if self.p_pos is not None:
+            for line in self.condition.get_items_by_predicate("Line"):
+                # AB is line, find other lines starts with B (BC, BD, ...)
+                other_lines = [
+                    l for l in self.condition.get_items_by_predicate("Line")
+                    if len(set(l) & set(line)) != 2 and l[0] == line[1]
+                    and not collinear(line[0], l[0], l[1])
+                ]
+                for l in other_lines:
+                    new_angle = (line[0], l[0], l[1])
+                    premise = (self.condition.get_id_by_predicate_and_item("Line", line),
+                            self.condition.get_id_by_predicate_and_item("Line", l))
+                    self.add("Angle", new_angle, premise, ("extended", None, None))
 
         # 6.Cocircular radius equal (new added).
         # for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
