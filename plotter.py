@@ -555,7 +555,7 @@ class Plotter():
             
     
     def plot_annotation(self):
-        self.plot_fill_in_color(self.annotation_targets['filled_entity'])
+        # self.plot_fill_in_color(self.annotation_targets['filled_entity'])
         self.plot_right_angle(self.annotation_targets['right_angles'])
         self.plot_equal_lines(self.annotation_targets['eq_lines'])
         self.plot_equal_anlges(self.annotation_targets['eq_angles'])
@@ -656,6 +656,8 @@ class Plotter():
             ori_height, ori_width = self.fig.shape[:2]
             new_height = int(ori_height * resize_ratio)
             new_width = int(ori_width * resize_ratio)
+            if new_height <=0 or new_width <= 0:
+                a = 1
             self.fig = cv2.resize(self.fig, (new_width, new_height), interpolation=cv2.INTER_AREA)
             
         if '.png' in fig_name or '.jpg' in fig_name:

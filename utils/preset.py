@@ -116,7 +116,7 @@ PREDICATES_TO_NAMES = {
     "CongruentBetweenTriangle": "congruent triangles",
     "CongruentBetweenQuadrilateral": "congruent quadrilaterals"
 }
-PRESET_COLOR_PROBS = [0.5, 0.06, 0.06, 0.06, 0.06, 0.06, 0.2]
+PRESET_COLOR_PROBS = [0.3, 0.06, 0.06, 0.06, 0.06, 0.06, 0.4]
 PRESET_COLORS = [
     # l: line | p: point | c: char | a: annoation | f: fill_in
     # Color: BGR

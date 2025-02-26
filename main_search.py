@@ -3,6 +3,7 @@ import itertools
 import json
 import os
 import traceback
+import random
 from multiprocessing import Pool
 from concurrent.futures import ProcessPoolExecutor, TimeoutError
 
@@ -56,7 +57,8 @@ def generate_one_sample(predicate_GDL,
             )
             plotter.plot()
             fig_name = f"{fig_idx}.png"
-            plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name)
+            resize_ratio = random.choice([0.3, 0.4, 0.5, 1])
+            plotter.save_fig(fig_dir=fig_dir, fig_name=fig_name, resize_ratio=resize_ratio)
 
             plot_success, _ = identify_image(
                 plotter.p_pos, plotter.fig_size)
@@ -99,6 +101,7 @@ def generate_one_sample(predicate_GDL,
             "goal_cdl": info_dict_symbolic['goal_cdl'],
             "search_time": info_dict_symbolic['time'],
             "theorems": info_dict_symbolic['theorems'],
+            "available_targets_num": info_dict_symbolic['available_targets_num'],
             "llm_info": {
                 "key": fig_idx,
                 "problem_level": info_dict_llm['problem_level'],
@@ -144,8 +147,8 @@ def generate_one_sample_with_timeout(
                           search_cfg):
     try:
         result = func_timeout(
-            # 200, 
-            300,
+            200, 
+            # 300,
             generate_one_sample, 
             args=(predicate_GDL, theorem_GDL, predicate_base, 
                   predicate_rel, n_more_lines, color_config, 
@@ -196,8 +199,8 @@ def run_task(seed,
     setup_seed(seed)
     
     failure_cases_path = f"geo_synth_2/{task_name}/failure_cases.json"
-    fig_dir = f"geo_synth_2/{task_name}/imgs"
-    info_dir = f"geo_synth_2/{task_name}/annotations"
+    fig_dir = f"geo_synth_debug/{task_name}/imgs"
+    info_dir = f"geo_synth_debug/{task_name}/annotations"
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(info_dir, exist_ok=True)
     print("Start Generation ...")
@@ -290,6 +293,16 @@ def run_task(seed,
     print("End for Generation.")
     
 
+def check_predicate_combs(pred_base_combs, pred_rel_combs):
+    # filter all 'IsMidsegmentOfQuadrilateral' if pred_base not in 
+    predicates_1 = ['Square', 'Rectangle', 'Rhombus', 'Parallelogram', 'Trapezoid', 'IsoscelesTrapezoid', 'RightTrapezoid', 'Kite']
+    if 'IsMidsegmentOfQuadrilateral' in pred_rel_combs:
+        if pred_base_combs[0] not in predicates_1:
+            return False
+        
+    return True 
+
+            
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
                      n_more_lines,
@@ -300,6 +313,9 @@ def build_input_args(pred_base_combs,
             for _ in range(repeat_times):
                 color_config = np.random.choice(
                     PRESET_COLORS, p=PRESET_COLOR_PROBS)
+                res = check_predicate_combs(predicate_base, predicate_rel)
+                if not res:
+                    continue
                 input_args.append(
                     (predicate_base, predicate_rel, n_more_lines, color_config)
                 )
@@ -316,7 +332,7 @@ def task_1():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=10)
+                                    repeat_times=5)
     print('Num: ', len(input_args_1))
 
     
@@ -335,7 +351,7 @@ def task_2():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=1)
+                                    repeat_times=3)
     print('Num: ', len(input_args_1))
 
     
@@ -384,10 +400,10 @@ def run_task_stage_2():
         
         
 def main():
-    # run_task(*task_1())
+    run_task(*task_1())
     # run_task(*task_2())
     # run_task()
-    run_task_stage_2()
+    # run_task_stage_2()
 
 def debug_main():
     seed, task_name, input_args_list, num_process = task_1()
