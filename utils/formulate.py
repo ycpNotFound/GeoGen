@@ -118,7 +118,7 @@ def formulate_eqs_simple(eq_str_dict, eq_str_list):
     if len(long_eqs) == 0:
         formulated_str = f"- <because> {', '.join(short_eqs)}, " 
     else:
-        formulated_str = f"- Substitute: {', '.join(short_eqs)} into equation:\n{long_eqs[0]}." 
+        formulated_str = f"- Substitute {', '.join(short_eqs)} into equation:\n{long_eqs[0]}." 
 
     return formulated_str
         
@@ -139,7 +139,7 @@ def formulate_eqs(eq_str_dict, target_str, problem):
     
     expr_list = []
     for eq in eq_str_list + [target_str]:
-        eq = eq.replace('∠', '\\angle').replace('°', '')
+        eq = eq.replace('∠', '\\angle').replace('°', '').replace('⌒', '')
         if '$' in eq:
             eq = re.findall(r'\$(.*?)\$', eq)[0]
         elif 'from' in eq:

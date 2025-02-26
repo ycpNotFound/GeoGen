@@ -1,6 +1,9 @@
 import json
 import re
+import os
 from collections import Counter
+from tqdm import tqdm
+import math
 
 def read_json(json_path):
     data = json.load(open(json_path, 'r', encoding='utf-8'))
@@ -274,7 +277,57 @@ def stats_for_synth_2(dir_id=1):
     return
 
 
+def states_for_predicates():
+    
+    json_dir = "geo_synth_debug\geosynth_ENT_1_REL_1/annotations"
+    predicate_combs_num = {}
+    predicate_combs_targets_num = {}
+
+    # 获取目录下所有json文件
+    for file in tqdm(os.listdir(json_dir)):
+        if file.endswith('.json'):
+            file_path = os.path.join(json_dir, file)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                predicate_0 = data['text_cdl'][0].split('(')[0]
+                predicate_1 = data['text_cdl'][1].split('(')[0]
+                targets_num = data['available_targets_num']
+
+                if (predicate_0, predicate_1) not in predicate_combs_targets_num:
+                    predicate_combs_targets_num[(predicate_0, predicate_1)] = 0
+                if (predicate_0, predicate_1) not in predicate_combs_num:
+                    predicate_combs_num[(predicate_0, predicate_1)] = 0
+                
+                predicate_combs_num[(predicate_0, predicate_1)] += 1
+                predicate_combs_targets_num[(predicate_0, predicate_1)] += targets_num
+
+    predicate_combs_targets_num = sorted(
+        predicate_combs_targets_num.items(), 
+        key=lambda x: x[1] // predicate_combs_num[x[0]], 
+        reverse=True
+    )
+    predicate_combs_targets_num_avg = {
+        str(k): v // predicate_combs_num[k] 
+        for k, v in predicate_combs_targets_num
+    }
+    print(len(predicate_combs_targets_num))
+    for pred_comb, num in predicate_combs_targets_num_avg.items():
+        print(f'{pred_comb}: {num}')
+
+    pred_combs_num = {}
+    num_list = list(predicate_combs_targets_num_avg.values())
+    func = lambda x: int(30*math.log(3*x))
+    for k, v in predicate_combs_targets_num_avg.items():
+        pred_combs_num[k] = func(v)
+        print(f'{k}: {pred_combs_num[k]}')
+
+    print('sum: ', sum(pred_combs_num.values()))
+    
+    with open('json/pred_combs_rel_1_num.json', 'w', encoding='utf-8') as f:
+        json.dump(pred_combs_num, f, ensure_ascii=False, indent=4)
+    
 
 if __name__ == '__main__':
     # stats_for_formalgeo()
-    stats_for_synth_2(dir_id=2)
+    # stats_for_synth_2(dir_id=2)
+    states_for_predicates()

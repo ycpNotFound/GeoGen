@@ -154,7 +154,7 @@ class TargetFinder():
         # 4. only has symbols begin with 'll_' or 'ma_'
         # 5. if has 2 vars: must have one same point for line, two for angle
         # 6. remove angle measure that >= 180
-        # 7. if has 1 var and has no constant term, remove
+        # 7. if has 1 var and has no constant term, remove.
         # reserve all proving targets.
         new_targets = []
         for condition in conditions_to_sample:
@@ -848,10 +848,10 @@ class TargetFinder():
     def create_question(self, target: Tuple):
         # create target and added conditions
         problem_text = random.choice([
+            ""
             "In this figure, ",
             "As shown in the figure, ",
-            "In the given diagram, ",
-            "According to the shown figure, ",
+            "According to the diagram, ",
             "Based on the figure provided, "
         ])
 
@@ -912,13 +912,17 @@ class TargetFinder():
         if len(add_conditions) > 0:
             if problem_text.endswith(', '):
                 problem_text += f"given {', '.join(add_conditions)}, {target_str}."
+            elif problem_text == '':
+                problem_text += f"Given {', '.join(add_conditions)}, {target_str}."
             else:
                 problem_text += f". Given {', '.join(add_conditions)}, {target_str}."
         else:
             if problem_text.endswith(', '):
                 problem_text += f"{target_str}."
+            elif problem_text == '':
+                problem_text += f"{target_str[0].upper() + target_str[1:]}"
             else:
-                problem_text += f". {target_str[0].upper() + target_str[1:]}."
+                problem_text += f". {target_str[0].upper() + target_str[1:]}"
 
         return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text, problem_text_type
     

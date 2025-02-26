@@ -198,7 +198,7 @@ def run_task(seed,
     # seed, task_name, predicate_base_combs, predicate_rel_combs = task_1()
     setup_seed(seed)
     
-    failure_cases_path = f"geo_synth_2/{task_name}/failure_cases.json"
+    failure_cases_path = f"geo_synth_debug/{task_name}/failure_cases.json"
     fig_dir = f"geo_synth_debug/{task_name}/imgs"
     info_dir = f"geo_synth_debug/{task_name}/annotations"
     os.makedirs(fig_dir, exist_ok=True)
@@ -306,10 +306,21 @@ def check_predicate_combs(pred_base_combs, pred_rel_combs):
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
                      n_more_lines,
-                     repeat_times):
+                     repeat_times=None):
+    rel_num = len(pred_rel_combs[0])
+    pred_combs_num_dict = None
+    if os.path.exists(f'json/pred_combs_rel_{rel_num}_num.json'):
+        pred_combs_num_dict = json.load(open(f'json/pred_combs_rel_{rel_num}_num.json', 'r', encoding='utf-8'))   
+
     input_args = []
     for predicate_base in pred_base_combs:
         for predicate_rel in pred_rel_combs:
+            if pred_combs_num_dict is not None:
+                key = str(predicate_base + predicate_rel)
+                if key in pred_combs_num_dict:
+                    repeat_times = pred_combs_num_dict[key]
+            if repeat_times is None:
+                repeat_times = 1
             for _ in range(repeat_times):
                 color_config = np.random.choice(
                     PRESET_COLORS, p=PRESET_COLOR_PROBS)
@@ -401,9 +412,9 @@ def run_task_stage_2():
         
 def main():
     # run_task(*task_1())
-    run_task(*task_2())
+    # run_task(*task_2())
     # run_task()
-    # run_task_stage_2()
+    run_task_stage_2()
 
 def debug_main():
     seed, task_name, input_args_list, num_process = task_1()
