@@ -221,23 +221,66 @@ def expand_one_sample(
     
     problem_CDL = dl.get_problem(pid=problem_idx)
     solver.load_problem(problem_CDL)
-
+    # solver.expand_conditions()
     for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
         solver.apply_theorem(t_name, t_branch, t_para)
-        
+    
     solver.problem.check_goal()
-    
-    # save target_condition first
-    target = solver.problem.condition.items[-1]
-    
+    if not solver.problem.goal.solved:
+        for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
+            solver.apply_theorem(t_name, t_branch, t_para)
+        solver.problem.check_goal()
+
     # expand new conditions
     solver.expand_conditions()
-    
     search_time = time.time() - search_start
     # construct graph
     condition_graph = ConditionGraph(solver.problem.condition.items)
     condition_graph.construct_graph()
-    
+    # find ori target tuple
+    ori_target = None
+    if solver.problem.goal.solved:
+        if solver.problem.goal.type == 'algebra':
+            target_expr = solver.problem.goal.item - solver.problem.goal.answer
+            target_id = solver.problem.condition.get_id_by_predicate_and_item('Equation', target_expr)
+            ori_target = solver.problem.condition.items[target_id]
+        else:
+            a = 1
+        # solution to original target    
+        res = TargetFinder.find_solution_for_target(
+            solver.problem, 
+            condition_graph, 
+            ori_target, 
+            natural_template,
+            solver.parsed_theorem_GDL,
+            expand_flag=True
+        )
+        solution_str = res[0]
+        if not solver.problem.goal.solved:
+            print(f'{problem_idx} not solved')
+            
+        data_info = {
+            "key": problem_idx,
+            "solved": solver.problem.goal.solved,
+            "construction_cdl": problem_CDL['construction_cdl'],
+            "text_cdl": problem_CDL['text_cdl'],
+            "image_cdl": problem_CDL['image_cdl'],
+            "positions": [],
+            "goal_cdl": problem_CDL['goal_cdl'],
+            "search_time": search_time,
+            "theorems": problem_CDL['theorem_seqs'],
+            "llm_info": {
+                "key": problem_idx,
+                "problem_level": len(problem_CDL['theorem_seqs']),
+                "problem_text": problem_CDL['problem_text_en'],
+                "problem_answer": problem_CDL['problem_answer'],
+                "solution_str": solution_str,
+                "caption_str": ""
+            }
+        }
+        with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
+            json.dump(data_info, f, indent=4, ensure_ascii=False)
+
     # define target_finder instance
     t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
     t_freq_info = {k: t_info[k][-1] for k in t_names}
@@ -248,58 +291,12 @@ def expand_one_sample(
         "points_on_circle": None,
         "clauses": None
     }
-
-    target_finder = TargetFinder(
-                 dl.predicate_GDL,
-                 dl.theorem_GDL,
-                 t_info,
-                 t_freq_info,
-                 allocater_states, 
-                 problem_CDL['text_cdl'],
-                 problem_CDL['construction_cdl'],
-                 problem_CDL['image_cdl'],
-                 problem_id=0,
-                 replace_characters=False,
-                 solver_type='formalgeo',
-                 predicate_num=2,
-                 debug=False
-    )
-    
-    # solution to original target    
-    res = TargetFinder.find_solution_for_target(
-        solver.problem, 
-        condition_graph, 
-        target, 
-        natural_template,
-        solver.parsed_theorem_GDL,
-        expand_flag=True
-    )
-    solution_str = res[0]
-    if not solver.problem.goal.solved:
-        print(f'{problem_idx} not solved')
-        
-    data_info = {
-        "key": problem_idx,
-        "solved": solver.problem.goal.solved,
-        "construction_cdl": problem_CDL['construction_cdl'],
-        "text_cdl": problem_CDL['text_cdl'],
-        "image_cdl": problem_CDL['image_cdl'],
-        "positions": [],
-        "goal_cdl": problem_CDL['goal_cdl'],
-        "search_time": search_time,
-        "theorems": problem_CDL['theorem_seqs'],
-        "llm_info": {
-            "key": problem_idx,
-            "problem_level": len(problem_CDL['theorem_seqs']),
-            "problem_text": problem_CDL['problem_text_en'],
-            "problem_answer": problem_CDL['problem_answer'],
-            "solution_str": solution_str,
-            "caption_str": ""
-        }
-    }
-    with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
-        json.dump(data_info, f, indent=4, ensure_ascii=False)
-        
+    target_finder = TargetFinder(dl.predicate_GDL, dl.theorem_GDL, 
+                                     t_info, t_freq_info, allocater_states, 
+                                     problem_CDL['text_cdl'] ,problem_CDL['construction_cdl'],
+                                     problem_CDL['image_cdl'],
+                                     problem_id=0, replace_characters=False,
+                                     solver_type='formalgeo', predicate_num=2, debug=False)
     # solution to expanded target, like `find_target_and_solution`
     conditions_to_sample = solver.problem.condition.items[-10:-1]
     # filter 1
@@ -307,8 +304,14 @@ def expand_one_sample(
         conditions_to_sample,
         solver.problem.condition.value_of_sym
     )
+    new_targets = TargetFinder.targets_filter_2(
+        new_targets,
+        strict=True
+    )
     if len(new_targets) == 0:
         return 
+    if solver.problem.goal.solved:
+        new_targets = [t for t in new_targets if t != ori_target]
     theorems_for_targets = {}
     solution_for_targets = {}
     level_for_targets = {}
@@ -332,7 +335,7 @@ def expand_one_sample(
     chosen_targets = []
     for type, targets in targets_dict.items():
         chosen_targets += targets
-    
+    a = 1
     # solution to expanded targets
     for i, chosen_target in enumerate(chosen_targets):
         chosen_thoerems = theorems_for_targets[chosen_target]
@@ -368,7 +371,7 @@ def expand_one_sample(
                 "caption_str": ""
             }
         }
-        with open(f"{save_dir}_expand/{problem_idx}_{i}.json", 'w', encoding='utf-8') as f:
+        with open(f"{save_dir}/{problem_idx}_{i}.json", 'w', encoding='utf-8') as f:
             json.dump(data_info, f, indent=4, ensure_ascii=False)
             
     return
@@ -412,7 +415,7 @@ def solve_main(split="test"):
         
 def solve_test():
     data_path = f"datasets/processed_data/fgo_train.json"
-    save_dir = f"datasets/processed_data/debug"
+    save_dir = f"datasets/fgo_train_search"
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
 
@@ -423,6 +426,8 @@ def solve_test():
  
     results = []
     for problem_idx in tqdm(keys):
+        if int(problem_idx) < 19:
+            continue
         problem_idx = int(problem_idx)
         res = expand_one_sample(problem_idx, dl, t_info, natural_template, save_dir)
         results.append(res)

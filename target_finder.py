@@ -163,6 +163,10 @@ class TargetFinder():
         # reserve all proving targets.
         new_targets = []
         for condition in conditions_to_sample:
+            if condition[3][0] == 'prerequisite':
+                continue
+            if condition[-1] == 0: # 0 step
+                continue
             if condition[0] == 'Equation':
                 syms = [str(x) for x in list(condition[1].free_symbols)]
                 f1 = len(syms) <= 2 or \
@@ -183,17 +187,17 @@ class TargetFinder():
                 f4 = all(['ll_' in sym or 'ma_' in sym or str(sym) in ['x', 'y', 'z', 'a', 'b', 'c'] for sym in syms])
 
                 f5 = True
-                if len(syms) == 2:
-                    if all(['ll_' in sym for sym in syms]):
-                        chars_1 = syms[0].split('_')[-1]
-                        chars_2 = syms[1].split('_')[-1]
-                        if len(set(chars_1) & set(chars_2)) != 1:
-                            f5 = False
-                    elif all(['ma_' in sym for sym in syms]):
-                        chars_1 = syms[0].split('_')[-1]
-                        chars_2 = syms[1].split('_')[-1]
-                        if len(set(chars_1) & set(chars_2)) != 2:
-                            f5 = False
+                # if len(syms) == 2:
+                #     if all(['ll_' in sym for sym in syms]):
+                #         chars_1 = syms[0].split('_')[-1]
+                #         chars_2 = syms[1].split('_')[-1]
+                #         if len(set(chars_1) & set(chars_2)) != 1:
+                #             f5 = False
+                #     elif all(['ma_' in sym for sym in syms]):
+                #         chars_1 = syms[0].split('_')[-1]
+                #         chars_2 = syms[1].split('_')[-1]
+                #         if len(set(chars_1) & set(chars_2)) != 2:
+                #             f5 = False
                 f6 = True
                 if all(['ma_' in sym for sym in syms]):
                     if len(syms) == 1:

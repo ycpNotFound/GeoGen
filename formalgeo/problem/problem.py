@@ -992,6 +992,7 @@ class Problem:
                     else:
                         self.goal.premise = tuple(premise)
                         self.goal.theorem = ("solve_eq", None, None)
+                        self.add("Equation", eq, self.goal.premise, ("solve_eq", None, None), skip_check=True)
         elif self.goal.type == "logic":  # logic relation
             if self.goal.answer in self.condition.get_items_by_predicate(self.goal.item):
                 self.goal.solved = True

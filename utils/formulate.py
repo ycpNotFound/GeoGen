@@ -5,7 +5,7 @@ import re
 import sympy
 from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer
 
-from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PREDICATES_REL_3, 
+from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PREDICATES_REL_3, PREDICATES_ATTR,
                      SYMBOL_MAPPING_1, SYMBOL_MAPPING_2)
 from .symbolic import parse_clause
 
@@ -333,24 +333,25 @@ def clause_to_nature_language(clauses,
                 }
                 
                 clause_l, clause_r = items[0], items[1] 
-                if clause_l.islower() or clause_l.isalnum():
-                    # y = 10
-                    condition_l = clause_l
-                else:
+                
+                if any(pred in clause_r for pred in PREDICATES_ATTR):
                     # Equal, MeasureOfAngle(..), MeasureOfArc(..)
                     pred_l, item_l = parse_clause(clause_l)
                     if pred_l in condition_dict:
                         condition_l = condition_dict[pred_l].format(item=item_l[0])
                     else:
                         condition_l = to_lower_with_spaces(pred_l) + f" {item_l[0]}"
-                if clause_r.islower() or clause_r.isalnum():
-                    condition_r = clause_r
                 else:
+                    condition_l = clause_l
+                
+                if any(pred in clause_r for pred in PREDICATES_ATTR):
                     pred_r, item_r = parse_clause(clause_r)
                     if pred_r in condition_dict:
                         condition_r = condition_dict[pred_r].format(item=item_r[0])
                     else:
                         condition_r = to_lower_with_spaces(pred_r) + f" {item_r[0]}"
+                else:
+                    condition_r = clause_r
                 
                 condition_i = f"{condition_l} = {condition_r}"
             else:

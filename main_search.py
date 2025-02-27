@@ -300,6 +300,10 @@ def check_predicate_combs(pred_base_combs, pred_rel_combs):
     if 'IsMidsegmentOfQuadrilateral' in pred_rel_combs:
         if pred_base_combs[0] not in predicates_1:
             return False
+    predicates_2 = ['IsCircumcenterOfQuadrilateral', 'IsTangentOfCircle', 'IsDiameterOfCircle', 'IsCircumcenterOfTriangle']
+    # if has 2 pred in predicates_2 that in pred_rel_combs
+    if len(set(predicates_2).intersection(set(pred_rel_combs))) > 1:
+        return False
         
     return True 
 
