@@ -670,7 +670,7 @@ class TargetFinder():
         # assign other_sym to value
         flag_1 = random.choice([True, False])
         flag_sqrt = 'sqrt' in str(target[1])
-        if flag_1 or flag_sqrt:
+        if flag_1 or flag_sqrt and self.solver.problem.p_pos is not None:
             value = random.randint(1, 10)
             expr = target[1].subs({other_sym: value})
             target_value = solve(Eq(expr, 0))[0]
@@ -789,7 +789,9 @@ class TargetFinder():
                 add_conditions = [f"\\angle {other_angle} = {other_value}°"]
                 add_cdls = [f"Equal(MeasureOfAngle({other_angle}),{other_value})"]
                 conclusion = f"\\angle {target_angle} = {target_value}°"
-                
+
+        else:
+            return self.create_question_prove(target)
         res_info = {
             "conclusion": conclusion,
             "add_cdls": add_cdls,
@@ -810,11 +812,16 @@ class TargetFinder():
             conclusion = f"{line} = {target_value}"
             target_str = f"find the length of {str(sym).split('ll_')[-1].upper()}"
             target_cdl = f"Value(LengthOfLine({str(sym)}))"
-        else:
+        elif 'ma' in str(sym):
             angle = str(sym).split('_')[-1].upper()
             conclusion = f"\\angle {angle} = {target_value}°"
             target_str = f"find the measure of \\angle {str(sym).split('ma_')[-1].upper()}"
             target_cdl = f"Value(MeasureOfAngle({''.join(angle)}))"
+        else:
+            sym = str(sym)
+            conclusion = f"{sym} = {target_value}"
+            target_str = f"find the value of {sym}"
+            target_cdl = f"Value({sym})"
             
         res_info = {
             "conclusion": conclusion,
@@ -868,8 +875,9 @@ class TargetFinder():
     
 
 
-    def create_question(self, target: Tuple, problem_text_type=None):
+    def create_question(self, target: Tuple, problem_text_type=None, used_symbols=None):
         assert problem_text_type in ['text_based', 'image_based']
+        self.symbols = used_symbols if used_symbols is not None else []
         # create target and added conditions
         problem_text = random.choice([
             "",
@@ -893,25 +901,22 @@ class TargetFinder():
         # target_value, target_str, target_cdl
         # target[1] like: - ll_cd + ll_ed, ma_abc + ma_edf - 180
         if target[0] == 'Equation': 
-            try:
-                if len(target[1].free_symbols) == 3:
-                    res_info = self.create_question_three_line_symbols(target)
-                elif len(target[1].free_symbols) == 2:
-                    sym_str = str(list(target[1].free_symbols)[0])
-                    if 'll' in sym_str:
-                        res_info = self.create_question_two_line_symbols(target)
-                        
-                    elif 'ma' in sym_str:
-                        res_info = self.create_question_two_angle_symbols(target)
-                    else:
-                        res_info = self.create_question_prove(target)
-                        
-                elif len(target[1].free_symbols) == 1:
-                    res_info = self.create_question_one_symbol(target)
+            if len(target[1].free_symbols) == 3 and self.solver.problem.p_pos is not None:
+                res_info = self.create_question_three_line_symbols(target)
+            elif len(target[1].free_symbols) == 2:
+                sym_str = str(list(target[1].free_symbols)[0])
+                if 'll' in sym_str:
+                    res_info = self.create_question_two_line_symbols(target)
+                    
+                elif 'ma' in sym_str:
+                    res_info = self.create_question_two_angle_symbols(target)
                 else:
-                    raise ValueError(len(target[1].free_symbols))
-            except Exception as e:
-                 res_info = self.create_question_prove(target)
+                    res_info = self.create_question_prove(target)
+                    
+            elif len(target[1].free_symbols) == 1:
+                res_info = self.create_question_one_symbol(target)
+            else:
+                res_info = self.create_question_prove(target)
                   
         else: # other predicates
             res_info = self.create_question_prove(target)

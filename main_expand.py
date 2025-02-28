@@ -211,15 +211,17 @@ def solve_one_test():
     
 def expand_one_sample(
     problem_idx,
-    dl,
+    problem_CDL,
+    predicate_GDL,
+    theorem_GDL,
     t_info,
     natural_template,
     save_dir
 ):
     search_start = time.time()
-    solver = Interactor(dl.predicate_GDL, dl.theorem_GDL, t_info)
+    solver = Interactor(predicate_GDL, theorem_GDL, t_info)
     
-    problem_CDL = dl.get_problem(pid=problem_idx)
+    # problem_CDL = dl.get_problem(pid=problem_idx)
     solver.load_problem(problem_CDL)
     # solver.expand_conditions()
     for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
@@ -295,12 +297,13 @@ def expand_one_sample(
         "points_on_circle": None,
         "clauses": None
     }
-    target_finder = TargetFinder(dl.predicate_GDL, dl.theorem_GDL, 
+    target_finder = TargetFinder(predicate_GDL, theorem_GDL, 
                                      t_info, t_freq_info, allocater_states, 
                                      problem_CDL['text_cdl'] ,problem_CDL['construction_cdl'],
                                      problem_CDL['image_cdl'],
                                      problem_id=0, replace_characters=False,
                                      solver_type='formalgeo', predicate_num=2, debug=False)
+    target_finder.solver = solver
     # solution to expanded target, like `find_target_and_solution`
     conditions_to_sample = solver.problem.condition.items[-10:-1]
     # filter 1
@@ -341,6 +344,7 @@ def expand_one_sample(
         chosen_targets += targets
     a = 1
     # solution to expanded targets
+    used_symbols = [str(s) for s in list(solver.problem.condition.value_of_sym.keys())]
     for i, chosen_target in enumerate(chosen_targets):
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
@@ -353,12 +357,12 @@ def expand_one_sample(
             target_cdl, 
             problem_text, 
             problem_text_type
-        ) = target_finder.create_question(chosen_target, 'image_based')
+        ) = target_finder.create_question(chosen_target, 'image_based', used_symbols=used_symbols)
 
         if len(add_conditions) != 0:
-            solution_str += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
+            chosen_solution += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
         else:
-            solution_str += f"\n<therefore> {conclusion}."
+            chosen_solution += f"\n<therefore> {conclusion}."
 
         # problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
         data_info = {
@@ -376,7 +380,7 @@ def expand_one_sample(
                 "key": problem_idx,
                 "problem_level": level_for_targets[chosen_target],
                 "problem_text": problem_text,
-                "problem_answer": '',
+                "problem_answer": str(target_value),
                 "solution_str": chosen_solution,
                 "caption_str": ""
             }
@@ -425,6 +429,8 @@ def solve_main(split="test"):
 def solve_test():
     data_path = f"datasets/processed_data/fgo_train.json"
     save_dir = f"datasets/fgo_train_search_debug"
+    predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
     os.makedirs(save_dir, exist_ok=True)
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
@@ -436,10 +442,12 @@ def solve_test():
  
     results = []
     for problem_idx in tqdm(keys):
-        if int(problem_idx) < 19:
-            continue
+        # if int(problem_idx) < 19:
+        #     continue
+        
+        problem_CDL = data[problem_idx]
         problem_idx = int(problem_idx)
-        res = expand_one_sample(problem_idx, dl, t_info, natural_template, save_dir)
+        res = expand_one_sample(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
         results.append(res)
  
 
