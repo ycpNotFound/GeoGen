@@ -393,14 +393,15 @@ def expand_one_sample(
 def solve_main(split="test"):
     save_dir = f"datasets/fgo_search_{split}"
     os.makedirs(save_dir, exist_ok=True)
-    
+    predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
     data_path = f"datasets/processed_data/fgo_{split}.json"
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
     
     num_process = 8
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
     natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
     
@@ -410,10 +411,11 @@ def solve_main(split="test"):
         def update(*args, **kwargs):
             pbar.update()
         for i, problem_idx in enumerate(keys):
+            problem_CDL = data[problem_idx]
             problem_idx = int(problem_idx)
             res = pool.apply_async(
                 expand_one_sample,
-                args=(problem_idx, dl, t_info, natural_template, save_dir),
+                args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir),
                 callback=update
             )
             results.append(res)
@@ -436,7 +438,7 @@ def solve_test():
     keys = list(data.keys())
 
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
     natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
  
