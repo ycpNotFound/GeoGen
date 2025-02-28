@@ -82,7 +82,7 @@ class Interactor:
         if not update:
             w_msg = "Theorem <{},{},{}> not applied. Please check your theorem or prerequisite.".format(
                 t_name, t_branch, t_para)
-            warnings.warn(w_msg)
+            # warnings.warn(w_msg)
 
         return update
 

@@ -4,7 +4,7 @@ import re
 
 import sympy
 from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer
-
+from formalgeo.parse.basic import parse_equal_predicate
 from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PREDICATES_REL_3, PREDICATES_ATTR,
                      SYMBOL_MAPPING_1, SYMBOL_MAPPING_2)
 from .symbolic import parse_clause
@@ -121,7 +121,21 @@ def formulate_eqs_simple(eq_str_dict, eq_str_list):
         formulated_str = f"- Substitute {', '.join(short_eqs)} into equation:\n{long_eqs[0]}." 
 
     return formulated_str
-        
+
+def formulate_eqs_simple_v2(eq_str_dict, eq_str_list):
+    long_eqs = [eq for eq in eq_str_list if '+' in eq or '-' in eq]
+    short_eqs = [eq for eq in eq_str_list if eq not in long_eqs]
+
+    if len(long_eqs) == 0:
+        formulated_str = f"- <because>:" 
+        for long_eq in long_eqs:
+            formulated_str += f"- \n{long_eq}."
+    else:
+        formulated_str = f"- Substitute {', '.join(short_eqs)} into equation group:"
+        for long_eq in long_eqs[1:]:
+            formulated_str += f"- \n{long_eq}."
+
+    return formulated_str
 
 def formulate_eqs(eq_str_dict, target_str, problem):
     eq_str_list = []
@@ -134,6 +148,8 @@ def formulate_eqs(eq_str_dict, target_str, problem):
 
     if long_eq_num <= 1:
         return formulate_eqs_simple(eq_str_dict, eq_str_list)
+    else:
+        return formulate_eqs_simple_v2(eq_str_dict, eq_str_list)
     if len(eq_str_dict) >= 5:
         return None
     
@@ -237,7 +253,173 @@ def to_lower_with_spaces(s):
     return result
 
 
+
 def clause_to_nature_language(clauses, 
+                              natural_template, 
+                              upper=True, 
+                              replace_sym=False,
+                              replace_sym_mode=None):
+    assert replace_sym_mode in [None, 'random', 'nature', 'math']
+    conditions = []
+    if replace_sym:
+        if replace_sym_mode == 'random':
+            symbol_mapping = random.choice(
+                [SYMBOL_MAPPING_1, SYMBOL_MAPPING_2]
+            )
+        elif replace_sym_mode == 'nature':
+            symbol_mapping = SYMBOL_MAPPING_1
+        else:
+            symbol_mapping = SYMBOL_MAPPING_2
+
+    for clause in clauses:
+        if 'Value' in clause:
+            clause = clause.replace('Value', 'Equal')
+        if 'Equal' in clause:
+            condition_i = formulate_equal_clause(clause)
+        else:
+            try:
+                pred, items = parse_clause(clause)
+            except Exception as e:
+                print('clause: ', clause)
+                raise e
+            
+            if 'Shape' in clause:
+                continue
+            elif 'Circle' in clause:
+                condition_i = f"\\odot {items[0]}"
+            elif 'Collinear' in clause:
+                points = items[0]
+                condition_i = random.choice([
+                    f"{', '.join(points)} lie on the same line",
+                    f"{', '.join(points)} are collinear",
+                    f"{', '.join(points)} are aligned in one line",
+                    f"{points[1]} lie on line segment {points[0]}{points[2]}",
+                    f"{points[1]} is on the line segment {points[0]}{points[2]}"
+                ])
+            elif 'Cocircular' in clause:
+                if len(items) == 1:
+                    condition_i = f'circle {items[0]}'
+                else:
+                    circle, points = items
+                    condition_i = random.choice([
+                        f"{', '.join(points)} lie on the circle {circle}",
+                        f"{', '.join(points)} lie on the same circle centered at {circle}",
+                        f"{', '.join(points)} are on circle {circle}"
+                    ])
+            elif pred in PREDICATES_ENT:
+                template = random.choice(natural_template[pred])
+                condition_i = template.format(points=items[0])
+            elif pred in PREDICATES_REL + PREDICATES_REL_2 + PREDICATES_REL + PREDICATES_REL_3:
+                template = random.choice(natural_template[pred])
+                condition_i = template.format(p1=items[0], p2=items[1])
+            elif 'Mirror' in clause:
+                pred = pred.replace('Mirror', '')
+                template = random.choice(natural_template[pred])
+                p1 = items[0]
+                p2 = ''.join([list(items[1])[0]] + list(items[1])[1:][::-1])
+                condition_i = template.format(p1=p1, p2=p2)
+                
+            elif 'Polygon' == pred:
+                condition_i = f"{items[0]} is a polygon"
+            elif 'Equation' == pred:
+                condition_i = sympy_to_latex(items[0])
+            elif 'Line' == pred:
+                condition_i = f"line {items[0]}"
+            elif 'Angle' == pred:
+                condition_i = f"\\angle {items[0]}"
+            elif 'Arc' == pred:
+                condition_i = f"\\arc {items[0]}"
+            
+            else:
+                raise KeyError(clause)
+            if upper:
+                condition_i = condition_i[0].upper() + condition_i[1:]
+            if replace_sym and pred != 'Equation':
+                for k, v in symbol_mapping.items():
+                    condition_i = condition_i.replace(k, v)
+            
+        conditions.append(condition_i)
+            
+    return conditions
+
+
+
+def formulate_equal_clause(clause):
+    assert 'Equal' in clause
+    eq_tree, attrs = parse_equal_predicate(clause)
+    left_tree, right_tree = eq_tree[1][0], eq_tree[1][1]
+    left_str = formulate_tree(left_tree)
+    right_str = formulate_tree(right_tree)
+    return f"{left_str} = {right_str}"
+
+
+def formulate_tree(tree):
+    if isinstance(tree, str):
+        return tree
+    if len(tree) == 1:
+        return tree[0]
+    name = tree[0]
+    if name in ['Add', 'Mul', 'Sub', 'Div', 'Pow', 'Mod']:
+        left_str = formulate_tree(tree[1][0])
+        right_str = formulate_tree(tree[1][1])
+        mid_symbol = {
+            'Add': '+',
+            'Mul': '*',
+            'Sub': '-',
+            'Div': '/',
+            'Pow': '^',
+            'Mod': '%'
+        }[name]
+        return f"{left_str} {mid_symbol} {right_str}"
+    elif len(tree) == 2:
+        name, items = tree[0], tree[1]
+        if name == 'sqrt':
+            tree_str = f"\\sqrt{{{items[0]}}}"
+        elif name == 'MeasureOfAngle':
+            tree_str = f"\\angle {''.join(items)}"
+        elif name == 'LengthOfLine':
+            tree_str = f"{''.join(items)}"
+        elif name in ['PerimeterOfTriangle', 'PerimeterOfQuadrilateral',
+                      'PerimeterOfCircle', 'PerimeterOfSector']:
+            tree_str = f"C_{''.join(items)}"
+        elif name in ['AreaOfTriangle', 'AreaOfQuadrilateral',
+                      'AreaOfCircle', 'AreaOfSector']:
+            tree_str = f"S_{''.join(items)}"
+        elif name in ['HeightOfTriangle', 'HeightOfQuadrilateral']:
+            tree_str = f"h_{''.join(items)}"
+        elif name == 'RatioOfSimilarTriangle':
+            tri_1, tri_2 = items[0][:3], items[0][3:]
+            tree_str = f"k_{{{''.join(tri_1)}}},{{{''.join(tri_2)}}}"
+        elif name == 'RatioOfSimilarQuadrilateral':
+            quad_1, quad_2 = items[0][:4], items[0][4:]
+            tree_str = f"k_{{{''.join(quad_1)}}}{{{''.join(quad_2)}}}"
+        elif name == 'RatioOfSimilarArc':
+            arc_1, arc_2 = items[0][:3], items[0][3:]
+            tree_str = f"k_{{{''.join(arc_1[1:])}}},{{{''.join(arc_2[1:])}}}"
+        elif name == 'RatioOfMirrorSimilarTriangle':
+            tri_1, tri_2 = items[0][:3], items[0][3:]
+            tree_str = f"k_{{{''.join(tri_1)}}},{{{''.join(tri_2[::-1])}}}"
+        elif name == 'RatioOfMirrorSimilarQuadrilateral':
+            quad_1, quad_2 = items[0][:4], items[0][4:]
+            tree_str = f"k_{{{''.join(quad_1)}}},{{{''.join(quad_2[::-1])}}}"
+        elif name == 'LengthOfArc':
+            tree_str = f"⌒{''.join(items[1:])}"
+        elif name == 'MeasureOfArc':
+            tree_str = f"m⌒{''.join(items[1:])}"
+        elif name == 'RadiusOfCircle':
+            tree_str = f"r_{''.join(items)}"
+        elif name == 'DiameterOfCircle':
+            tree_str = f"d_{''.join(items)}"
+
+        else:
+            raise KeyError(name)
+    else:
+        raise KeyError(len(tree))
+    
+    return tree_str
+
+
+def clause_to_nature_language_ori(clauses, 
                               natural_template, 
                               upper=True, 
                               replace_sym=False,
@@ -270,7 +452,7 @@ def clause_to_nature_language(clauses,
                 ])
                 
             if pred == 'MeasureOfAngle':
-                if items[1].isalpha():
+                if items[1].isalpha() and len(items[1]) > 1:
                     condition_i = f"\\angle {items[0]} = \\angle {items[1]}"
                 else:
                     if '+' in items[1] or '-' in items[1]:
@@ -423,3 +605,5 @@ def convert_upper_to_lower(name):
             char = char.lower()
         converted_name += char
     return converted_name
+
+

@@ -746,7 +746,7 @@ class TargetFinder():
             add_conditions = []
             add_cdls = []
             conclusion = f"\\angle {angle_1} = {target_value}°"
-        elif not flag_1 and not flag_2: # angle_1, angle_2 have no value
+        elif not flag_1 and not flag_2 and self.solver.problem.p_pos is not None: # angle_1, angle_2 have no value
             flag_3 = random.choice([True, False])
             if flag_3: # angle_1 = ax+b, angle_2 = cx+d, solve x
                 v1 = random.randint(1, 10)

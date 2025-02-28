@@ -10,6 +10,7 @@ import numpy as np
 import sympy
 from sympy import Eq
 from tqdm import tqdm
+import traceback
 
 from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.data import DatasetLoader
@@ -21,7 +22,8 @@ from graph import ConditionGraph, ConditionNode, display_solution, draw_graph
 from target_finder import TargetFinder
 from utils.formulate import clause_to_nature_language
 from utils.symbolic import move_subtractions_to_rhs
-
+from utils.tools import read_json, write_json
+from func_timeout import func_timeout, FunctionTimedOut
 
 def construct_goal_from_condition(condition: Tuple):
     # example: 
@@ -208,7 +210,31 @@ def solve_one_test():
         info_dict = display_solution(condition_graph, new_target, new_goal)
         print(info_dict['solution_str'])
         print('--------------------------')
-    
+
+
+def expand_one_sample_with_timeout(
+        problem_idx,
+        problem_CDL,
+        predicate_GDL,
+        theorem_GDL,
+        t_info,
+        natural_template,
+        save_dir):
+    try:
+        result = func_timeout(
+            200, 
+            # 300,
+            expand_one_sample, 
+            args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
+        )
+        return result
+    # except Exception as e:
+    except FunctionTimedOut as e:
+        tb = traceback.format_exc()
+        print(tb)
+        print(f"Error: {str(e)}")
+        return False
+
 def expand_one_sample(
     problem_idx,
     problem_CDL,
@@ -218,6 +244,8 @@ def expand_one_sample(
     natural_template,
     save_dir
 ):
+    # if os.path.exists(f"{save_dir}/{problem_idx}.json"):
+    #     return True
     search_start = time.time()
     solver = Interactor(predicate_GDL, theorem_GDL, t_info)
     
@@ -252,7 +280,13 @@ def expand_one_sample(
             target_id = solver.problem.condition.get_id_by_predicate_and_item('Logic', target_predicate)
             ori_target = solver.problem.condition.items[target_id]
         # solution to original target    
-        res = TargetFinder.find_solution_for_target(
+        (
+            solution_str, 
+            solution_formal_dict, 
+            theorems_formal, 
+            sub_nodes, 
+            too_complex
+        ) = TargetFinder.find_solution_for_target(
             solver.problem, 
             condition_graph, 
             ori_target, 
@@ -260,7 +294,7 @@ def expand_one_sample(
             solver.parsed_theorem_GDL,
             expand_flag=True
         )
-        solution_str = res[0]
+
         if not solver.problem.goal.solved:
             print(f'{problem_idx} not solved')
             
@@ -280,6 +314,7 @@ def expand_one_sample(
                 "problem_level": len(problem_CDL['theorem_seqs']),
                 "problem_text": problem_CDL['problem_text_en'],
                 "problem_answer": problem_CDL['problem_answer'],
+                "solution_dict": solution_formal_dict,
                 "solution_str": solution_str,
                 "caption_str": ""
             }
@@ -321,9 +356,16 @@ def expand_one_sample(
         new_targets = [t for t in new_targets if t != ori_target]
     theorems_for_targets = {}
     solution_for_targets = {}
+    solution_dict_for_targets = {}
     level_for_targets = {}
     for target in new_targets:
-        solution_str, theorems, _, _, _ = TargetFinder.find_solution_for_target(
+        (
+            solution_str, 
+            solution_formal_dict, 
+            theorems_formal, 
+            sub_nodes, 
+            too_complex
+        ) = TargetFinder.find_solution_for_target(
             solver.problem,
             condition_graph, 
             target, 
@@ -331,9 +373,10 @@ def expand_one_sample(
             solver.parsed_theorem_GDL,
             expand_flag=True
         )
-        theorems_for_targets[target] = theorems
+        theorems_for_targets[target] = theorems_formal
         solution_for_targets[target] = solution_str
-        level_for_targets[target] = len(theorems)
+        level_for_targets[target] = len(theorems_formal)
+        solution_dict_for_targets[target] = solution_formal_dict
     # filter 2
     new_targets = TargetFinder.targets_filter_2(new_targets)
     # filter 3
@@ -348,7 +391,7 @@ def expand_one_sample(
     for i, chosen_target in enumerate(chosen_targets):
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
-
+        chosen_solution_dict = solution_dict_for_targets[chosen_target]
         (
             conclusion, 
             add_cdls,
@@ -381,6 +424,7 @@ def expand_one_sample(
                 "problem_level": level_for_targets[chosen_target],
                 "problem_text": problem_text,
                 "problem_answer": str(target_value),
+                "solution_dict": chosen_solution_dict,
                 "solution_str": chosen_solution,
                 "caption_str": ""
             }
@@ -391,15 +435,21 @@ def expand_one_sample(
     return
                 
 def solve_main(split="test"):
-    save_dir = f"datasets/fgo_search_{split}"
+    # save_dir = f"datasets/fgo_search_{split}"
+    save_dir = f"datasets/fgo_search_{split}_v2"
     os.makedirs(save_dir, exist_ok=True)
     predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
     theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
     data_path = f"datasets/processed_data/fgo_{split}.json"
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
-    
-    num_process = 8
+
+    # exist_keys = 3242
+    # keys = keys[3900:]
+    regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
+    keys = [k for k in keys if k in regen_keys]
+
+    num_process = 10
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
@@ -407,15 +457,19 @@ def solve_main(split="test"):
     
     pool = Pool(num_process)
     results = []
+
+    
     with tqdm(total=len(keys), desc="Processing") as pbar:
         def update(*args, **kwargs):
             pbar.update()
         for i, problem_idx in enumerate(keys):
+            
             # problem_CDL = data[problem_idx]
             problem_idx = int(problem_idx)
             problem_CDL = dl.get_problem(problem_idx)
             res = pool.apply_async(
-                expand_one_sample,
+                # expand_one_sample,
+                expand_one_sample_with_timeout,
                 args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir),
                 callback=update
             )
@@ -450,7 +504,7 @@ def solve_test():
         
         problem_CDL = data[problem_idx]
         problem_idx = int(problem_idx)
-        res = expand_one_sample(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
+        res = expand_one_sample_with_timeout(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
         results.append(res)
  
 
