@@ -401,7 +401,7 @@ def solve_main(split="test"):
     
     num_process = 8
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
     natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
     
@@ -411,8 +411,9 @@ def solve_main(split="test"):
         def update(*args, **kwargs):
             pbar.update()
         for i, problem_idx in enumerate(keys):
-            problem_CDL = data[problem_idx]
+            # problem_CDL = data[problem_idx]
             problem_idx = int(problem_idx)
+            problem_CDL = dl.get_problem(problem_idx)
             res = pool.apply_async(
                 expand_one_sample,
                 args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir),
@@ -522,8 +523,8 @@ def setup_seed():
 
 if __name__ == '__main__':
     setup_seed()
-    solve_test()
+    # solve_test()
     # check_type()
     # solve_iteration()
     # draw_iteration()
-    # solve_main(split='train')
+    solve_main(split='train')
