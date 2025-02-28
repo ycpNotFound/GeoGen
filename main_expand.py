@@ -244,8 +244,11 @@ def expand_one_sample(
             target_expr = solver.problem.goal.item - solver.problem.goal.answer
             target_id = solver.problem.condition.get_id_by_predicate_and_item('Equation', target_expr)
             ori_target = solver.problem.condition.items[target_id]
-        else:
-            a = 1
+        elif solver.problem.goal.type == 'logic':
+            print('-------problem_idx-------: ', problem_idx)
+            target_predicate = solver.problem.goal.item
+            target_id = solver.problem.condition.get_id_by_predicate_and_item('Logic', target_predicate)
+            ori_target = solver.problem.condition.items[target_id]
         # solution to original target    
         res = TargetFinder.find_solution_for_target(
             solver.problem, 
@@ -262,6 +265,7 @@ def expand_one_sample(
         data_info = {
             "key": problem_idx,
             "solved": solver.problem.goal.solved,
+            "source": problem_CDL['source'],
             "construction_cdl": problem_CDL['construction_cdl'],
             "text_cdl": problem_CDL['text_cdl'],
             "image_cdl": problem_CDL['image_cdl'],
@@ -351,10 +355,16 @@ def expand_one_sample(
             problem_text_type
         ) = target_finder.create_question(chosen_target, 'image_based')
 
+        if len(add_conditions) != 0:
+            solution_str += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
+        else:
+            solution_str += f"\n<therefore> {conclusion}."
+
         # problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
         data_info = {
             "key": problem_idx,
             "solved": True,
+            "source": problem_CDL['source'],
             "construction_cdl": problem_CDL['construction_cdl'],
             "text_cdl": problem_CDL['text_cdl'],
             "image_cdl": problem_CDL['image_cdl'],
@@ -377,15 +387,14 @@ def expand_one_sample(
     return
                 
 def solve_main(split="test"):
-    save_dir = f"datasets/processed_data/fgo_{split}"
+    save_dir = f"datasets/fgo_search_{split}"
     os.makedirs(save_dir, exist_ok=True)
-    os.makedirs(f"{save_dir}_expand", exist_ok=True)
     
     data_path = f"datasets/processed_data/fgo_{split}.json"
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
     
-    num_process = 6
+    num_process = 8
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
@@ -415,7 +424,8 @@ def solve_main(split="test"):
         
 def solve_test():
     data_path = f"datasets/processed_data/fgo_train.json"
-    save_dir = f"datasets/fgo_train_search"
+    save_dir = f"datasets/fgo_train_search_debug"
+    os.makedirs(save_dir, exist_ok=True)
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
 
@@ -490,6 +500,7 @@ def check_type():
         # print(goal)
         if type != 'value':
             pass
+    
         
     counted_type = Counter(type_lst)
     print(counted_type)
@@ -505,4 +516,4 @@ if __name__ == '__main__':
     # check_type()
     # solve_iteration()
     # draw_iteration()
-    # solve_main(split='val')
+    # solve_main(split='train')
