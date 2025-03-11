@@ -487,13 +487,12 @@ def debug_main():
     
     cnt = 0
 
-    # multiprocess generate
     for args in input_args_list:
         pred_base, pred_rel, n_more_lines, color_config = args
         result = generate_one_sample(
             predicate_GDL, theorem_GDL, pred_base, pred_rel, 
             n_more_lines, color_config, fig_dir, cnt, info_dir, search_cfg)
-        
+        cnt += 1
         print(result)
         
 
