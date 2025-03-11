@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import networkx as nx
 
-from formalgeo.data import DatasetLoader
+from formalgeo_v2.data import DatasetLoader
 from utils.preset import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2
 from utils.symbolic import (find_target_for_construct, get_content,
                             get_points_mapping, get_points_num,

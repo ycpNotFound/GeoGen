@@ -12,19 +12,19 @@ from sympy import (Eq, Float, Integer, Rational, Symbol, simplify, solve, sqrt,
                    total_degree)
 
 from allocator import Allocator
-from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.data import DatasetLoader
-from formalgeo.parse import (inverse_parse_one, inverse_parse_one_theorem,
+from formalgeo_v2.core import EquationKillerV2 as EqKiller
+from formalgeo_v2.data import DatasetLoader
+from formalgeo_v2.parse import (inverse_parse_one, inverse_parse_one_theorem,
                              parse_theorem_seqs)
-from formalgeo.problem import Problem
-from formalgeo.problem.condition import Goal
-from formalgeo.solver import BackwardSearcher, ForwardSearcher, Interactor
+from formalgeo_v2.problem import Problem
+from formalgeo_v2.problem.condition import Goal
+from formalgeo_v2.solver import BackwardSearcher, ForwardSearcher, Interactor
 from generator import ClauseGenerator
 from graph import (ConditionGraph, ConditionNode, draw_graph, topological_sort,
                    topological_sort_bfs)
 from plotter import Plotter
 from solver import FormalGeoSolver
-from utils.formulate import clause_to_nature_language, formulate_eqs, sympy_to_latex
+from utils.formulate import clause_to_nature_language, formulate_eqs_simple, sympy_to_latex
 from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
                           SYMBOL_MAPPING_2)
 from utils.symbolic import (get_angle_measure, parse_clause,
@@ -95,6 +95,7 @@ class TargetFinder():
             "text_cdl": self.text_cdls,
             "image_cdl": self.image_cdls,
             # "goal_cdl": f"Value(LengthOfLine({''.join(self.lines[0])}))",
+            # `goal_cdl` is not used when searching
             "goal_cdl": f"Value(x)",
             "problem_answer": "45",
         }
@@ -544,7 +545,7 @@ class TargetFinder():
                 if f4:
                     step_count += 1
                     solution_str += f'\n{step_count}. Solve equations:\n'
-                    eq_solution = formulate_eqs(premise_statements, statement, problem)
+                    eq_solution = formulate_eqs_simple(premise_statements)
                     
                     # check if solve too many eqs in one step
                     if eq_solution is None: 
@@ -727,7 +728,8 @@ class TargetFinder():
         angle_2_val = self.solver.problem.condition.value_of_sym[sym_2]
         flag_1 = type(angle_1_val) in [Integer, Float]
         flag_2 = type(angle_2_val) in [Integer, Float]
-        
+        if flag_1 and flag_2: # angle_1 and angle_2 both solved
+            return self.create_question_prove(target)
         if flag_1 and not flag_2: # angle_1 = n (solved by symbolic), solve angle_2
             other_value = angle_1_val
             expr = target[1].subs({sym_1: other_value})
@@ -746,36 +748,11 @@ class TargetFinder():
             add_conditions = []
             add_cdls = []
             conclusion = f"\\angle {angle_1} = {target_value}°"
-        elif not flag_1 and not flag_2 and self.solver.problem.p_pos is not None: # angle_1, angle_2 have no value
-            flag_3 = random.choice([True, False])
-            if flag_3: # angle_1 = ax+b, angle_2 = cx+d, solve x
-                v1 = random.randint(1, 10)
-                v2 = random.randint(1, 10)
-                v3 = random.randint(1, 10)
-                v4 = random.randint(1, 10)
-                if v1 == v3:
-                    v3 = v3 + random.randint(1, 5)
-                new_sym = self.add_new_symbol()
-                expr_1 = v1*new_sym + v2
-                expr_2 = v3*new_sym + v4
-                expr = target[1].subs({sym_1: expr_1, sym_2: expr_2})
-                expr_fixed = subs_without_simplification(
-                    target[1], 
-                    {sym_1: expr_1, sym_2: expr_2}
-                )
-                target_value = solve(Eq(expr, 0))[0]
-                target_str = f"find the value of {str(new_sym)}"
-                target_cdl = f"Value({str(new_sym)})"
-                add_cdls = [
-                    f"Equal(MeasureOfAngle({angle_1}),{str(expr_1)})",
-                    f"Equal(MeasureOfAngle({angle_2}),{str(expr_2)})",
-                ]
-                add_conditions = [
-                    f"\\angle {angle_1} = {str(expr_1)}",
-                    f"\\angle {angle_2} = {str(expr_2)}",
-                ]
-                conclusion = f"\n- $ {expr_fixed} = 0 $.\n- $ {expr} = 0 $.\n- $ {new_sym} = {target_value} $"
-            else: # calculate value of one angle from coordinate, solve the other
+
+        elif not flag_1 and not flag_2:
+
+            if hasattr(self.solver.problem, 'p_pos') and self.solver.problem.p_pos is not None:
+                # calculate value of one angle from coordinate, solve the other
                 target_angle = random.choice([angle_1, angle_2])
                 other_angle = list(set([angle_1, angle_2]) - set([target_angle]))[0]
                 other_pos = [self.p_pos[p] for p in other_angle]
@@ -790,8 +767,40 @@ class TargetFinder():
                 add_cdls = [f"Equal(MeasureOfAngle({other_angle}),{other_value})"]
                 conclusion = f"\\angle {target_angle} = {target_value}°"
 
-        else:
-            return self.create_question_prove(target)
+            else:
+                # angle_1, angle_2 have no value, solve for new sym or prove
+                flag_3 = random.choice([True, False]) 
+                if flag_3: # angle_1 = ax+b, angle_2 = cx+d, solve x
+                    v1 = random.randint(1, 10)
+                    v2 = random.randint(1, 10)
+                    v3 = random.randint(1, 10)
+                    v4 = random.randint(1, 10)
+                    if v1 == v3:
+                        v3 = v3 + random.randint(1, 5)
+                    new_sym = self.add_new_symbol()
+                    expr_1 = v1*new_sym + v2
+                    expr_2 = v3*new_sym + v4
+                    expr = target[1].subs({sym_1: expr_1, sym_2: expr_2})
+                    expr_fixed = subs_without_simplification(
+                        target[1], 
+                        {sym_1: expr_1, sym_2: expr_2}
+                    )
+                    target_value = solve(Eq(expr, 0))[0]
+                    target_str = f"find the value of {str(new_sym)}"
+                    target_cdl = f"Value({str(new_sym)})"
+                    add_cdls = [
+                        f"Equal(MeasureOfAngle({angle_1}),{str(expr_1)})",
+                        f"Equal(MeasureOfAngle({angle_2}),{str(expr_2)})",
+                    ]
+                    add_conditions = [
+                        f"\\angle {angle_1} = {str(expr_1)}",
+                        f"\\angle {angle_2} = {str(expr_2)}",
+                    ]
+                    conclusion = f"\n- $ {expr_fixed} = 0 $.\n- $ {expr} = 0 $.\n- $ {new_sym} = {target_value} $"
+                else: 
+                    return self.create_question_prove(target)
+
+            
         res_info = {
             "conclusion": conclusion,
             "add_cdls": add_cdls,
@@ -875,8 +884,7 @@ class TargetFinder():
     
 
 
-    def create_question(self, target: Tuple, problem_text_type=None, used_symbols=None):
-        assert problem_text_type in ['text_based', 'image_based']
+    def create_question(self, target: Tuple, used_symbols=None):
         self.symbols = used_symbols if used_symbols is not None else []
         # create target and added conditions
         problem_text = random.choice([
@@ -935,14 +943,7 @@ class TargetFinder():
             target_str = target_str.replace(k, v)
             add_conditions = [c.replace(k, v) for c in add_conditions]
             
-        # conditions += add_conditions
-        if problem_text_type is None:
-            problem_text_type = random.choice([
-                'text_based', 'image_based'
-            ])
-        
-        if problem_text_type == 'text_based':
-            problem_text += ', '.join(conditions)
+        caption_str = ', '.join(conditions)
 
         if len(add_conditions) > 0:
             if problem_text.endswith(', '):
@@ -960,7 +961,7 @@ class TargetFinder():
                 problem_text += f". {target_str[0].upper() + target_str[1:]}"
         if not problem_text.endswith('.'):
             problem_text += '.'
-        return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text, problem_text_type
+        return conclusion, add_cdls, add_conditions, target_value, target_cdl, problem_text, caption_str
     
     def target_tuple_to_clause(self, target):
         keys = list(self.predicate_GDL['Relation'].keys())
@@ -976,7 +977,7 @@ class TargetFinder():
         clause = f"{target[0]}({''.join(items)})"
         return clause
         
-    def formulate(self):
+    def formulate(self, image_based=True):
         start_time = time.time()
         self.solver.init_search(self.problem_CDL)
         self.solver.search()
@@ -1009,11 +1010,16 @@ class TargetFinder():
             target_value, 
             target_cdl, 
             problem_text,
-            problem_text_type
+            cap_str
         ) = self.create_question(target)
         self.text_cdls += add_cdls
         self.image_cdls += add_cdls
 
+        if image_based:
+            solution_str = f'In the figure, we can get:\n{cap_str}.\n{solution_str}'
+        else:
+            problem_text += f'In the figure, {cap_str}.'
+        
         if len(add_conditions) != 0:
             solution_str += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
         else:
@@ -1035,7 +1041,6 @@ class TargetFinder():
             "problem_type": target_type,
             "problem_level": problem_level,
             "problem_text": problem_text,
-            "problem_text_type": problem_text_type,
             "problem_answer": str(target_value),
             "solution_str": solution_str,
             "solution_dict": solution_dict

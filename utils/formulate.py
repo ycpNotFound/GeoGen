@@ -4,7 +4,7 @@ import re
 
 import sympy
 from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer
-from formalgeo.parse.basic import parse_equal_predicate
+from formalgeo_v2.parse.basic import parse_equal_predicate
 from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PREDICATES_REL_3, PREDICATES_ATTR,
                      SYMBOL_MAPPING_1, SYMBOL_MAPPING_2)
 from .symbolic import parse_clause
@@ -111,7 +111,7 @@ def latex_to_sympy(latex_str, problem=None):
     expr = simplify(f"({lhs})-({rhs})")
     return expr
 
-def formulate_eqs_simple(eq_str_dict, eq_str_list):
+def formulate_eqs_simple_temp(eq_str_dict, eq_str_list):
     
     long_eqs = [eq for eq in eq_str_list if '+' in eq or '-' in eq]
     short_eqs = [eq for eq in eq_str_list if eq not in long_eqs]
@@ -122,111 +122,32 @@ def formulate_eqs_simple(eq_str_dict, eq_str_list):
 
     return formulated_str
 
-def formulate_eqs_simple_v2(eq_str_dict, eq_str_list):
-    long_eqs = [eq for eq in eq_str_list if '+' in eq or '-' in eq]
-    short_eqs = [eq for eq in eq_str_list if eq not in long_eqs]
-
-    if len(long_eqs) == 0:
-        formulated_str = f"- <because>:" 
-        for long_eq in long_eqs:
-            formulated_str += f"- \n{long_eq}."
-    else:
-        formulated_str = f"- Substitute {', '.join(short_eqs)} into equation group:"
-        for long_eq in long_eqs[1:]:
-            formulated_str += f"- \n{long_eq}."
-
-    return formulated_str
-
-def formulate_eqs(eq_str_dict, target_str, problem):
+def formulate_eqs_simple(eq_str_dict):
     eq_str_list = []
-    eq_str_premise_step = []
     for k, v in eq_str_dict.items():
         for eq in v:
             eq_str_list.append(eq)
-            eq_str_premise_step.append(k)
-    long_eq_num = sum([1 if '+' in eq or '-' in eq else 0 for eq in eq_str_list])
 
-    if long_eq_num <= 1:
-        return formulate_eqs_simple(eq_str_dict, eq_str_list)
-    else:
-        return formulate_eqs_simple_v2(eq_str_dict, eq_str_list)
-    if len(eq_str_dict) >= 5:
-        return None
-    
-    expr_list = []
-    for eq in eq_str_list + [target_str]:
-        eq = eq.replace('∠', '\\angle').replace('°', '').replace('⌒', '')
-        if '$' in eq:
-            eq = re.findall(r'\$(.*?)\$', eq)[0]
-        elif 'from' in eq:
-            eq = eq.split('from')[0]
-        expr = latex_to_sympy(eq, problem)
-        expr_list.append(expr)
-    
-    target_sym = expr_list[-1].free_symbols.pop()
-    expr_list = expr_list[:-1]
-    
-    # substitute value in expr_list
-    sym_value_premise_list = []
-    for idx, expr in enumerate(expr_list):
-        if len(expr.free_symbols) == 1:
-            sym = expr.free_symbols.pop()
-            res = solve(Eq(expr, 0), sym, dict=True)[0]
-            sym_value_premise_list.append([sym, res[sym], idx])
-
-    expr_subs_list, expr_subs_ids = [], []
-    expr_id2premise = {}
-    for i, expr in enumerate(expr_list):
-        if i in [item[2] for item in sym_value_premise_list]:
-            continue
-        premise_ids = []
-
-        for sym, value, j in sym_value_premise_list:
-            if sym in expr.free_symbols:
-                expr = expr.subs({sym: value})
-                premise_ids.append(j)
-
-        if len(expr.free_symbols) > 0:
-            expr_subs_list.append(expr)
-            expr_subs_ids.append(i)
-            expr_id2premise[i] = premise_ids
-    
-    # find miniset of eqs
-    eqs = [Eq(expr, 0) for expr in expr_subs_list]
-    subset_ids = find_minimal_equation_subset(eqs, expr_subs_ids, target_sym)
-
-    if len(subset_ids) > 3 or len(subset_ids) == 0:
-        return None
-
-    formulated_str = ''
-    for idx_ori in subset_ids:
-        idx_subs = expr_subs_ids.index(idx_ori)
-        premise_ids = expr_id2premise[idx_ori]
-        if len(premise_ids) > 0:
-            # has changed by substitute value
-            premise_str = ', '.join([eq_str_list[i] for i in premise_ids])
-            extend_eq = eqs[idx_subs]
-            extend_str = sympy_to_latex(str(extend_eq.lhs))
-            formulated_str += f"- Substitute {premise_str} in {eq_str_list[idx_ori]}, <therefore> {extend_str}.\n"
-
-        else:
-            extend_str = eq_str_list[idx_ori]
-            step = eq_str_premise_step[idx_ori]
-            formulated_str += f"- From {step}: {extend_str}.\n"
-            
-    if len(subset_ids) <= 1:
-        pass
-        
-    else:
-        formulated_str += '- Solving: \n'
-        for idx_ori in subset_ids:
-            idx_subs = expr_subs_ids.index(idx_ori)
-            premise_ids = expr_id2premise[idx_ori]
-            extend_eq = eqs[idx_subs]
-            extend_str = sympy_to_latex(str(extend_eq.lhs))
-            formulated_str += f'\t- {extend_str}.\n'
+    formulated_str = f"- <because>:" 
+    for eq in eq_str_list:
+        formulated_str += f"- \n{eq}."
 
     return formulated_str
+
+# def formulate_eqs(eq_str_dict, target_str, problem):
+#     eq_str_list = []
+#     eq_str_premise_step = []
+#     for k, v in eq_str_dict.items():
+#         for eq in v:
+#             eq_str_list.append(eq)
+#             eq_str_premise_step.append(k)
+#     long_eq_num = sum([1 if '+' in eq or '-' in eq else 0 for eq in eq_str_list])
+
+#     if long_eq_num <= 1:
+#         return formulate_eqs_simple(eq_str_dict, eq_str_list)
+#     else:
+#         return formulate_eqs_simple_v2(eq_str_dict, eq_str_list)
+    
 
 def find_minimal_equation_subset(eq_list, idx_list, target_symbol):
     if len(eq_list) in [1, 2]:
@@ -292,9 +213,9 @@ def clause_to_nature_language(clauses,
                 condition_i = random.choice([
                     f"{', '.join(points)} lie on the same line",
                     f"{', '.join(points)} are collinear",
-                    f"{', '.join(points)} are aligned in one line",
-                    f"{points[1]} lie on line segment {points[0]}{points[2]}",
-                    f"{points[1]} is on the line segment {points[0]}{points[2]}"
+                    f"{', '.join(points)} are in one line",
+                    f"{points[1]} lie on line {points[0]}{points[2]}",
+                    f"{points[1]} is on the line {points[0]}{points[2]}"
                 ])
             elif 'Cocircular' in clause:
                 if len(items) == 1:
@@ -303,7 +224,7 @@ def clause_to_nature_language(clauses,
                     circle, points = items
                     condition_i = random.choice([
                         f"{', '.join(points)} lie on the circle {circle}",
-                        f"{', '.join(points)} lie on the same circle centered at {circle}",
+                        f"{', '.join(points)} lie on circle centered at {circle}",
                         f"{', '.join(points)} are on circle {circle}"
                     ])
             elif pred in PREDICATES_ENT:

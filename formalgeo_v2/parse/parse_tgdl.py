@@ -1,4 +1,4 @@
-from formalgeo.parse.basic import parse_geo_predicate, parse_equal_predicate, operation
+from formalgeo_v2.parse.basic import parse_geo_predicate, parse_equal_predicate, operation
 
 
 def parse_theorem_gdl(theorem_GDL, parsed_predicate_GDL):
@@ -11,8 +11,16 @@ def parse_theorem_gdl(theorem_GDL, parsed_predicate_GDL):
 
         body = {}
         branch_count = 1
+        
+        # debug
+        if 'trapezoid_judgment_parallel' in theorem_name:
+            a = 1
+        if 'square_property_cocircular' in theorem_name:
+            a = 1
+            
         for branch in theorem_GDL[theorem_name]:
             raw_premise_GDL = [theorem_GDL[theorem_name][branch]["premise"]]
+            
             parsed_premise, paras_list = parse_premise(raw_premise_GDL)
             raw_theorem_GDL = theorem_GDL[theorem_name][branch]["conclusion"]
             parsed_conclusion, paras = parse_conclusion(raw_theorem_GDL)
@@ -200,8 +208,8 @@ def parse_premise(premise_GDL):
         algebra_constraint = []
         existing_paras = set()
         for j in range(len(premise_GDL[i])):
-            if premise_GDL[i][j][0][0] == "~":
-                continue
+            # if premise_GDL[i][j][0][0] == "~":
+            #     continue
 
             if premise_GDL[i][j][0] == "Equal":
                 algebra_constraint.append(premise_GDL[i][j])

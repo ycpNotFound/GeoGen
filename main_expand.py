@@ -12,12 +12,12 @@ from sympy import Eq
 from tqdm import tqdm
 import traceback
 
-from formalgeo.core import EquationKiller as EqKiller
 from formalgeo.data import DatasetLoader
 from formalgeo.parse import inverse_parse_one, parse_theorem_seqs
 from formalgeo.problem import Problem
 from formalgeo.problem.condition import Goal
 from formalgeo.solver import Interactor
+
 from graph import ConditionGraph, ConditionNode, display_solution, draw_graph
 from target_finder import TargetFinder
 from utils.formulate import clause_to_nature_language
@@ -234,8 +234,30 @@ def expand_one_sample_with_timeout(
         print(tb)
         print(f"Error: {str(e)}")
         return False
+    
+def solve_one_sample_with_timeout(
+        problem_idx,
+        problem_CDL,
+        predicate_GDL,
+        theorem_GDL,
+        t_info,
+        natural_template,
+        save_dir):
+    try:
+        result = func_timeout(
+            300, 
+            solve_one_sample, 
+            args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
+        )
+        return result
+    # except Exception as e:
+    except FunctionTimedOut as e:
+        tb = traceback.format_exc()
+        print(tb)
+        print(f"Error: {str(e)}")
+        return False
 
-def expand_one_sample(
+def solve_one_sample(
     problem_idx,
     problem_CDL,
     predicate_GDL,
@@ -249,9 +271,7 @@ def expand_one_sample(
     search_start = time.time()
     solver = Interactor(predicate_GDL, theorem_GDL, t_info)
     
-    # problem_CDL = dl.get_problem(pid=problem_idx)
     solver.load_problem(problem_CDL)
-    # solver.expand_conditions()
     for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
         solver.apply_theorem(t_name, t_branch, t_para)
     
@@ -261,70 +281,131 @@ def expand_one_sample(
             solver.apply_theorem(t_name, t_branch, t_para)
         solver.problem.check_goal()
 
-    # expand new conditions
-    solver.expand_conditions()
     search_time = time.time() - search_start
+    
+    # exit when not solved
+    if not solver.problem.goal.solved:
+        print(f'Problem {problem_idx} not solved.')
+        return 
+    
+    if solver.problem.goal.type == 'algebra':
+        target_premise = solver.problem.goal.premise
+        if len(target_premise) > 1:
+            target_expr = solver.problem.goal.item - solver.problem.goal.answer
+            solver.problem.add('Equation', target_expr, target_premise, ('extended', None, None))
+            target_id = solver.problem.condition.get_id_by_predicate_and_item('Equation', target_expr)
+        elif len(target_premise) == 1:
+            target_id = target_premise[0]
+        else:
+            raise ValueError(len(target_premise))
+
+        ori_target = solver.problem.condition.items[target_id]
+
+    elif solver.problem.goal.type == 'logic':
+        print('-------problem_idx-------: ', problem_idx)
+        target_predicate = solver.problem.goal.item
+        target_id = solver.problem.condition.get_id_by_predicate_and_item('Logic', target_predicate)
+        ori_target = solver.problem.condition.items[target_id]
+    
     # construct graph
     condition_graph = ConditionGraph(solver.problem.condition.items)
     condition_graph.construct_graph()
-    # find ori target tuple
-    ori_target = None
-    if solver.problem.goal.solved:
-        if solver.problem.goal.type == 'algebra':
-            target_expr = solver.problem.goal.item - solver.problem.goal.answer
-            target_id = solver.problem.condition.get_id_by_predicate_and_item('Equation', target_expr)
-            ori_target = solver.problem.condition.items[target_id]
-        elif solver.problem.goal.type == 'logic':
-            print('-------problem_idx-------: ', problem_idx)
-            target_predicate = solver.problem.goal.item
-            target_id = solver.problem.condition.get_id_by_predicate_and_item('Logic', target_predicate)
-            ori_target = solver.problem.condition.items[target_id]
-        # solution to original target    
-        (
-            solution_str, 
-            solution_formal_dict, 
-            theorems_formal, 
-            sub_nodes, 
-            too_complex
-        ) = TargetFinder.find_solution_for_target(
-            solver.problem, 
-            condition_graph, 
-            ori_target, 
-            natural_template,
-            solver.parsed_theorem_GDL,
-            expand_flag=True
-        )
+    
+    # solution to original target    
+    (
+        solution_str, 
+        solution_formal_dict, 
+        theorems_formal, 
+        sub_nodes, 
+        too_complex
+    ) = TargetFinder.find_solution_for_target(
+        solver.problem, 
+        condition_graph, 
+        ori_target, 
+        natural_template,
+        solver.parsed_theorem_GDL,
+        expand_flag=True
+    )
 
-        if not solver.problem.goal.solved:
-            print(f'{problem_idx} not solved')
-            
-        data_info = {
+    if not solver.problem.goal.solved:
+        print(f'{problem_idx} not solved')
+        
+    data_info = {
+        "key": problem_idx,
+        "solved": solver.problem.goal.solved,
+        "source": problem_CDL['source'],
+        "construction_cdl": problem_CDL['construction_cdl'],
+        "text_cdl": problem_CDL['text_cdl'],
+        "image_cdl": problem_CDL['image_cdl'],
+        "positions": [],
+        "goal_cdl": problem_CDL['goal_cdl'],
+        "search_time": search_time,
+        "theorems": problem_CDL['theorem_seqs'],
+        "llm_info": {
             "key": problem_idx,
-            "solved": solver.problem.goal.solved,
-            "source": problem_CDL['source'],
-            "construction_cdl": problem_CDL['construction_cdl'],
-            "text_cdl": problem_CDL['text_cdl'],
-            "image_cdl": problem_CDL['image_cdl'],
-            "positions": [],
-            "goal_cdl": problem_CDL['goal_cdl'],
-            "search_time": search_time,
-            "theorems": problem_CDL['theorem_seqs'],
-            "llm_info": {
-                "key": problem_idx,
-                "problem_level": len(problem_CDL['theorem_seqs']),
-                "problem_text": problem_CDL['problem_text_en'],
-                "problem_answer": problem_CDL['problem_answer'],
-                "solution_dict": solution_formal_dict,
-                "solution_str": solution_str,
-                "caption_str": ""
-            }
+            "problem_level": len(problem_CDL['theorem_seqs']),
+            "problem_text": problem_CDL['problem_text_en'],
+            "problem_answer": problem_CDL['problem_answer'],
+            "solution_dict": solution_formal_dict,
+            "solution_str": solution_str,
+            "caption_str": ""
         }
-        with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
-            json.dump(data_info, f, indent=4, ensure_ascii=False)
+    }
 
-    # define target_finder instance
-    t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
-    t_freq_info = {k: t_info[k][-1] for k in t_names}
+    with open(f"{save_dir}/{problem_idx}.json", 'w', encoding='utf-8') as f:
+        json.dump(data_info, f, indent=4, ensure_ascii=False)
+
+    return 
+
+def expand_one_sample(
+    problem_idx,
+    problem_CDL,
+    predicate_GDL,
+    theorem_GDL,
+    t_info,
+    natural_template,
+    save_dir,
+    debug=False
+):
+    if os.path.exists(f"{save_dir}/{problem_idx}_0.json"):
+        return True
+    solver = Interactor(predicate_GDL, theorem_GDL, t_info)
+    
+    solver.load_problem(problem_CDL)
+    # solver.expand_conditions()
+
+    for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
+        solver.apply_theorem(t_name, t_branch, t_para)
+    
+    solver.problem.check_goal()
+    if not solver.problem.goal.solved:
+        for t_name, t_branch, t_para in parse_theorem_seqs(problem_CDL["theorem_seqs"]):
+            solver.apply_theorem(t_name, t_branch, t_para)
+        solver.problem.check_goal()
+
+    # expand
+    solver.expand_conditions()
+    
+    if solver.problem.goal.type == 'algebra':
+        target_premise = solver.problem.goal.premise
+        if len(target_premise) > 1:
+            target_expr = solver.problem.goal.item - solver.problem.goal.answer
+            solver.problem.add('Equation', target_expr, target_premise, ('extended', None, None))
+            target_id = solver.problem.condition.get_id_by_predicate_and_item('Equation', target_expr)
+        elif len(target_premise) == 1:
+            target_id = target_premise[0]
+        else:
+            raise ValueError(len(target_premise))
+
+        ori_target = solver.problem.condition.items[target_id]
+
+    elif solver.problem.goal.type == 'logic':
+        print('-------problem_idx-------: ', problem_idx)
+        target_predicate = solver.problem.goal.item
+        target_id = solver.problem.condition.get_id_by_predicate_and_item('Logic', target_predicate)
+        ori_target = solver.problem.condition.items[target_id]
+
+
     allocater_states = {
         "p_pos": None,
         "lines": None,
@@ -332,28 +413,36 @@ def expand_one_sample(
         "points_on_circle": None,
         "clauses": None
     }
+    t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
+    t_freq_info = {k: t_info[k][-1] for k in t_names}
+
     target_finder = TargetFinder(predicate_GDL, theorem_GDL, 
-                                     t_info, t_freq_info, allocater_states, 
-                                     problem_CDL['text_cdl'] ,problem_CDL['construction_cdl'],
-                                     problem_CDL['image_cdl'],
-                                     problem_id=0, replace_characters=False,
-                                     solver_type='formalgeo', predicate_num=2, debug=False)
+                                t_info, t_freq_info, allocater_states, 
+                                problem_CDL['text_cdl'] ,problem_CDL['construction_cdl'],
+                                problem_CDL['image_cdl'],
+                                problem_id=0, replace_characters=False,
+                                solver_type='formalgeo', predicate_num=2, 
+                                debug=debug)
+
     target_finder.solver = solver
-    # solution to expanded target, like `find_target_and_solution`
-    conditions_to_sample = solver.problem.condition.items[-10:-1]
+    condition_graph = ConditionGraph(target_finder.solver.problem.condition.items)
+    condition_graph.construct_graph()
+
+    conditions_to_sample = solver.problem.condition.items[-15:]
+    conditions_to_sample = [t for t in conditions_to_sample if t != ori_target]
     # filter 1
     new_targets = TargetFinder.targets_filter_1(
         conditions_to_sample,
-        solver.problem.condition.value_of_sym
+        target_finder.solver.problem.condition.value_of_sym
     )
+    # filter 2
     new_targets = TargetFinder.targets_filter_2(
         new_targets,
         strict=True
     )
     if len(new_targets) == 0:
         return 
-    if solver.problem.goal.solved:
-        new_targets = [t for t in new_targets if t != ori_target]
+
     theorems_for_targets = {}
     solution_for_targets = {}
     solution_dict_for_targets = {}
@@ -366,28 +455,46 @@ def expand_one_sample(
             sub_nodes, 
             too_complex
         ) = TargetFinder.find_solution_for_target(
-            solver.problem,
+            target_finder.solver.problem,
             condition_graph, 
             target, 
             natural_template,
-            solver.parsed_theorem_GDL,
+            target_finder.solver.parsed_theorem_GDL,
             expand_flag=True
         )
-        theorems_for_targets[target] = theorems_formal
+        if too_complex:
+            continue
+        theorems_for_targets[target] = [v['theorem'] for v in solution_formal_dict.values() if v['theorem'] != None]
         solution_for_targets[target] = solution_str
-        level_for_targets[target] = len(theorems_formal)
+        level_for_targets[target] = len(theorems_for_targets[target])
         solution_dict_for_targets[target] = solution_formal_dict
-    # filter 2
-    new_targets = TargetFinder.targets_filter_2(new_targets)
+
     # filter 3
+    new_targets, idx_for_targets = target_finder.targets_filter_3(
+        new_targets, theorems_for_targets, target_finder.max_depth
+    )
     targets_dict = TargetFinder.targets_into_groups(new_targets)
 
     chosen_targets = []
-    for type, targets in targets_dict.items():
-        chosen_targets += targets
-    a = 1
-    # solution to expanded targets
-    used_symbols = [str(s) for s in list(solver.problem.condition.value_of_sym.keys())]
+    type_list = ['line', 'angle', 'prove']
+    # type_list = ['line', 'angle'， ‘]
+    while any([len(targets_dict[t]) > 0 for t in type_list]):  # 只要有一个列表不为空就继续循环
+        for type_i in type_list:
+            if targets_dict[type_i]:  # 检查列表是否为空
+                element = targets_dict[type_i].pop(0)
+                chosen_targets.append(element)
+            else:
+                pass
+    
+    source_key = problem_CDL['source']
+    if 'GeoQA' in source_key: # less targets for geoqa
+        chosen_targets = chosen_targets[:3]
+    else:
+        chosen_targets = chosen_targets[:6]
+
+    used_symbols = [str(s) for s in list(target_finder.solver.problem.condition.value_of_sym.keys())]
+
+    # create question for every target
     for i, chosen_target in enumerate(chosen_targets):
         chosen_thoerems = theorems_for_targets[chosen_target]
         chosen_solution = solution_for_targets[chosen_target]
@@ -399,7 +506,7 @@ def expand_one_sample(
             target_value, 
             target_cdl, 
             problem_text, 
-            problem_text_type
+            cap_str
         ) = target_finder.create_question(chosen_target, 'image_based', used_symbols=used_symbols)
 
         if len(add_conditions) != 0:
@@ -417,7 +524,6 @@ def expand_one_sample(
             "image_cdl": problem_CDL['image_cdl'],
             "positions": [],
             "goal_cdl": '',
-            "search_time": search_time,
             "theorems": chosen_thoerems,
             "llm_info": {
                 "key": problem_idx,
@@ -434,9 +540,9 @@ def expand_one_sample(
             
     return
                 
-def solve_main(split="test"):
+def solve_main(split="train"):
     # save_dir = f"datasets/fgo_search_{split}"
-    save_dir = f"datasets/fgo_search_{split}_v2"
+    save_dir = f"datasets/fgo_search_{split}_v5_ori"
     os.makedirs(save_dir, exist_ok=True)
     predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
     theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
@@ -446,10 +552,59 @@ def solve_main(split="test"):
 
     # exist_keys = 3242
     # keys = keys[3900:]
-    regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
-    keys = [k for k in keys if k in regen_keys]
+    # regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
+    # keys = [k for k in keys if k in regen_keys]
 
     num_process = 10
+    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    
+    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
+    
+    pool = Pool(num_process)
+    results = []
+
+    
+    with tqdm(total=len(keys), desc="Processing") as pbar:
+        def update(*args, **kwargs):
+            pbar.update()
+        for i, problem_idx in enumerate(keys):
+            
+            # problem_CDL = data[problem_idx]
+            problem_idx = int(problem_idx)
+            problem_CDL = dl.get_problem(problem_idx)
+            res = pool.apply_async(
+                # expand_one_sample,
+                solve_one_sample_with_timeout,
+                args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir),
+                callback=update
+            )
+            results.append(res)
+        for r in results:
+            r.wait()
+        # if os.path.exists(f"{save_dir}/{problem_idx}.json"):
+        #     tmp_data = json.load(open(f"{save_dir}/{problem_idx}.json", 'r', encoding='utf-8'))
+        #     if 'solved' in tmp_data:
+        #         continue
+
+    print("End for solve.")
+
+def expand_main(split="train"):
+    # save_dir = f"datasets/fgo_search_{split}"
+    save_dir = f"datasets/fgo_search_{split}_v5_exp"
+    os.makedirs(save_dir, exist_ok=True)
+    predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
+    data_path = f"datasets/processed_data/fgo_{split}.json"
+    data = json.load(open(data_path, 'r', encoding='utf-8'))
+    keys = list(data.keys())
+
+    # exist_keys = 3242
+    # keys = keys[3900:]
+    # regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
+    # keys = [k for k in keys if k in regen_keys]
+
+    num_process = 6
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
     dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
@@ -492,6 +647,9 @@ def solve_test():
     data = json.load(open(data_path, 'r', encoding='utf-8'))
     keys = list(data.keys())
 
+    # regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
+    # keys = [k for k in keys if k in regen_keys]
+
     t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
     # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     
@@ -504,7 +662,38 @@ def solve_test():
         
         problem_CDL = data[problem_idx]
         problem_idx = int(problem_idx)
-        res = expand_one_sample_with_timeout(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
+        res = solve_one_sample(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
+        results.append(res)
+
+def expand_test():
+    data_path = f"datasets/processed_data/fgo_train.json"
+    save_dir = f"datasets/fgo_train_expand_debug"
+    os.makedirs(save_dir, exist_ok=True)
+    # predicate_GDL = json.load(open("json/predicate_GDL_for_search.json", 'r', encoding='utf-8'))
+    # theorem_GDL = json.load(open("json/theorem_GDL_for_search.json", 'r', encoding='utf-8'))
+    predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
+    os.makedirs(save_dir, exist_ok=True)
+    data = json.load(open(data_path, 'r', encoding='utf-8'))
+    keys = list(data.keys())
+
+    # regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
+    # keys = [k for k in keys if k in regen_keys]
+
+    # t_info = json.load(open("json/t_info_new.json", 'r', encoding='utf-8'))
+    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    
+    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
+ 
+    results = []
+    for problem_idx in tqdm(keys):
+        # if int(problem_idx) < 19:
+        #     continue
+        
+        problem_CDL = data[problem_idx]
+        problem_idx = int(problem_idx)
+        res = expand_one_sample(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir, debug=True)
         results.append(res)
  
 
@@ -539,41 +728,40 @@ def draw_iteration():
                    idx=problem_idx,
                    target_condition=target_condition, 
                    img_dir=save_dir)
-        
-def check_type():
-    from collections import Counter
-    split = "train"
-    data_path = f"datasets/processed_data/fgo_{split}.json"
-    data = json.load(open(data_path, 'r', encoding='utf-8'))
-    keys = list(data.keys())
-    save_path = f"datasets/processed_data/fgo_{split}_solution.json"
-    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    
-    type_lst = []
-    for problem_idx in tqdm(keys):
-        problem_idx = int(problem_idx)
-        solver = Interactor(dl.predicate_GDL, dl.theorem_GDL, t_info)
-        
-        problem_CDL = dl.get_problem(pid=problem_idx)
-        solver.load_problem(problem_CDL)
-        
-        problem = solver.problem.parsed_problem_CDL
-        type = problem['parsed_cdl']['goal']['type']
-        type_lst.append(type)
 
-        # print(goal)
-        if type != 'value':
-            pass
-    
-        
-    counted_type = Counter(type_lst)
-    print(counted_type)
         
 def setup_seed():
     seed = 1234
     random.seed(seed)
     np.random.seed(seed)
+
+def check_goal():
+    data_path = f"datasets/processed_data/fgo_train.json"
+    save_dir = f"datasets/fgo_train_search_debug"
+    predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
+    os.makedirs(save_dir, exist_ok=True)
+    data = json.load(open(data_path, 'r', encoding='utf-8'))
+    keys = list(data.keys())
+
+    # regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
+    # keys = [k for k in keys if k in regen_keys]
+
+    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
+    # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
+    
+    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
+ 
+    results = []
+    for problem_idx in tqdm(keys):
+        # if int(problem_idx) < 19:
+        #     continue
+        
+        problem_CDL = data[problem_idx]
+        problem_idx = int(problem_idx)
+        if problem_CDL['goal_cdl'] == '':
+           print(problem_idx)
+
 
 if __name__ == '__main__':
     setup_seed()
@@ -581,4 +769,7 @@ if __name__ == '__main__':
     # check_type()
     # solve_iteration()
     # draw_iteration()
-    solve_main(split='train')
+    solve_main(split='val')
+    # expand_test()
+    # check_goal()
+    expand_main()

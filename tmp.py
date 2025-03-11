@@ -1,11 +1,12 @@
 from sympy import simplify, nsimplify, Integer, Float, symbols, linear_eq_to_matrix, solve, Eq, Matrix
 import re
+import os
 import numpy as np
-from formalgeo.core.engine import EquationKiller as EqKiller
+from formalgeo_v2.core.engine import EquationKiller as EqKiller
 import requests
 import json
 import itertools
-
+from tqdm import tqdm
 
 def test_parse():
     from utils.symbolic import parse_clause
@@ -270,7 +271,8 @@ def test_formulate():
     clauses = [
         # 'Equal(LengthOfLine(AB),2)',
         # 'Equal(MeasureOfAngle(ABC),90)',
-        'Value(MeasureOfArc(KLJ),148)',
+        # 'Value(MeasureOfArc(KLJ),148)',
+        'Value(PerimeterOfCircle(A),20*pi)',
         'Equal(MeasureOfAngle(ABC),MeasureOfArc(OAC))',
         'Equal(MeasureOfAngle(ABC),MeasureOfArc(OAC))',
         # 'Equal(LengthOfLine(AB),RadiusOfCircle(O))',
@@ -293,4 +295,17 @@ if __name__ == '__main__':
     # test_subs()
     # test_adjust_coef()
     # test_check_expr()
-    test_formulate()
+    # test_formulate()
+    dir_1 = 'datasets/fgo_search_train_v2'
+    dir_2 = 'datasets/fgo_search_train_v3'
+    files_1 = os.listdir(dir_1)
+    files_2 = os.listdir(dir_2)
+
+    import shutil
+    cnt = 0
+    for f_in_1 in tqdm(files_1):
+        if not os.path.exists(f"{dir_2}/{f_in_1}"):
+            cnt += 1
+            shutil.copy2(f"{dir_1}/{f_in_1}", f"{dir_2}/{f_in_1}")
+
+    print(cnt)

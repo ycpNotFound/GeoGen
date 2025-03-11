@@ -1,10 +1,10 @@
 import time
 import random
-from formalgeo.problem import Problem
-from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
-from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
-from formalgeo.tools import get_used_pid_and_theorem, debug_print
+from formalgeo_v2.problem import Problem
+from formalgeo_v2.core import GeometryPredicateLogicExecutor as GPLExecutor
+from formalgeo_v2.core import EquationKiller as EqKiller
+from formalgeo_v2.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
+from formalgeo_v2.tools import get_used_pid_and_theorem, debug_print
 
 
 def get_p2t_map_fw(t_info, parsed_theorem_GDL):

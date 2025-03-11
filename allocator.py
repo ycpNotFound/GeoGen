@@ -11,7 +11,7 @@ from sympy import (And, Eq, Expr, Float, I, Or, StrictGreaterThan,
                    StrictLessThan, Symbol, cos, im, nsimplify, oo, pi,
                    simplify, solve, symbols)
 
-from formalgeo.data import DatasetLoader
+from formalgeo_v2.data import DatasetLoader
 from generator import ClauseGenerator
 from utils.preset import PREDICATES_ENT, PREDICATES_REL
 from utils.symbolic import (find_target_for_construct, get_predicate_name,

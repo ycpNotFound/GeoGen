@@ -2,13 +2,13 @@ import time
 import json
 import warnings
 
-from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
-from formalgeo.parse import (get_equation_from_tree, parse_predicate_gdl,
+from formalgeo_v2.core import EquationKiller as EqKiller
+from formalgeo_v2.core import GeometryPredicateLogicExecutor as GPLExecutor
+from formalgeo_v2.parse import (get_equation_from_tree, parse_predicate_gdl,
                              parse_problem_cdl, parse_theorem_gdl)
-from formalgeo.problem import Problem
-from formalgeo.tools import debug_print, rough_equal
-from formalgeo.solver.forward_search import get_p2t_map_fw
+from formalgeo_v2.problem import Problem
+from formalgeo_v2.tools import debug_print, rough_equal
+from formalgeo_v2.solver.forward_search import get_p2t_map_fw
 
 class Interactor:
 
@@ -82,7 +82,7 @@ class Interactor:
         if not update:
             w_msg = "Theorem <{},{},{}> not applied. Please check your theorem or prerequisite.".format(
                 t_name, t_branch, t_para)
-            warnings.warn(w_msg)
+            # warnings.warn(w_msg)
 
         return update
 
@@ -443,6 +443,92 @@ class Interactor:
                             selections.append(((t_name, t_branch, theorem_para), tuple(conclusions)))
         return selections
     
+    def get_theorem_selection_v2(self):
+        """
+        Return theorem selections according to <self.last_step>.
+        :return selections: <list> of ((t_name, t_branch, t_para), ((predicate, item, premise))).
+        """
+        selections = []
+
+        timing = time.time()
+        related_pres = []  # new added predicates
+        related_syms = []  # new added/updated equations
+        for step in range(0, self.problem.condition.step_count):  # get related conditions
+            for _id in self.problem.condition.ids_of_step[step]:
+                if self.problem.condition.items[_id][0] in self.ignore_ops:
+                    continue
+                if self.problem.condition.items[_id][0] == "Equation":
+                    for sym in self.problem.condition.items[_id][1].free_symbols:
+                        if sym in related_syms:
+                            continue
+                        related_syms.append(sym)
+                else:
+                    if self.problem.condition.items[_id][0] not in self.p2t_map:
+                        continue
+                    item = self.problem.condition.items[_id][1]
+                    for t_name, t_branch, p_vars in self.p2t_map[self.problem.condition.items[_id][0]]:
+                        if len(p_vars) != len(item):
+                            continue
+                        letters = {}
+                        for i in range(len(p_vars)):
+                            letters[p_vars[i]] = item[i]
+                        related_pre = (t_name, t_branch, letters)
+                        if related_pre not in related_pres:
+                            related_pres.append(related_pre)
+        debug_print(self.debug, "(timing={:.4f}s) Get Related.".format(time.time() - timing))
+        debug_print(self.debug, "Related predicates: {}.".format(related_pres))
+        debug_print(self.debug, "Related syms: {}.".format(related_syms))
+
+        timing = time.time()
+        logic_selections = self.try_theorem_logic(related_pres)
+        debug_print(self.debug, "(timing={:.4f}s) Get {} logic-related selections: {}.".format(
+            time.time() - timing, len(logic_selections), logic_selections))
+        timing = time.time()
+        
+        # algebra_selections = self.try_theorem_algebra(related_syms)
+        algebra_selections = []
+        debug_print(self.debug, "(timing={:.4f}s) Get {} algebra-related selections: {}.".format(
+            time.time() - timing, len(algebra_selections), algebra_selections))
+
+        timing = time.time()
+        added_selections = []
+        for selection in logic_selections + algebra_selections:  # remove redundancy
+            _, conclusions = selection
+            s = []
+            for conclusion in conclusions:
+                predicate, item, _ = conclusion
+                s.append((predicate, item))
+            s = tuple(s)
+            if s not in added_selections:
+                added_selections.append(s)
+                selections.append(selection)
+
+        for i in range(len(selections))[::-1]:
+            t_msg, conclusions = selections[i]
+            t_name, t_branch, t_para = t_msg
+            if "area" in t_name:
+                if "ratio" in t_name:
+                    para1 = t_para[0:int(len(t_para) / 2)]
+                    para2 = t_para[int(len(t_para) / 2):]
+                    if not (para1 in self.problem_a_paras and para2 in self.problem_a_paras):
+                        selections.pop(i)
+                else:
+                    if t_para not in self.problem_a_paras:
+                        selections.pop(i)
+            elif "perimeter" in t_name:
+                if "ratio" in t_name:
+                    para1 = t_para[0:int(len(t_para) / 2)]
+                    para2 = t_para[int(len(t_para) / 2):]
+                    if not (para1 in self.problem_p_paras and para2 in self.problem_p_paras):
+                        selections.pop(i)
+                else:
+                    if t_para not in self.problem_p_paras:
+                        selections.pop(i)
+        debug_print(self.debug, "(timing={:.4f}s) Get {}  selections: {}.".format(
+            time.time() - timing, len(selections), selections))
+
+        return selections
+    
     def expand_conditions(self):
         selections = self.get_theorem_selection()
         # debug_print(selections)
@@ -453,3 +539,4 @@ class Interactor:
 
             EqKiller.solve_equations(self.problem) 
             self.problem.step(t_msg, 0)
+ 

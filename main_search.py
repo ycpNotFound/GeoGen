@@ -2,10 +2,10 @@
 import itertools
 import json
 import os
-import traceback
 import random
-from multiprocessing import Pool
+import traceback
 from concurrent.futures import ProcessPoolExecutor, TimeoutError
+from multiprocessing import Pool
 
 import numpy as np
 from func_timeout import FunctionTimedOut, func_timeout
@@ -65,7 +65,7 @@ def generate_one_sample(predicate_GDL,
             if plot_success:
                 break
         
-        goal_finder = TargetFinder(
+        target_finder = TargetFinder(
             search_cfg['predicate_GDL'],
             search_cfg['theorem_GDL'],
             search_cfg['t_info'],
@@ -78,7 +78,8 @@ def generate_one_sample(predicate_GDL,
             solver_type='formalgeo',
             debug=False
         )
-        info_dict_symbolic, info_dict_llm = goal_finder.formulate()
+        image_based_flag = random.choice([True, False])
+        info_dict_symbolic, info_dict_llm = target_finder.formulate(image_based=image_based_flag)
         
         task_info = {
             "key": fig_idx,
@@ -102,6 +103,7 @@ def generate_one_sample(predicate_GDL,
             "search_time": info_dict_symbolic['time'],
             "theorems": info_dict_symbolic['theorems'],
             "available_targets_num": info_dict_symbolic['available_targets_num'],
+            "image_based": image_based_flag,
             "llm_info": {
                 "key": fig_idx,
                 "problem_level": info_dict_llm['problem_level'],
@@ -240,8 +242,8 @@ def run_task(seed,
                     
                 # )
                 result = pool.apply_async(
-                    # generate_one_sample,
-                    generate_one_sample_with_timeout, 
+                    generate_one_sample,
+                    # generate_one_sample_with_timeout, 
                     args=(predicate_GDL, theorem_GDL, pred_base, pred_rel, 
                         n_more_lines, color_config, fig_dir, cnt, info_dir, search_cfg),
                     callback=update,
@@ -377,7 +379,7 @@ def task_2():
 
 def run_task_stage_2():
     input_args_list = []
-    num_process = 12
+    num_process = 2
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
@@ -399,15 +401,51 @@ def run_task_stage_2():
     seed_2 = 115
     print(f'Task: {task_name_2}', len(input_args_2))
     
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
+    input_args_3 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=2,
+                                    repeat_times=30)
+    task_name_3 = "geo_gen_ENT_1_REL_1_L_2"
+    seed_3 = 115
+    print(f'Task: {task_name_3}', len(input_args_3))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_4 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=0,
+                                    repeat_times=30)
+    task_name_4 = "geo_gen_ENT_1_REL_2_L_0"
+    seed_4 = 115
+    print(f'Task: {task_name_4}', len(input_args_4))
+    
+    pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
+    pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 2))
+    input_args_5 = build_input_args(pred_base_combs, 
+                                    pred_rel_combs, 
+                                    n_more_lines=1,
+                                    repeat_times=30)
+    task_name_5 = "geo_gen_ENT_1_REL_2_L_1"
+    seed_5 = 115
+    print(f'Task: {task_name_5}', len(input_args_5))
+    
     
     input_args_list = [
         input_args_1, input_args_2, 
+        input_args_3, input_args_4, 
+        input_args_5
     ]
     task_name_list = [
         task_name_1, task_name_2, 
+        task_name_3, task_name_4, 
+        task_name_5, 
     ]
     seed_list = [
         seed_1, seed_2,
+        seed_3, seed_4,
+        seed_5,
     ]
     print('Total Num: ', sum([len(args) for args in input_args_list]))
     for input_args, task_name, seed in zip(input_args_list, task_name_list, seed_list):
@@ -461,6 +499,6 @@ def debug_main():
 
 
 if __name__ == '__main__':
-    main()
-    # debug_main()
+    # main()
+    debug_main()
     

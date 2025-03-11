@@ -1,16 +1,21 @@
-import time
 import copy
+import itertools
+import math
+import time
 import warnings
+from copy import deepcopy
 from itertools import combinations
+
 from sympy import symbols
-from formalgeo.problem.condition import Condition, Goal
-from formalgeo.parse import parse_expr, get_equation_from_tree
-from formalgeo.tools import rough_equal
-from formalgeo.core import EquationKiller as EqKiller
+
+from formalgeo_v2.core import EquationKillerV2 as EqKiller
+from formalgeo_v2.parse import get_equation_from_tree, parse_expr
+from formalgeo_v2.problem.condition import Condition, Goal
+from formalgeo_v2.tools import rough_equal
 
 
 class Problem:
-    def __init__(self):
+    def __init__(self, p_pos=None):
         """Problem conditions, goal, and solving message."""
         self.parsed_predicate_GDL = None
         self.parsed_theorem_GDL = None
@@ -18,6 +23,41 @@ class Problem:
         self.condition = None  # <Condition>, all conditions of current problem.
         self.goal = None  # <Goal>, problem goal.
         self.timing = {}  # <dict>, {step: (theorem, timing)}, such as {0: ('init_problem', 0.00325)}.
+        self.p_pos = p_pos
+        
+    def sort_counter_clocksiwe_angle(self, points):
+        if self.p_pos is None:
+            return points
+        (A, B, C) = [self.p_pos[p] for p in points]
+        AB = (B[0] - A[0], B[1] - A[1])
+        BC = (C[0] - B[0], C[1] - B[1])
+        cross_product_z = AB[0]*BC[1] - AB[1]*BC[0]
+        if cross_product_z > 0:
+            return tuple([points[2], points[1], points[0]])
+        else:
+            return points
+        
+    def sort_counter_clockwise_cocircular(self, centre, points):
+        if self.p_pos is None:
+            return points
+        O = self.p_pos[centre]
+
+        def angle_from_origin(point):
+            dx = point[0] - O[0]
+            dy = point[1] - O[1]
+            return math.atan2(dy, dx)
+        angles = [(key, angle_from_origin(self.p_pos[key])) for key in points]
+        sorted_angles = sorted(angles, key=lambda x: x[1], reverse=True)
+        sorted_points = [item[0] for item in sorted_angles]
+        start_idx = sorted_points.index(min(points))
+        sorted_points = sorted_points[start_idx:] + sorted_points[:start_idx]
+        return tuple(sorted_points)
+    
+    def sort_by_x_collinear(self, points):
+        if self.p_pos is None:
+            return points
+        sorted_points = sorted(points, key=lambda x: self.p_pos[x][0])
+        return tuple(sorted_points)
 
     def load_problem_by_fl(self, parsed_predicate_GDL, parsed_theorem_GDL, parsed_problem_CDL):
         """Load problem through problem CDL."""
@@ -41,6 +81,13 @@ class Problem:
             elif predicate == "Equation":
                 self.add("Equation", parse_expr(self, item),
                          (-1,), ("prerequisite", None, None))
+            elif predicate == 'ParallelBetweenLine' and self.p_pos is not None:
+                item_1, item_2 = self.same_side_for_parallel(item)
+                self.add(predicate, tuple(item_1), (-1,), ("prerequisite", None, None))
+                self.add(predicate, tuple(item_2), (-1,), ("prerequisite", None, None))
+            elif predicate == 'IsBisectorOfAngle':
+                item = item[:2] + list(self.sort_counter_clocksiwe_angle(item[2:]))
+                self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
             else:
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
 
@@ -58,6 +105,18 @@ class Problem:
         self.goal = Goal()  # set goal
         self.goal.init_by_copy(problem.goal)
 
+    def same_side_for_parallel(self, item):
+        # AB // CD, AC in one side, BD in the other side
+        A, B, C, D = item
+        AB = [self.p_pos[B][0] - self.p_pos[A][0],
+                  self.p_pos[B][1] - self.p_pos[A][1]]
+        CD = [self.p_pos[D][0] - self.p_pos[C][0],
+                  self.p_pos[D][1] - self.p_pos[C][1]]
+        if AB[0] * CD[0] + AB[1] * CD[1] > 0:
+            return (A, B, C, D), (C, D, A, B)
+        else:
+            return (A, B, D, C), (D, C, A, B)
+    
     def _construction_init(self):
         """
         Constructive process.
@@ -66,9 +125,19 @@ class Problem:
         3.Shape expand. Shape(s1,s2,s3), Shape(s3,s2,s4) ==> Shape(s1,s4).
         4.Angle expand (combination).
         5.Angle expand (collinear).
-        6.Angle expand (vertical angle).
+        6.Angle expand (find possible angle).
         """
-
+        # 0. Add all point and line instances.
+        for line in self.parsed_problem_CDL['lines']:
+            for i in range(len(line)-1):
+                line_unit = (line[i], line[i+1])
+                line_unit_rev = (line[i+1], line[i])
+                self.condition.add('Line', line_unit, (-1,), ("prerequisite", None, None))
+                self.condition.add('Line', line_unit_rev, (-1,), ("prerequisite", None, None))
+        for point in self.parsed_problem_CDL['points']:
+            self.condition.add('Point', (point, ), (-1, ), ("prerequisite", None, None)) 
+            
+                    
         # 1.Collinear expand.
         for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Collinear
             if predicate != "Collinear":
@@ -89,6 +158,12 @@ class Problem:
                 self.condition.add("Collinear", extended_item[::-1], (_id,), ("extended", None, None))
                 self.add("Angle", extended_item, (_id,), ("extended", None, None))
                 self.add("Angle", extended_item[::-1], (_id,), ("extended", None, None))
+                angle_sym_1 = self.get_sym_of_attr('MeasureOfAngle', extended_item)
+                angle_sym_2 = self.get_sym_of_attr('MeasureOfAngle', extended_item[::-1])
+                if angle_sym_1 is not None:
+                    self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
+                if angle_sym_2 is not None:
+                    self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
 
         # 2.Cocircular expand.
         for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
@@ -250,6 +325,7 @@ class Problem:
                         continue
 
                     new_angle = (unit[0], unit[1], comb[2])
+                    new_angle = self.sort_counter_clocksiwe_angle(new_angle)
 
                     if not len(new_angle) == len(set(new_angle)):  # ensure same points
                         continue
@@ -275,9 +351,67 @@ class Problem:
                 self.add("Angle", same_angle, premise, ("extended", None, None))
 
         # 6.Angle expand (vertical angle).
-        for angle in self.condition.get_items_by_predicate("Angle"):
-            premise = (self.condition.get_id_by_predicate_and_item("Angle", angle),)
-            self.add("Angle", (angle[2], angle[1], angle[0]), premise, ("extended", None, None))
+        # for angle in self.condition.get_items_by_predicate("Angle"):
+        #     premise = (self.condition.get_id_by_predicate_and_item("Angle", angle),)
+        #     self.add("Angle", (angle[2], angle[1], angle[0]), premise, ("extended", None, None))
+
+        # 6.Angle expand (find possible angle).
+        def collinear(p1, p2, p3):
+            collinear_ls = self.condition.get_items_by_predicate("Collinear")
+            for l in collinear_ls:
+                if len(set(l) & set((p1, p2, p3))) == 3:
+                    return True
+            if self.p_pos is not None:
+                pos_1 = self.p_pos[p1]
+                pos_2 = self.p_pos[p2]
+                pos_3 = self.p_pos[p3]
+                AB = (pos_2[0] - pos_1[0], pos_2[1] - pos_1[1])
+                AC = (pos_3[0] - pos_1[0], pos_3[1] - pos_1[1])
+                cross_product = AB[0] * AC[1] - AB[1] * AC[0]
+                if abs(cross_product) < 1e-5:
+                    return True
+            return False
+        
+        if self.p_pos is not None:
+            for line in self.condition.get_items_by_predicate("Line"):
+                # AB is line, find other lines starts with B (BC, BD, ...)
+                other_lines = [
+                    l for l in self.condition.get_items_by_predicate("Line")
+                    if len(set(l) & set(line)) != 2 and l[0] == line[1]
+                    and not collinear(line[0], l[0], l[1])
+                ]
+                for l in other_lines:
+                    new_angle = (line[0], l[0], l[1])
+                    premise = (self.condition.get_id_by_predicate_and_item("Line", line),
+                            self.condition.get_id_by_predicate_and_item("Line", l))
+                    self.add("Angle", new_angle, premise, ("extended", None, None))
+
+        # 6.Cocircular radius equal (new added).
+        # for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["construction_cdl"]:  # Cocircular
+        #     if predicate != "Cocircular":
+        #         continue
+        #     if not self.fv_check("Cocircular", item):  # FV check
+        #         w_msg = "FV check not passed: [{}, {}]".format(predicate, item)
+        #         warnings.warn(w_msg)
+        #         continue
+        #     radius = []
+        #     for p in item[1:]:
+        #         line = (item[0], p)
+        #         if line in self.condition.items_group['Line']:
+        #             radius.append(line)
+            
+        #     for i in range(len(radius)-1):
+        #         l1, l2 = radius[i], radius[i+1]
+        #         l1_sym = self.get_sym_of_attr('LengthOfLine', l1)
+        #         l2_sym = self.get_sym_of_attr('LengthOfLine', l2)
+        #         premise = [
+        #             self.condition.get_id_by_predicate_and_item(predicate, tuple(item)),
+        #             self.condition.get_id_by_predicate_and_item("Line", l1),
+        #             self.condition.get_id_by_predicate_and_item("Line", l2),
+        #         ]
+        #         self.add("Equation", l1_sym - l2_sym, premise, ("extended", None, None))
+        return 
+
 
     def _add_shape(self, shape, premise, theorem):
         """pass"""
@@ -383,9 +517,89 @@ class Problem:
         for a_point in a_points:
             for b_point in b_points:
                 same_angles.append((a_point, v, b_point))
+                # reverse angle regards to be same
+                # same_angles.append((b_point, v, a_point))
 
         return same_angles
 
+    def add_collinear_extend(self, item, _id):
+        item_rev = tuple(list(item)[::-1])
+        self.condition.add('Collinear', item_rev, (_id, ), ("extended", None, None))
+        # add sub lines
+        for i in range(len(item)-1):
+            new_line = (item[i], item[i+1])
+            new_line_rev = (item[i+1], item[i])
+            self.condition.add('Line', new_line, (_id, ), ("extended", None, None))
+            self.condition.add('Line', new_line_rev, (_id, ), ("extended", None, None))
+        # add flat angles
+        for extended_item in combinations(item, 3):  # l=3 is enough
+            self.condition.add("Collinear", extended_item, (_id,), ("extended", None, None))
+            self.condition.add("Collinear", extended_item[::-1], (_id,), ("extended", None, None))
+            self.condition.add("Angle", extended_item, (_id,), ("extended", None, None))
+            self.condition.add("Angle", extended_item[::-1], (_id,), ("extended", None, None))
+            angle_sym_1 = self.get_sym_of_attr('MeasureOfAngle', extended_item)
+            angle_sym_2 = self.get_sym_of_attr('MeasureOfAngle', extended_item[::-1])
+            self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
+            self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
+
+        # add potential collinear
+        for ps in self.condition.get_items_by_predicate('Collinear'):
+            if len(set(item) & set(ps)) == 2:
+                ps_co = tuple(set(item) & set(ps))
+                p1 = tuple(set(item) - set(ps_co))[0]
+                p2 = tuple(set(ps) - set(ps_co))[0]
+                for p in ps_co:
+                    new_item = self.sort_by_x_collinear((p1, p, p2))
+                    new_item_rev = tuple(list(new_item)[::-1])
+                    _pre = self.condition.get_id_by_predicate_and_item('Collinear', ps)
+                    self.condition.add('Collinear', new_item, (_id, _pre), ("extended", None, None))
+                    self.condition.add('Collinear', new_item_rev, (_id, _pre), ("extended", None, None))
+        
+        def rotations(t):
+            return [t[i:] + t[:i] for i in range(len(t))]
+        
+        # add potential shape 
+        # A M B collinear, find lines like with XM
+        lines_XM = [l for l in self.condition.get_items_by_predicate('Line') if item[1] == l[1]]
+        # find lines like MY
+        lines_MY = [l for l in self.condition.get_items_by_predicate('Line') if item[1] == l[0]]
+        # check whether shape XMY exists
+        for l1, l2 in itertools.product(lines_XM, lines_MY):
+            if len(set(l1) & set(l2)) == 2:
+                continue
+            if len(set(l1).union(l2) & set(item)) == 3:
+                continue
+            # check whether points of l1, l2 collinear
+            collinear_flag = False
+            for collinear_ps in self.condition.get_items_by_predicate('Collinear'):
+                if len(set(collinear_ps) & set([l1[0], l1[1], l2[1]])) == 3:
+                    collinear_flag = True
+                    break
+            if collinear_flag:
+                continue
+
+            l3 = (l1[0], l2[1])
+            if l3 in self.condition.get_items_by_predicate('Line'):
+                poly = (l1[0], l1[1], l2[1])
+                if poly in self.condition.get_items_by_predicate('Collinear'):
+                    continue
+                poly = self.sort_counter_clocksiwe_angle(poly)
+                self.add('Polygon', poly, (_id, ), ("extended", None, None))
+                for angle in rotations(poly):
+                    self.add("Angle", angle, (_id, ), ("extended", None, None))
+                
+    def add_cocircular_extend(self, item, _id):
+        ori_ps = self.condition.items_group['Cocircular'][0]
+        new_ps = [p for p in item if p not in ori_ps]
+        for p in new_ps:
+            self.condition.add('Cocircular', (ori_ps[0], p), (_id, ), ("extended", None, None))
+            for ori_ps_i in deepcopy(self.condition.items_group['Cocircular']):
+                c, ps_on_c = ori_ps_i[0], ori_ps_i[1:]
+                added_ps = tuple(set(ps_on_c + (p, )))
+                added_ps = self.sort_counter_clockwise_cocircular(c, added_ps)
+                added_ps = (c, ) + added_ps
+                self.condition.add('Cocircular', added_ps, (_id, ), ("extended", None, None))
+        
     def add(self, predicate, item, premise, theorem, skip_check=False):
         """
         Add item to condition of specific predicate category.
@@ -399,6 +613,31 @@ class Problem:
         """
         if not skip_check and not self.check(predicate, item, premise, theorem):
             return False
+        # special cases:
+        if predicate == 'ParallelBetweenLine':
+            for collinear_ps in self.condition.get_items_by_predicate('Collinear'):
+                if len(set(collinear_ps) & set([item[0], item[1], item[2]])) == 3:
+                    return False
+                if len(set(collinear_ps) & set([item[0], item[1], item[3]])) == 3:
+                    return False
+        elif predicate == 'Collinear':
+            item = self.sort_by_x_collinear(item)
+        elif predicate == 'Angle':
+            if self.p_pos is not None:
+                # check the points in angle are counter clockwise
+                # self.p_pos: {'p': [x, y]}
+                p1, p2, p3 = item
+                p1_pos = self.p_pos[p1]
+                p2_pos = self.p_pos[p2]
+                p3_pos = self.p_pos[p3]
+                # Calculate the vectors
+                v1 = (p2_pos[0] - p1_pos[0], p2_pos[1] - p1_pos[1])
+                v2 = (p3_pos[0] - p1_pos[0], p3_pos[1] - p1_pos[1])
+                # Calculate the cross product: p2-p1 x p3-p1 > 0 (in cv2 < 0) is ccw
+                cross = v1[0] * v2[1] - v1[1] * v2[0]
+                if cross > 1e-5: # if cross > 0, is not ccw
+                    return False
+                
 
         added, _id = self.condition.add(predicate, item, premise, theorem)
         if added:
@@ -418,6 +657,9 @@ class Problem:
                              (_id,), ("extended", None, None), skip_check=True)
                     self.add("Line", (item[1], item[2]),
                              (_id,), ("extended", None, None), skip_check=True)
+                    # define symbol for angle
+                    sym = self.get_sym_of_attr('MeasureOfAngle', item)
+                    a = 1
                 elif predicate == "Polygon":
                     l = len(item)
                     for bias in range(1, l):  # all forms
@@ -427,8 +669,17 @@ class Problem:
 
             if predicate in self.parsed_predicate_GDL["Entity"]:  # user defined Entity
                 item_GDL = self.parsed_predicate_GDL["Entity"][predicate]
-            else:  # user defined Relation
+            elif predicate in self.parsed_predicate_GDL["Relation"]:  # user defined Relation
                 item_GDL = self.parsed_predicate_GDL["Relation"][predicate]
+                
+            else: # other cases
+                if predicate == 'Collinear':
+                    self.add_collinear_extend(item, _id)
+                elif predicate == 'Cocircular':
+                    self.add_cocircular_extend(item, _id)
+                else:
+                    pass
+                return True
 
             predicate_vars = item_GDL["vars"]
             letters = {}  # used for vars-letters replacement
@@ -441,6 +692,13 @@ class Problem:
             for extended_predicate, para in item_GDL["extend"]:  # extended
                 if extended_predicate == "Equal":
                     self.add("Equation", get_equation_from_tree(self, para, True, letters),
+                             (_id,), ("extended", None, None))
+                elif extended_predicate == 'PerpendicularBetweenLine':
+                    # check counter clockwise (ccw)
+                    points = tuple(letters[i] for i in para)[:3]
+                    points_ccw = self.sort_counter_clocksiwe_angle(points)
+                    points_input = points_ccw + (points[1], )
+                    self.add(extended_predicate, points_input,
                              (_id,), ("extended", None, None))
                 else:
                     self.add(extended_predicate, tuple(letters[i] for i in para),
@@ -625,15 +883,44 @@ class Problem:
             self.condition.sym_of_attr[(attr, item)] = sym  # add sym
             self.condition.value_of_sym[sym] = None  # init symbol's value
             self.condition.attr_of_sym[sym] = (attr, (item,))  # add attr
+            self.condition.equivalence_of_sym[sym] = []
             return sym
 
         if attr == "MeasureOfAngle":  # align angle's sym
             sym = symbols("ma_" + "".join(item).lower(), positive=True)  # init sym
             self.condition.value_of_sym[sym] = None  # init symbol's value
+            self.condition.sym_of_attr[("MeasureOfAngle", item)] = sym
+            self.condition.attr_of_sym[sym] = ("MeasureOfAngle", (item,))
+            self.condition.equivalence_of_sym[sym] = []
+            # define same angle
             same_angles = self._get_same_angles(item)
             for same_angle in same_angles:
-                self.condition.sym_of_attr[("MeasureOfAngle", same_angle)] = sym
-            self.condition.attr_of_sym[sym] = ("MeasureOfAngle", tuple(same_angles))
+                if same_angle == item: 
+                    continue
+                
+                # define angle
+                if ("MeasureOfAngle", same_angle) not in self.condition.sym_of_attr:
+                    same_angle_sym = symbols("ma_" + "".join(same_angle).lower(), positive=True)
+                    self.condition.sym_of_attr[("MeasureOfAngle", same_angle)] = same_angle_sym
+                    self.condition.attr_of_sym[same_angle_sym] = ("MeasureOfAngle", (same_angle,))
+                    self.condition.value_of_sym[same_angle_sym] = None
+                    self.condition.equivalence_of_sym[same_angle_sym] = []
+                
+                same_angle_sym = self.condition.sym_of_attr[("MeasureOfAngle", same_angle)]
+                
+                # find premise of collinear
+                collinear_ps = tuple(set(item[1:] + same_angle[1:]))
+                collinear_total = self.condition.get_items_by_predicate('Collinear')
+                for ps in collinear_total:
+                    if set(collinear_ps) == set(ps):
+                        break
+                collinear_premise = self.condition.get_id_by_predicate_and_item('Collinear', ps)
+                
+                # add equality relation
+                self.condition.add('Equation', same_angle_sym - sym, [collinear_premise], ('extended', None, None))
+                # self.condition.sym_of_attr[("MeasureOfAngle", same_angle)] = sym
+            # self.condition.attr_of_sym[sym] = ("MeasureOfAngle", tuple(same_angles))
+            
             return sym
 
         attr_GDL = self.parsed_predicate_GDL["Attribution"][attr]
@@ -654,6 +941,7 @@ class Problem:
                 extend_items.append(tuple(extended_item))
 
             self.condition.attr_of_sym[sym] = (attr, tuple(extend_items))  # add attr
+            self.condition.equivalence_of_sym[sym] = []
             return sym
 
     def set_value_of_sym(self, sym, value, premise):
@@ -667,7 +955,9 @@ class Problem:
 
         if self.condition.value_of_sym[sym] is None:
             self.condition.value_of_sym[sym] = value
-            added, _id = self.condition.add("Equation", sym - value, premise, ("solve_eq", None, None))
+            if 'ma_eac' in str(sym):
+                a = 1 # debug
+            added, _id = self.condition.add("Equation", sym - value, premise, ("solve_eq", 'set_value', None))
             return added
         return False
 
@@ -702,6 +992,7 @@ class Problem:
                     else:
                         self.goal.premise = tuple(premise)
                         self.goal.theorem = ("solve_eq", None, None)
+                        self.add("Equation", eq, self.goal.premise, ("solve_eq", None, None), skip_check=True)
         elif self.goal.type == "logic":  # logic relation
             if self.goal.answer in self.condition.get_items_by_predicate(self.goal.item):
                 self.goal.solved = True

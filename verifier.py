@@ -6,7 +6,7 @@ from copy import deepcopy
 from sympy import Eq, cos, rad, simplify, sin, solve, tan
 
 # from formalgeo.solver import Interactor
-from formalgeo.parse.basic import (get_equation_from_tree,
+from formalgeo_v2.parse.basic import (get_equation_from_tree,
                                    parse_equal_predicate, parse_geo_predicate)
 from solver import Interactor
 from utils.formulate import clause_to_nature_language

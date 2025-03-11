@@ -1,4 +1,4 @@
-from formalgeo.parse.basic import parse_geo_predicate, parse_equal_predicate, parse_equal_to_tree
+from formalgeo_v2.parse.basic import parse_geo_predicate, parse_equal_predicate, parse_equal_to_tree
 
 
 def parse_problem_cdl(problem_CDL):
@@ -15,7 +15,9 @@ def parse_problem_cdl(problem_CDL):
             "construction_cdl": [],
             "text_and_image_cdl": [],
             "goal": {},
-        }
+        },
+        "lines": problem_CDL['line_instances'] if 'line_instances' in problem_CDL else [],
+        "points": list(problem_CDL['point_positions'].keys()) if 'point_positions' in problem_CDL else []
     }
     for fl in problem_CDL["construction_cdl"]:
         predicate, para = fl.split("(")

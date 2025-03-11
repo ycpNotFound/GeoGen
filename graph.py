@@ -13,16 +13,15 @@ from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
 from sympy import Eq
 from tqdm import tqdm
 
-from formalgeo.data import (DatasetLoader, download_dataset,
+from formalgeo_v2.data import (DatasetLoader, download_dataset,
                             show_available_datasets)
-from formalgeo.parse import parse_theorem_seqs
-from formalgeo.problem import Problem
-from formalgeo.problem.condition import Goal
-from formalgeo.solver import Interactor
-from formalgeo.tools import show_solution
+from formalgeo_v2.parse import parse_theorem_seqs
+from formalgeo_v2.problem import Problem
+from formalgeo_v2.problem.condition import Goal
+from formalgeo_v2.solver import Interactor
+from formalgeo_v2.tools import show_solution
 from utils.symbolic import move_subtractions_to_rhs
-from utils.formulate import clause_to_nature_language, formulate_eqs, formulate_eqs_simple
-from formalgeo.parse import inverse_parse_one, inverse_parse_one_theorem
+from formalgeo_v2.parse import inverse_parse_one, inverse_parse_one_theorem
 # show_available_datasets()
 
 class ConditionNode():

@@ -9,12 +9,12 @@ from func_timeout import FunctionTimedOut, func_timeout
 from sympy import Eq, cos, rad, simplify, sin, solve, sqrt, tan
 from tqdm import tqdm
 
-from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
-from formalgeo.parse import (parse_predicate_gdl, parse_problem_cdl,
+from formalgeo_v2.core import EquationKillerV2 as EqKiller
+from formalgeo_v2.core import GeometryPredicateLogicExecutorV2 as GPLExecutor
+from formalgeo_v2.parse import (parse_predicate_gdl, parse_problem_cdl,
                              parse_theorem_gdl)
-from formalgeo.problem import Problem
-from formalgeo.tools import debug_print, get_used_pid_and_theorem
+from formalgeo_v2.problem import Problem
+from formalgeo_v2.tools import debug_print, get_used_pid_and_theorem
 from inter_gps_solver.extended_definition import ExtendedDefinition
 from inter_gps_solver.logic_parser import LogicParser
 from inter_gps_solver.logic_solver import LogicSolver

@@ -1,10 +1,10 @@
 import time
 import random
-from formalgeo.problem import Problem
-from formalgeo.core import GeometryPredicateLogicExecutor as GPLExecutor
-from formalgeo.core import EquationKiller as EqKiller
-from formalgeo.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
-from formalgeo.tools import get_used_pid_and_theorem, debug_print
+from formalgeo_v2.problem import Problem
+from formalgeo_v2.core import GeometryPredicateLogicExecutor as GPLExecutor
+from formalgeo_v2.core import EquationKiller as EqKiller
+from formalgeo_v2.parse import parse_predicate_gdl, parse_theorem_gdl, parse_problem_cdl
+from formalgeo_v2.tools import get_used_pid_and_theorem, debug_print
 
 
 def get_p2t_map_fw(t_info, parsed_theorem_GDL):
@@ -284,6 +284,14 @@ class ForwardSearcher:
                 else:
                     if t_para not in self.problem_p_paras:
                         selections.pop(i)
+                        
+        # sele_to_remove = []
+        # for sele in selections:
+        #     if sele[0][0] == 'round_angle':
+        #         sele_to_remove.append(sele)
+        # for sele in sele_to_remove:
+        #     selections.remove(sele)
+            
         debug_print(self.debug, "(timing={:.4f}s) Get {}  selections: {}.".format(
             time.time() - timing, len(selections), selections))
 
@@ -313,7 +321,13 @@ class ForwardSearcher:
 
                 if len(conclusions) > 0:
                     selections.append(((t_name, t_branch, t_para), tuple(conclusions)))
-
+        # sele_to_remove = []
+        # for sele in selections:
+        #     if sele[0][0] == 'round_angle':
+        #         sele_to_remove.append(sele)
+        # for sele in sele_to_remove:
+        #     selections.remove(sele)
+            
         return selections
 
     def try_theorem_algebra(self, related_syms):

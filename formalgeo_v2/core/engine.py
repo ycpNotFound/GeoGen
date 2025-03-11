@@ -1,15 +1,14 @@
 import copy
-from sympy import symbols, solve, Float
+from sympy import symbols, solve, Float, Poly
 from func_timeout import func_set_timeout, FunctionTimedOut
-from formalgeo.parse import get_equation_from_tree
-from formalgeo.tools import rough_equal
+from formalgeo_v2.parse import get_equation_from_tree
+from formalgeo_v2.tools import rough_equal
 import warnings
-
 
 class EquationKiller:
     solve_eqs = True  # whether to solve the equation in the intermediate process
     sym_simplify = True  # whether to apply symbol substitution simplification
-    accurate_mode = False  # whether to use accurate mode
+    accurate_mode = True  # whether to use accurate mode
     solve_rank_deficient_eqs = False  # whether to solve rank deficient equations
     use_cache = False  # whether to use cache to store solved target equations
     cache_eqs = None  # <dict>, {tuple(str(eqs),): [(sym_str, value)]}
@@ -180,7 +179,7 @@ class EquationKiller:
         return mini_syms
 
     @staticmethod
-    @func_set_timeout(2)
+    # @func_set_timeout(2)
     def simplification_value_replace(problem):
         """
         Simplify equations by replacing sym with known value.
@@ -211,6 +210,8 @@ class EquationKiller:
             for eq in problem.condition.simplified_equation:  # value replace
                 if eq in remove_lists:
                     continue
+                # if len(eq.free_symbols) != 1:
+                #     continue
                 raw_eq = eq
                 simplified = False
                 added_premise = []
@@ -282,8 +283,10 @@ class EquationKiller:
                 equations.pop(i)
 
     @staticmethod
-    @func_set_timeout(2)
+    # @func_set_timeout(2)
     def solve(equations, target_sym=None, keep_sym=False):
+        if type(equations) == tuple and len(equations) > 6: 
+            return {}
         try:
             if target_sym is not None:
                 solved = solve(equations, target_sym, dict=True)
@@ -371,9 +374,19 @@ class EquationKiller:
         except FunctionTimedOut:
             msg = "Timeout when simplify equations by value replace."
             warnings.warn(msg)
+        
+        # only solve symbols for line len or angle measure
+        eq_filtered = [
+            eq for eq in list(problem.condition.simplified_equation)
+            if all([
+                'll_' in str(sym) or 'ma_' in str(sym) 
+                for sym in list(eq.free_symbols)
+            ])
+        ]
 
         mini_eqs_lists, n_m = EquationKiller.get_minimum_group_equations(  # get mini equations
-            list(problem.condition.simplified_equation)
+            # list(problem.condition.simplified_equation)
+            eq_filtered
         )
 
         for i in range(len(mini_eqs_lists)):
@@ -406,7 +419,7 @@ class EquationKiller:
                 results = EquationKiller.solve(mini_eqs_lists[i])  # solve equations
             except FunctionTimedOut:
                 msg = "Timeout when solve equations: {}".format(mini_eqs_lists[i])
-                # warnings.warn(msg)
+                warnings.warn(msg)
             else:
                 for sym in results:
                     if problem.condition.value_of_sym[sym] is None:
@@ -485,9 +498,17 @@ class EquationKiller:
         if len(target_expr.free_symbols) == 0:
             return target_expr, premise
 
+        linear_exprs = []
+        for expr in list(problem.condition.simplified_equation):
+        # 检查表达式是否是线性的
+            poly = Poly(expr)
+            if poly.total_degree() == 1:
+                linear_exprs.append(expr)
+
         target_sym, mini_eqs, n_m = EquationKiller.get_minimum_target_equations(  # get mini equations
             target_expr,
-            list(problem.condition.simplified_equation)
+            # list(problem.condition.simplified_equation)
+            linear_exprs
         )
 
         if len(mini_eqs) == 0:  # no mini equations, can't solve
@@ -516,6 +537,13 @@ class EquationKiller:
             solved = False
             p = int((head + tail) / 2)
             try_mini_eqs = copy.copy(mini_eqs[0:p + 1])
+            
+            # if too complex: return
+            all_symbols = set()
+            for expr in try_mini_eqs:
+                all_symbols.update(expr.free_symbols)
+            # if len(all_symbols) >= 4:
+            #     return None, []
 
             if EquationKiller.sym_simplify:
                 try:
@@ -523,7 +551,7 @@ class EquationKiller:
                 except FunctionTimedOut:
                     msg = "Timeout when simplify equations by sym replace."
                     warnings.warn(msg)
-
+            
             try:
                 results = EquationKiller.solve(try_mini_eqs)  # solve equations
             except FunctionTimedOut:
@@ -854,7 +882,7 @@ class GeometryPredicateLogicExecutor:
                     result, premise = EquationKiller.solve_target(eq, problem)
                 except FunctionTimedOut:
                     msg = "Timeout when solve target: {}".format(str(eq))
-                    warnings.warn(msg)
+                    # warnings.warn(msg)
                 else:
                     if result is not None and rough_equal(result, 0):  # meet constraints
                         r_id = tuple(set(premise + list(r1_ids[i])))

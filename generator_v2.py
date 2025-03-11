@@ -6,15 +6,15 @@ from copy import deepcopy
 from tqdm import tqdm
 import networkx as nx
 from sympy import sin, cos, tan, sqrt, pi, Symbol
-from formalgeo.data import DatasetLoader
-from formalgeo.parse import (parse_predicate_gdl, parse_problem_cdl,
+from formalgeo_v2.data import DatasetLoader
+from formalgeo_v2.parse import (parse_predicate_gdl, parse_problem_cdl,
                              parse_theorem_gdl)
 from utils.preset import PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2
 from utils.symbolic import (find_target_for_construct, get_content,
                             get_points_mapping, get_points_num,
                             get_predicate_name, parse_clause, replace_points)
 from utils.tools import append_lst, setup_seed
-from formalgeo.parse.parse_cdl import parse_one_theorem
+from formalgeo_v2.parse.parse_cdl import parse_one_theorem
 
 class ClauseGenerator():
     def __init__(self, predicate_GDL, theorem_GDL):

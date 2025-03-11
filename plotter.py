@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
 from allocator import Allocator
-from formalgeo.data import DatasetLoader
+from formalgeo_v2.data import DatasetLoader
 from generator import ClauseGenerator
 from utils.formulate import clause_to_nature_language, convert_upper_to_lower
 from utils.preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2,
