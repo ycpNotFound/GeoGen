@@ -29,19 +29,31 @@ from func_timeout import func_timeout, FunctionTimedOut
 
 
 def search_one_sample_with_timeout(
-        problem_idx,
-        problem_CDL,
+        image_idx,
+        info,
         predicate_GDL,
         theorem_GDL,
         t_info,
+        t_freq_info,
+        save_dir,
         natural_template,
-        save_dir):
+        debug=False
+    ):
     try:
         result = func_timeout(
-            200, 
-            # 300,
-            expand_one_sample, 
-            args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir)
+            300,
+            search_one_sample, 
+            args=(
+                image_idx,
+                info,
+                predicate_GDL,
+                theorem_GDL,
+                t_info,
+                t_freq_info,
+                save_dir,
+                natural_template,
+                debug
+            )
         )
         return result
     # except Exception as e:
@@ -169,26 +181,28 @@ def search_one_sample(
     
 
 def search_main(split="train"):
-    # save_dir = f"datasets/fgo_search_{split}"
-    save_dir = f"datasets/fgo_search_{split}_v5_exp"
+    data_path = f"datasets/pgps/train_formal_img.json"
+    save_dir = f"datasets/pgps/train_search"
+    keys_ignore_path = f"datasets/pgps/lack_pos_keys.json"
     os.makedirs(save_dir, exist_ok=True)
-    predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
-    theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
-    data_path = f"datasets/processed_data/fgo_{split}.json"
-    data = json.load(open(data_path, 'r', encoding='utf-8'))
-    keys = list(data.keys())
+    predicate_GDL = json.load(open("json/predicate_GDL_for_search.json", 'r', encoding='utf-8'))
+    theorem_GDL = json.load(open("json/theorem_GDL_for_search.json", 'r', encoding='utf-8'))
+    # predicate_GDL = json.load(open("datasets/formalgeo7k/gdl/predicate_GDL.json", 'r', encoding='utf-8'))
+    # theorem_GDL = json.load(open("datasets/formalgeo7k/gdl/theorem_GDL.json", 'r', encoding='utf-8'))
 
-    # exist_keys = 3242
-    # keys = keys[3900:]
-    # regen_keys = read_json('D:/Desktop/GeoExpand/jsons/regen_keys_v2.json')
-    # keys = [k for k in keys if k in regen_keys]
+    data = read_json(data_path)
+    ignore_keys = read_json(keys_ignore_path)
+    keys = list(data.keys())
+    keys = [k for k in keys if k not in ignore_keys]
+
+    t_info = json.load(open("json/t_info_new.json", 'r', encoding='utf-8'))
+    t_names = sorted(t_info, reverse=True, key=lambda k: t_info[k][-1])
+    t_freq_info = {k: t_info[k][-1] for k in t_names}
+    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
+
+    cnt = 0
 
     num_process = 6
-    t_info = json.load(open("datasets/formalgeo7k/files/t_info.json", 'r', encoding='utf-8'))
-    dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
-    
-    natural_template = json.load(open("json/predicates_to_nature_language.json", 'r', encoding='utf-8'))
-    
     pool = Pool(num_process)
     results = []
 
@@ -196,18 +210,24 @@ def search_main(split="train"):
     with tqdm(total=len(keys), desc="Processing") as pbar:
         def update(*args, **kwargs):
             pbar.update()
-        for i, problem_idx in enumerate(keys):
-            
-            # problem_CDL = data[problem_idx]
-            problem_idx = int(problem_idx)
-            problem_CDL = dl.get_problem(problem_idx)
+        for i, image_idx in enumerate(keys):
+            info = data[image_idx]
             res = pool.apply_async(
-                # expand_one_sample,
-                expand_one_sample_with_timeout,
-                args=(problem_idx, problem_CDL, predicate_GDL, theorem_GDL, t_info, natural_template, save_dir),
+                search_one_sample_with_timeout,
+                args=(
+                    image_idx, 
+                    info, 
+                    predicate_GDL, 
+                    theorem_GDL, 
+                    t_info, 
+                    t_freq_info, 
+                    save_dir, 
+                    natural_template,
+                ),
                 callback=update
             )
             results.append(res)
+            
         for r in results:
             r.wait()
         # if os.path.exists(f"{save_dir}/{problem_idx}.json"):
@@ -243,7 +263,8 @@ def search_test():
     image_dir_1 = 'D:/Desktop/资源/几何答题/UniAll/imgs/pgps9k'
     image_dir_2 = 'D:/Desktop/资源/几何答题/UniAll/imgs/pgps9k_annoted'
 
-    keys = random.sample(keys, 10)
+    # keys = random.sample(keys, 10)
+    fail_cases = {}
     for image_idx in tqdm(keys):
         cnt += 1
         # if cnt < 55:
@@ -254,18 +275,22 @@ def search_test():
             print(f'{image_dir_2}/{image_idx}')
         else:
             print(f'{image_dir_1}/{image_idx}')
-        res = search_one_sample(
-            image_idx, 
-            info, 
-            predicate_GDL, 
-            theorem_GDL, 
-            t_info, 
-            t_freq_info, 
-            save_dir, 
-            natural_template,
-            debug=True
-        )
-        results.append(res)
+        try:
+            res = search_one_sample(
+                image_idx, 
+                info, 
+                predicate_GDL, 
+                theorem_GDL, 
+                t_info, 
+                t_freq_info, 
+                save_dir, 
+                natural_template,
+                debug=True
+            )
+            results.append(res)
+        except Exception as e:
+            tb = traceback.format_exc() 
+            fail_cases[image_idx] = tb
  
 
         
@@ -334,5 +359,6 @@ if __name__ == '__main__':
     # draw_iteration()
     # expand_test()
     # check_goal()
-    search_test()
+    # search_test()
+    search_main()
     # stats()
