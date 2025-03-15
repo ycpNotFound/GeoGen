@@ -408,7 +408,7 @@ def run_task_stage_2():
                                     n_more_lines=2,
                                     repeat_times=30)
     task_name_3 = "geo_gen_ENT_1_REL_1_L_2"
-    seed_3 = 115
+    seed_3 = 116
     print(f'Task: {task_name_3}', len(input_args_3))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -418,7 +418,7 @@ def run_task_stage_2():
                                     n_more_lines=0,
                                     repeat_times=30)
     task_name_4 = "geo_gen_ENT_1_REL_2_L_0"
-    seed_4 = 115
+    seed_4 = 117
     print(f'Task: {task_name_4}', len(input_args_4))
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
@@ -428,7 +428,7 @@ def run_task_stage_2():
                                     n_more_lines=1,
                                     repeat_times=30)
     task_name_5 = "geo_gen_ENT_1_REL_2_L_1"
-    seed_5 = 115
+    seed_5 = 118
     print(f'Task: {task_name_5}', len(input_args_5))
     
     

@@ -18,7 +18,7 @@ from formalgeo_v2.tools import debug_print, get_used_pid_and_theorem
 from inter_gps_solver.extended_definition import ExtendedDefinition
 from inter_gps_solver.logic_parser import LogicParser
 from inter_gps_solver.logic_solver import LogicSolver
-from utils.symbolic import degree_of_expr, formalgeo_to_intergps, parse_clause
+from utils.symbolic import degree_of_expr, parse_clause
 
 
 def make_timing_decorator(debug_attr='debug'):
@@ -32,7 +32,7 @@ def make_timing_decorator(debug_attr='debug'):
             
             # Check instance's debug attribute and print only if True
             if getattr(instance, debug_attr, False):
-                print(f"Function [{func.__name__}] took {elapsed_time:.6f} seconds to execute.")
+                print(f"Function [{func.__name__}] took {elapsed_time:.3f} seconds to execute.")
             
             return result
         return wrapper
@@ -46,9 +46,10 @@ def get_p2t_map_fw(t_info, parsed_theorem_GDL):
     """
     p2t_map_fw = {}
     for t_name in t_info:
-        if t_name == 'angle_addition': 
+        if t_name == 'cosine_theorem': 
             a = 1
         if t_info[t_name][1] == 0 or t_info[t_name][0] == 3:  # skip no used and diff t
+        # if t_info[t_name][1] == 0:
             continue
         for t_branch in parsed_theorem_GDL[t_name]["body"]:
             theorem_unit = parsed_theorem_GDL[t_name]["body"][t_branch]
@@ -97,6 +98,7 @@ class FormalGeoSolver:
         self.problem_a_paras = None  # Area
 
         self.leveled_condition = {}
+        self.algebra_seen_syms = set()
         
     @make_timing_decorator('debug')
     def init_search(self, problem_CDL):
@@ -133,7 +135,8 @@ class FormalGeoSolver:
         timing = time.time()
         selections = self.get_theorem_selection(
             start_step=0,
-            end_step=len(self.problem.condition.items)
+            end_step=len(self.problem.condition.items),
+            sample_num_per_th=3
         )
         self.add_selections([], selections)
         self.leveled_condition[0] = {
@@ -141,7 +144,7 @@ class FormalGeoSolver:
                 self.problem.condition.items
             )
         }
-        debug_print(self.debug, "(Depth=0)(timing={:.4f}s) Expand {} child node.".
+        debug_print(self.debug, "(Depth=0)(timing={:.3f}s) Expand {} child node.".
                     format(time.time() - timing, len(selections)))
         
     def solve_special_angles(self):
@@ -202,246 +205,7 @@ class FormalGeoSolver:
                     self.problem.step(('solve_eq', None, None), 0)
         return
         
-    
-    def solve_equations(self):
-        # solve equation, substitute value of syms first
-        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
-        value_of_sym = {
-            k: v for k, v in 
-            self.problem.condition.value_of_sym.items()
-            if v is not None
-        }
-        for expr in eq_exprs:
-            solved = False 
-            eq_idx = eq_exprs[expr][0]
-            premise = [eq_idx]
-            syms_in_expr = list(expr.free_symbols)
-            expr_new = copy(expr)
-            
-            for sym, value in value_of_sym.items():
-                if sym in syms_in_expr and value != None:
-                    premise_expr = sym - value
-                    for i, c in enumerate(self.problem.condition.items):
-                        if c[0] == 'Equation' and c[1] == premise_expr:
-                            premise.append(i)
-                    expr_new = expr_new.subs(sym, value)
-            
-            last_step = len(self.problem.condition.items)
-            
-            # can solve to value directly
-            if len(expr_new.free_symbols) == 1 and len(expr.free_symbols) > 1:
-                sym = list(expr_new.free_symbols)[0]
-                eq = Eq(expr_new, 0)
-                results = solve(eq, sym)
 
-                if self.problem.condition.value_of_sym[sym] is None and len(results) != 0:
-                    solved = True
-                    solved_results = results[0]
-                    self.problem.set_value_of_sym(sym, solved_results, premise)     
-
-            # can get new numerical relation though substitute
-            elif len(expr_new.free_symbols) == 2 and len(expr.free_symbols) > 2:
-                solved = True
-                self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
-                # remove the past equation
-                self.problem.condition.simplified_equation.pop(expr)
-                # add condition idx of new equation
-                self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
-                    
-            if not solved:
-                continue
-            
-            # add condition in `leveled_condition`
-            if len(self.problem.condition.items) - last_step > 0:
-                new_condition = deepcopy(self.problem.condition.items[last_step:])
-                # find position in search tree
-                pos = list(self.leveled_condition.keys())[-1]
-                for k, v in self.leveled_condition.items():
-                    if eq_idx in list(v.keys()):
-                        pos = k
-                # get new depth and pos
-                depth = len(pos)
-                if depth not in self.node_count:
-                    self.node_count[depth] = 1
-                new_pos = tuple(list(pos) + [self.node_count[depth]])
-                self.node_count[depth] += 1
-                self.leveled_condition[new_pos] = {}
-                for i in range(len(new_condition)):
-                    self.leveled_condition[new_pos][last_step+i] = new_condition[i]
-                    
-                self.problem.step(('solve_eq', None, None), 0)
-
-        return 
-    
-    def solve_equivalence_relation(self):
-        def set2key(set_input):
-            res = sorted(set_input, key=lambda x: str(x))
-            return tuple(res)
-        
-        def contains_sqrt(expr):
-            return any(isinstance(term, sp.Pow) and term.exp == sp.S.Half for term in sp.preorder_traversal(expr))
-        
-        def is_equal_expr(expr):
-            f1 = len(expr.free_symbols) == 2
-            f2 = all(abs(v) == 1 for v in expr.as_coefficients_dict().values()) 
-            f3 = not contains_sqrt(expr)
-            return f1 and f2 and f3
-        
-        # expand equivalence relation in equation groups
-        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
-        # split expr like: ll_ab - ll_cd
-        expr_list = [
-            expr for expr in eq_exprs if is_equal_expr(expr)
-        ]
-
-        eq_sym_groups = [] # list of set (symbols)
-        eq_groups_to_ids = {} # dict: tuple (symbols) -> id set (premise)
-
-        # find equivalent class (symbols group)
-        for expr in expr_list:
-            var_a, var_b = list(expr.free_symbols)
-            class_a, class_b = None, None
-            for sym_group in eq_sym_groups:
-                if var_a in sym_group:
-                    class_a = sym_group
-                if var_b in sym_group:
-                    class_b = sym_group
-            
-            # merge symbols group, remove origin and add new
-            if class_a is not None and class_b is not None:
-                if class_a != class_b:
-                    eq_sym_groups.remove(class_a)
-                    eq_sym_groups.remove(class_b)
-                    eq_sym_groups.append(class_a.union(class_b))
-                    id_1 = eq_groups_to_ids.pop(set2key(class_a))
-                    id_2 = eq_groups_to_ids.pop(set2key(class_b))
-                    # premise id from class a, class b, new expr
-                    eq_groups_to_ids[set2key(class_a.union(class_b))] = set(list(id_1) + list(id_2) + eq_exprs[expr])
-            elif class_a is not None:
-                id_1 = eq_groups_to_ids.pop(set2key(class_a))
-                class_a.add(var_b)
-                eq_groups_to_ids[set2key(class_a)] = set(list(id_1) + eq_exprs[expr])
-
-            elif class_b is not None:
-                id_1 = eq_groups_to_ids.pop(set2key(class_b))
-                class_b.add(var_a)
-                eq_groups_to_ids[set2key(class_b)] = set(list(id_1) + eq_exprs[expr])
-            else:
-                eq_sym_groups.append({var_a, var_b})
-                eq_groups_to_ids[set2key({var_a, var_b})] = set(eq_exprs[expr])
-        
-        # get new expr
-        new_expr_list = []
-        premise_list = []
-        for sym_group_set in eq_sym_groups:
-            sym_group = list(sym_group_set)
-            for i in range(len(sym_group) - 1):
-                for j in range(i + 1, len(sym_group)):
-                    new_expr_1 = sym_group[i] - sym_group[j]
-                    new_expr_2 = sym_group[j] - sym_group[i]
-                    if new_expr_1 not in expr_list and new_expr_2 not in expr_list:
-                        new_expr_list.append(new_expr_1)
-                        premise_list.append(list(eq_groups_to_ids[set2key(sym_group)]))
-        
-        for expr, premise in zip(new_expr_list, premise_list):
-            # add condition in `items`
-            last_step = len(self.problem.condition.items)
-            self.problem.add('Equation', expr, premise, ('solve_eq', None, None))
-            new_condition = deepcopy(self.problem.condition.items[last_step:])
-            
-            if len(new_condition) > 0:
-                # add condition in `leveled_condition`
-                pos = list(self.leveled_condition.keys())[-1]
-                for k, v in self.leveled_condition.items():
-                    if premise[0] in list(v.keys()):
-                        pos = k
-                        
-                depth = len(pos)
-                if depth not in self.node_count:
-                    self.node_count[depth] = 1
-                new_pos = tuple(list(pos) + [self.node_count[depth]])
-                self.node_count[depth] += 1
-                self.leveled_condition[new_pos] = {}
-                for i in range(len(new_condition)):
-                    self.leveled_condition[new_pos][last_step+i] = new_condition[i]
-                
-            self.problem.step(('solve_eq', None, None), 0)
-            
-        return 
-
-
-    @make_timing_decorator('debug')
-    def solve_equation_groups(self):
-        eq_exprs = deepcopy(self.problem.condition.simplified_equation)
-        eqs = [simplify(Eq(e, 0)) for e in eq_exprs]
-        update = False
-        
-        for i, expr_i in enumerate(eq_exprs):
-            if degree_of_expr(expr_i) >= 2:
-                continue
-            if len(expr_i.free_symbols) != 2:
-                continue
-            # assert expr_i has 2 free symbols
-            related_exprs = [
-                expr for expr in list(eq_exprs.keys())[i+1:]
-                if len(expr_i.free_symbols & expr.free_symbols) == 2
-            ]
-            last_step = len(self.problem.condition.items)
-            
-            for expr_j in related_exprs:
-                premise = eq_exprs[expr_i] + eq_exprs[expr_j]
-
-                # 1. if expr_j is linear, use sympy `solve`
-                # 2. if expr_j's degree == 2, substitute to get new expr
-                if degree_of_expr(expr_j) == 1:
-                    results = solve((expr_i, expr_j), expr_i.free_symbols, dict=True)
-                elif degree_of_expr(expr_j) == 2:
-                    sym_1, sym_2 = list(expr_i.free_symbols)
-                    expr_i_result = solve(expr_i, sym_1, dict=True)
-                    if isinstance(expr_i_result, list):
-                        expr_i_result = expr_i_result[0]
-                    expr_new = expr_j.subs(expr_i_result)
-                    results = solve(expr_new, sym_2, dict=True)
-                else:
-                    continue
-                
-                if len(results) == 0:
-                    continue
-                if isinstance(results, list):
-                    results = results[0]
-                    
-                # add conditions
-                for k, v in results.items():
-                    expr_new = k - v
-                    # check if already in equations
-                    if simplify(Eq(expr_new, 0)) in eqs:
-                        continue
-                    self.problem.add('Equation', expr_new, premise, ('solve_eq', None, None))
-                    self.problem.condition.simplified_equation[expr_new] = [len(self.problem.condition.items) - 1]
-                    
-            
-            # add condition
-            if len(self.problem.condition.items) - last_step > 0:
-                new_condition = deepcopy(self.problem.condition.items[last_step:])
-                # find position in search tree
-                pos = list(self.leveled_condition.keys())[-1]
-                for k, v in self.leveled_condition.items():
-                    if max(premise) in list(v.keys()):
-                        pos = k
-                # get new depth and pos
-                depth = len(pos)
-                if depth not in self.node_count:
-                    self.node_count[depth] = 1
-                new_pos = tuple(list(pos) + [self.node_count[depth]])
-                self.node_count[depth] += 1
-                self.leveled_condition[new_pos] = {}
-                for i in range(len(new_condition)):
-                    self.leveled_condition[new_pos][last_step+i] = new_condition[i]
-                update = True
-        if update:
-            self.problem.step(('solve_eq', None, None), 0)
-        return 
-    
     def search(self):
         """
         Search problem and return search result.
@@ -495,10 +259,11 @@ class FormalGeoSolver:
             start_step, end_step = end_step, len(self.problem.condition.items)
             timing = time.time()
             selections = self.get_theorem_selection(
-                start_step, end_step
+                start_step, end_step,
+                sample_num_per_th=3
             )
             self.add_selections(depth_i, selections)
-            debug_print(self.debug, "(Depth={})(timing={:.4f}s) Expand {} child node.".
+            debug_print(self.debug, "(Depth={})(timing={:.3f}s) Expand {} child node.".
                         format(depth_i, time.time() - timing, len(selections)))
             
             if start_step == end_step:
@@ -579,7 +344,7 @@ class FormalGeoSolver:
                         continue
                 timing = time.time()
                 selections = self.get_theorem_selection(
-                    # sample_num_per_th=3
+                    sample_num_per_th=3
                 )
                 self.add_selections(pos, selections)
                 debug_print(self.debug, "(timing={:.4f}s) Expand {} child node.".
@@ -651,8 +416,8 @@ class FormalGeoSolver:
         )
         # algebra_selections = []
         # debug_print(self.debug, "(timing={:.4f}s) Get {} algebra-related selections: {}.".format(time.time() - timing, len(algebra_selections), algebra_selections))
-        # debug_print(f'logic: {len(logic_selections)}')
-        # debug_print(f'algeb: {len(algebra_selections)}')
+        # debug_print(self.debug, f'logic: {len(logic_selections)}')
+        # debug_print(self.debug, f'algeb: {len(algebra_selections)}')
         
         timing = time.time()
         added_selections = []
@@ -667,6 +432,8 @@ class FormalGeoSolver:
                 added_selections.append(s)
                 selections.append(selection)
 
+        # if has too much selections, do not solve for premeter / area
+        pop_perimeter_area = len(selections) > 200
         for i in range(len(selections))[::-1]:
             t_msg, conclusions = selections[i]
             t_name, t_branch, t_para = t_msg
@@ -677,8 +444,10 @@ class FormalGeoSolver:
                     if not (para1 in self.problem_a_paras and para2 in self.problem_a_paras):
                         selections.pop(i)
                 else:
-                    if t_para not in self.problem_a_paras:
-                        selections.pop(i)
+                    if pop_perimeter_area:
+                        if t_para not in self.problem_a_paras:
+                            selections.pop(i)
+
             elif "perimeter" in t_name:
                 if "ratio" in t_name:
                     para1 = t_para[0:int(len(t_para) / 2)]
@@ -686,8 +455,9 @@ class FormalGeoSolver:
                     if not (para1 in self.problem_p_paras and para2 in self.problem_p_paras):
                         selections.pop(i)
                 else:
-                    if t_para not in self.problem_p_paras:
-                        selections.pop(i)
+                    if pop_perimeter_area:
+                        if t_para not in self.problem_p_paras:
+                            selections.pop(i)
 
             
         # debug_print(self.debug, "(timing={:.4f}s) Get {}  selections: {}.".format(time.time() - timing, len(selections), selections))
@@ -747,7 +517,11 @@ class FormalGeoSolver:
         pre_selections = []
         for k, v in selection_dict.items():
             if 'similar' in k or 'congruent' in k:
-                continue
+                f1 = len(self.problem.condition.items_group['Square']) > 0
+                f2 = len(self.problem.condition.items_group['Rhombus']) > 0
+                if f1 or f2:
+                    continue
+                pre_selections += random.sample(v, 2)
             else:
                 pre_selections += random.sample(
                     v, min(sample_num_per_th, len(v)))
@@ -779,7 +553,7 @@ class FormalGeoSolver:
         #     sample_num_per_th=sample_num_per_th
         # )
         debug_theorems = [
-            'collinear_judgement_parallel_extend'
+            'similar_triangle_judgment_aa'
         ]
         def process_related_pres(t_name, t_branch, t_letters):
             if t_name in debug_theorems:
@@ -852,9 +626,23 @@ class FormalGeoSolver:
                     continue
                 paras_of_attrs[attr].append(para)
 
+        # reduce search time
+        if 'MeasureOfAngle' in paras_of_attrs:
+            paras_of_attrs['MeasureOfAngle'] = random.sample(
+                paras_of_attrs['MeasureOfAngle'], 
+                min(len(paras_of_attrs['MeasureOfAngle']), 10)
+            )
+        if 'LengthOfLine' in paras_of_attrs:
+            paras_of_attrs['LengthOfLine'] = random.sample(
+                paras_of_attrs['LengthOfLine'], 
+                min(len(paras_of_attrs['LengthOfLine']), 10)
+            )
+
         selections = []
+        iter_times = 0
         for related_attr in paras_of_attrs:
             related_paras = set(paras_of_attrs[related_attr])
+            # related_theorems = self.p2t_map[related_attr]
             related_theorems = self.pre_select_theorems_algebra(self.p2t_map[related_attr], sample_num_per_th)
             # if related_attr == 'MeasureOfAngle':
             #     a = 1
@@ -865,6 +653,7 @@ class FormalGeoSolver:
                     for i in range(len(p_vars)):
                         letters[p_vars[i]] = related_para[i]
                     results = GPLExecutor.run(gpl, self.problem, letters)  # get gpl reasoned result
+                    iter_times += 1
                     for letters, premise, conclusion in results:
                         theorem_para = tuple([letters[i] for i in self.parsed_theorem_GDL[t_name]["vars"]])
                         premise = tuple(premise)
@@ -879,6 +668,7 @@ class FormalGeoSolver:
                             selections.append(((t_name, t_branch, theorem_para), tuple(conclusions)))
                             # if len(selections) > self.beam_size:
                             #     return selections
+        # debug_print(self.debug, f"Function [try_theorem_algebra] iter {iter_times} times.")
         return selections
 
     def apply_and_check_goal(self, selection, depth):

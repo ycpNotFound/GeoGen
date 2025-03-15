@@ -3,6 +3,7 @@ import itertools
 import math
 import time
 import warnings
+import numpy as np
 from copy import deepcopy
 from itertools import combinations
 
@@ -12,6 +13,20 @@ from formalgeo_v2.core import EquationKillerV2 as EqKiller
 from formalgeo_v2.parse import get_equation_from_tree, parse_expr
 from formalgeo_v2.problem.condition import Condition, Goal
 from formalgeo_v2.tools import rough_equal
+
+QUADS = [
+    # Entity
+    # "Circle",
+    "Parallelogram",
+    "Rectangle",
+    "Rhombus",
+    "Square",
+    "Trapezoid",
+    "Kite",
+    "RightTrapezoid",
+    "IsoscelesTrapezoid",
+]
+
 
 
 class Problem:
@@ -24,9 +39,35 @@ class Problem:
         self.goal = None  # <Goal>, problem goal.
         self.timing = {}  # <dict>, {step: (theorem, timing)}, such as {0: ('init_problem', 0.00325)}.
         self.p_pos = p_pos
+
+    def sort_counter_clockwise_arc(self, c, pa, pb):
+        # 向量OA和OB
+        if self.p_pos is None or any(p not in self.p_pos for p in [c, pa, pb]):
+            return (pa, pb)
+        xa, ya = self.p_pos[pa]
+        xb, yb = self.p_pos[pb]
+        xo, yo = self.p_pos[c]
+        radius_2 = (xo - xa) ** 2 + (yo - ya) ** 2
+        OA = np.array([xa, ya]) - np.array([xo, yo])
+        OB = np.array([xb, yb]) - np.array([xo, yo])
+        
+        # 计算两个向量的夹角（点积公式）
+        dot_product = np.dot(OA, OB)
+        angle_cos = dot_product / radius_2
+        angle_rad = np.arccos(np.clip(angle_cos, -1.0, 1.0))  # 使用clip防止数值误差导致acos超出范围
+        
+        # 判断角度的方向（通过叉积判断）
+        cross_product_z = np.cross(OA, OB)
+        
+        if cross_product_z < 0:
+            # 逆时针方向为较小的角（劣弧）a -> b 
+            return (pa, pb)
+        else:
+            # 逆时针方向为较大的角（优弧），应该反向
+            return (pb, pa)
         
     def sort_counter_clocksiwe_angle(self, points):
-        if self.p_pos is None:
+        if self.p_pos is None or any(p not in self.p_pos for p in points):
             return points
         (A, B, C) = [self.p_pos[p] for p in points]
         AB = (B[0] - A[0], B[1] - A[1])
@@ -38,7 +79,7 @@ class Problem:
             return points
         
     def sort_counter_clockwise_cocircular(self, centre, points):
-        if self.p_pos is None:
+        if self.p_pos is None or centre not in self.p_pos or any(p not in self.p_pos for p in points):
             return points
         O = self.p_pos[centre]
 
@@ -52,11 +93,31 @@ class Problem:
         start_idx = sorted_points.index(min(points))
         sorted_points = sorted_points[start_idx:] + sorted_points[:start_idx]
         return tuple(sorted_points)
+
+    def sort_counter_clockwise(self, points):
+        if self.p_pos is None or any(p not in self.p_pos for p in points):
+            return points
+        xo = sum([self.p_pos[p][0] for p in points]) / len(points)
+        yo = sum([self.p_pos[p][1] for p in points]) / len(points)
+        def angle_from_origin(point):
+            dx = point[0] - xo
+            dy = point[1] - yo
+            return math.atan2(dy, dx)
+        angles = [(key, angle_from_origin(self.p_pos[key])) for key in points]
+        sorted_angles = sorted(angles, key=lambda x: x[1], reverse=True)
+        sorted_points = [item[0] for item in sorted_angles]
+        start_idx = sorted_points.index(min(points))
+        sorted_points = sorted_points[start_idx:] + sorted_points[:start_idx]
+        return tuple(sorted_points)
     
     def sort_by_x_collinear(self, points):
-        if self.p_pos is None:
+        if self.p_pos is None or any(p not in self.p_pos for p in points):
             return points
-        sorted_points = sorted(points, key=lambda x: self.p_pos[x][0])
+        x1, x2 = self.p_pos[points[0]][0], self.p_pos[points[1]][0]
+        if abs(x1 - x2) < 1:
+            sorted_points = sorted(points, key=lambda x: self.p_pos[x][1])
+        else: 
+            sorted_points = sorted(points, key=lambda x: self.p_pos[x][0])
         return tuple(sorted_points)
 
     def load_problem_by_fl(self, parsed_predicate_GDL, parsed_theorem_GDL, parsed_problem_CDL):
@@ -76,6 +137,21 @@ class Problem:
         # conditions of text_and_image
         for predicate, item in self.parsed_problem_CDL["parsed_cdl"]["text_and_image_cdl"]:
             if predicate == "Equal":
+                # correct angle to ccw
+                if type(item[0]) == tuple and item[0][0] == 'MeasureOfAngle':
+                    new_item_l = ('MeasureOfAngle', tuple(self.sort_counter_clocksiwe_angle(item[0][1])))
+                    item = (new_item_l, item[1])
+                if type(item[1]) == tuple and item[1][0] == 'MeasureOfAngle':
+                    new_item_r = ('MeasureOfAngle', tuple(self.sort_counter_clocksiwe_angle(item[1][1])))
+                    item = (item[0], new_item_r)
+                # correct measure of arc
+                if type(item[0]) == tuple and item[0][0] == 'MeasureOfArc':
+                    if type(item[1]) == str:
+                        center = item[0][1][0]
+                        pa, pb = item[0][1][1:]
+                        new_points = (center, ) + self.sort_counter_clockwise_arc(center, pa, pb)
+                        new_item_r = ('MeasureOfArc', new_points)
+                        item = (new_item_r, item[1])
                 self.add("Equation", get_equation_from_tree(self, item),
                          (-1,), ("prerequisite", None, None))
             elif predicate == "Equation":
@@ -87,6 +163,19 @@ class Problem:
                 self.add(predicate, tuple(item_2), (-1,), ("prerequisite", None, None))
             elif predicate == 'IsBisectorOfAngle':
                 item = item[:2] + list(self.sort_counter_clocksiwe_angle(item[2:]))
+                self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
+            elif 'Congruent' in predicate or 'Similar' in predicate:
+                item_1, item_2 = item[:len(item)//2], item[len(item)//2:]
+                item_1_ccw = list(self.sort_counter_clockwise(item_1))
+                item_2_ccw = list(self.sort_counter_clockwise(item_2))
+                if item_1 != item_1_ccw and item_2 == item_2_ccw:
+                    self.add(f"Mirror{predicate}", tuple(item_1_ccw + item_2_ccw), (-1,), ("prerequisite", None, None))
+                elif item_1 == item_1_ccw and item_2 != item_2_ccw:
+                    self.add(f"Mirror{predicate}", tuple(item_1_ccw + item_2_ccw), (-1,), ("prerequisite", None, None))
+                else:
+                    self.add(predicate, tuple(item_1_ccw + item_1_ccw), (-1,), ("prerequisite", None, None))
+            elif predicate in QUADS:
+                item = self.sort_counter_clockwise(item)
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
             else:
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))
@@ -541,6 +630,7 @@ class Problem:
             angle_sym_2 = self.get_sym_of_attr('MeasureOfAngle', extended_item[::-1])
             self.condition.add("Equation", angle_sym_1 - 180, (_id, ), ("extended", None, None))
             self.condition.add("Equation", angle_sym_2 - 180, (_id, ), ("extended", None, None))
+            
 
         # add potential collinear
         for ps in self.condition.get_items_by_predicate('Collinear'):
@@ -596,7 +686,7 @@ class Problem:
             for ori_ps_i in deepcopy(self.condition.items_group['Cocircular']):
                 c, ps_on_c = ori_ps_i[0], ori_ps_i[1:]
                 added_ps = tuple(set(ps_on_c + (p, )))
-                added_ps = self.sort_counter_clockwise_cocircular(c, added_ps)
+                added_ps = self.sort_counter_clockwise(added_ps)
                 added_ps = (c, ) + added_ps
                 self.condition.add('Cocircular', added_ps, (_id, ), ("extended", None, None))
         
@@ -637,7 +727,14 @@ class Problem:
                 cross = v1[0] * v2[1] - v1[1] * v2[0]
                 if cross > 1e-5: # if cross > 0, is not ccw
                     return False
-                
+        elif predicate == 'PerpendicularBetweenLine':
+            points = tuple(item)[:3]
+            points_ccw = self.sort_counter_clocksiwe_angle(points)
+            item = points_ccw + (points[1], )
+
+        elif predicate == 'Equation':
+            if 'I' in str(item) or 'log(' in str(item):
+                return False
 
         added, _id = self.condition.add(predicate, item, premise, theorem)
         if added:
@@ -952,6 +1049,9 @@ class Problem:
         :param value: <float>
         :param premise: tuple of <int>, premise of getting value.
         """
+
+        if 'I' in str(value) or 'log(' in str(value):
+            return False
 
         if self.condition.value_of_sym[sym] is None:
             self.condition.value_of_sym[sym] = value

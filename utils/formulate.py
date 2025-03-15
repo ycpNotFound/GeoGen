@@ -3,11 +3,28 @@ import random
 import re
 
 import sympy
-from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer
+from sympy import Eq, Float, Integer, nsimplify, simplify, solve, symbols, Integer, preorder_traversal
 from formalgeo_v2.parse.basic import parse_equal_predicate
 from .preset import (PREDICATES_ENT, PREDICATES_REL, PREDICATES_REL_2, PREDICATES_REL_3, PREDICATES_ATTR,
                      SYMBOL_MAPPING_1, SYMBOL_MAPPING_2)
 from .symbolic import parse_clause
+
+def variable_in_function(expr):
+    # 获取表达式中的所有符号（变量）
+    if type(expr) == str:
+        expr = simplify(expr)
+    variables = expr.free_symbols  
+    if not variables:  
+        return False  # 没有符号变量，直接返回 False
+    
+    # 检查复杂函数的参数是否包含变量
+    vars_in_func = False
+    for sub_expr in preorder_traversal(expr):
+        if sub_expr.is_Function:  # 只考虑函数对象
+            if any(arg.has(*variables) for arg in sub_expr.args):  # 其参数是否含变量
+                vars_in_func = True
+                break
+    return vars_in_func
 
 def inverse_parse_one_theorem(theorem, parsed_theorem_GDL):
     """
@@ -40,9 +57,10 @@ def inverse_parse_one_theorem(theorem, parsed_theorem_GDL):
 
 
 def sympy_to_latex(expr):
+    # if not variable_in_function(expr):
     lhs, rhs = expr.split('=') if '=' in expr else (expr, '0')
     expr = simplify(lhs + '-(' + rhs + ')')
-
+    # expr = simplify(expr)
     lhs_terms, rhs_terms = [], []
     terms = expr.as_ordered_terms()
     for term in terms:
@@ -294,7 +312,7 @@ def formulate_tree(tree):
         return f"{left_str} {mid_symbol} {right_str}"
     elif len(tree) == 2:
         name, items = tree[0], tree[1]
-        if name == 'sqrt':
+        if name == 'Sqrt':
             tree_str = f"\\sqrt{{{items[0]}}}"
         elif name == 'MeasureOfAngle':
             tree_str = f"\\angle {''.join(items)}"

@@ -6,8 +6,8 @@ from itertools import combinations, product
 
 import sympy
 from func_timeout import FunctionTimedOut, func_set_timeout
-from sympy import (Add, Float, Integer, Mul, Number, Poly, Pow, Rational,
-                   Symbol, degree, preorder_traversal, simplify, solve, sqrt,
+from sympy import (Add, Float, Integer, Mul, Number, Poly, Pow, Rational, Expr,
+                   Symbol, degree, total_degree, preorder_traversal, simplify, solve, sqrt,
                    symbols)
 
 from formalgeo_v2.parse import get_equation_from_tree
@@ -25,9 +25,27 @@ def contains_sqrt_once(expr):
             return False
     return sqrt_count == 1
 
+def variable_in_function(expr):
+    # 获取表达式中的所有符号（变量）
+    variables = expr.free_symbols  
+    if not variables:  
+        return False  # 没有符号变量，直接返回 False
+    
+    # 检查复杂函数的参数是否包含变量
+    vars_in_func = False
+    for sub_expr in preorder_traversal(expr):
+        if sub_expr.is_Function:  # 只考虑函数对象
+            if any(arg.has(*variables) for arg in sub_expr.args):  # 其参数是否含变量
+                vars_in_func = True
+                break
+    return vars_in_func
+
 def check_expr(expr, min_symbol_num=2, max_items_num=3):
     # 筛选符合条件的expr: ax + by + c = 0
     free_symbols = expr.free_symbols
+
+    if 'sin' in str(expr) or 'cos' in str(expr):
+        return False
     
     # free symbols num最多为2
     if len(free_symbols) not in list(range(min_symbol_num, 3)):
@@ -39,11 +57,9 @@ def check_expr(expr, min_symbol_num=2, max_items_num=3):
         return False
     
     # 最大次数为1或2
-    max_degree = 0
-    for symbol in free_symbols:
-        current_degree = degree(expr, symbol)
-        if current_degree > max_degree:
-            max_degree = current_degree
+    if 'aq_hgfj' in str(expr):
+        a = 1
+    max_degree = total_degree(expr)
     
     if max_degree == 1:
         # 允许一个根号
@@ -66,7 +82,26 @@ def check_expr(expr, min_symbol_num=2, max_items_num=3):
             return False
         if expr.as_coefficients_dict().get(1, 0) != 0:
             return False
-    
+    # 如果是面积 / 周长 / 高，只允许出现一次
+    special_var_prefix = ['pt_', 'at_', 'ht_', 'pq_', 'aq_', 'hq_', 'pc_', 'ac_', 'ps_', 'as_']
+    special_vars = [
+        sym for sym in list(expr.free_symbols)
+        if any(p in str(sym) for p in special_var_prefix)
+    ]
+    if len(special_vars) >= 2 and max_degree >= 2:
+        return False
+        
+    return True
+
+def check_expr_perimeter_area(expr):
+    special_var_prefix = ['pt_', 'at_', 'pq_', 'aq_', 'pc_', 'ac_', 'ps_', 'as_']
+    special_vars = [
+        sym for sym in list(expr.free_symbols)
+        if any(p in str(sym) for p in special_var_prefix)
+    ]
+    if len(special_vars) >= 2:
+        return False
+        
     return True
 
 def extract_coefficient(expr):
@@ -421,6 +456,13 @@ class EquationKillerV2:
     def solve(equations, target_sym=None, keep_sym=False):
         if type(equations) in [tuple, list] and len(equations) > 6: 
             return {}
+        if isinstance(equations, Expr):
+            # if eq like: sin(x) + y = 0
+            if variable_in_function(equations) and len(equations.free_symbols) >= 2:
+                return {}
+            if len(equations.free_symbols) >= 3:
+                return {}
+
         try:
             if target_sym is not None:
                 solved = solve(equations, target_sym, dict=True)
@@ -577,11 +619,11 @@ class EquationKillerV2:
                         equivalent_exprs_to_remove.append((expr, premise_ids))
                         if problem.condition.value_of_sym[sym] is None:
                             value_dict = dict(zip(expr.free_symbols, [problem.condition.value_of_sym[sym_i] for sym_i in expr.free_symbols]))
-                            premise_ids = []
+                            _premise_ids = copy.deepcopy(premise_ids)
                             for sym_i, value_i in value_dict.items():
-                                premise_ids.append(problem.condition.get_id_by_predicate_and_item('Equation', sym_i - value_i))
-                            
-                            problem.set_value_of_sym(sym, expr.subs(value_dict), premise_ids)
+                                _premise_ids.append(problem.condition.get_id_by_predicate_and_item('Equation', sym_i - value_i))
+
+                            problem.set_value_of_sym(sym, expr.subs(value_dict), _premise_ids)
                 
                 for expr, premise_ids in equivalent_exprs_to_remove:
                     equivalent_exprs.remove((expr, premise_ids))
@@ -601,6 +643,10 @@ class EquationKillerV2:
         # substitute all combinations of equivalent value for symbols in expr, return all possible values
         if 'll_ce**2' in str(expr): # debug
              a = 1
+        # if expr has >= 2 perimeter or area symbol
+        if not check_expr_perimeter_area(expr):
+            return []
+        
         variables = list(expr.free_symbols)
         value_combinations = list(product(
             *[values_dict[var] if len(values_dict[var]) > 0 else [(var, [])]
@@ -634,7 +680,8 @@ class EquationKillerV2:
                     break
 
             EquationKillerV2.cache_possible_values[expr] = substitute_res
-    
+
+            
         return EquationKillerV2.cache_possible_values[expr]
     
     @staticmethod
@@ -665,12 +712,13 @@ class EquationKillerV2:
             # 将新的等价表达式添加到condition中
             for expand_expr, expand_premise in expand_res:
                 if expand_expr != eq_expr and len(expand_expr.free_symbols) < symbols_num_ori and len(expand_expr.free_symbols) > 0:
-                    # 先简化expand_expr，将类似a/2 + b/2 变为 a + b
-                    new_expr = adjust_first_variable_coefficient(expand_expr)
-                    eqs_to_add.append((new_expr, expand_premise))
-                    # problem.add('Equation', new_expr, expand_premise, ('solve_eq', None, None))
+                    if check_expr(expand_expr):
+                        # 先简化expand_expr，将类似a/2 + b/2 变为 a + b
+                        new_expr = adjust_first_variable_coefficient(expand_expr)
+                        eqs_to_add.append((new_expr, expand_premise))
+                        # problem.add('Equation', new_expr, expand_premise, ('solve_eq', None, None))
 
-                    update = True
+                        update = True
 
             if update:
                 eqs_to_remove.add(eq_expr)
@@ -778,6 +826,15 @@ class EquationKillerV2:
         except FunctionTimedOut:
             msg = "Timeout when solving equations through equivalence expressions."
             warnings.warn(msg)
+
+        # delete too complex equations first
+        too_complex_eqs = set()
+        for eq in list(problem.condition.simplified_equation):
+            if variable_in_function(eq) and len(eq.free_symbols) >= 3:
+                too_complex_eqs.add(eq)
+
+        for eq in list(too_complex_eqs):
+            problem.condition.simplified_equation.pop(eq)
 
         # first try to solve single equation one by one
         single_solved = False
@@ -901,14 +958,7 @@ class EquationKillerV2:
         if -target_expr in problem.condition.get_items_by_predicate("Equation"):
             return 0, [problem.condition.get_id_by_predicate_and_item("Equation", -target_expr)]
 
-        # print('-------------------------------------------')
-        # start_time = time.time()
-        # try:
-        #     EquationKillerV2.simplification_value_replace(problem)  # simplify equations before solving
-        # except FunctionTimedOut:
-        #     msg = "Timeout when simplify equations by value replace."
-        #     warnings.warn(msg)
-        # print(f"simplification_value_replace: {time.time() - start_time}")
+        
 
         # start_time = time.time()
         try:
@@ -928,6 +978,10 @@ class EquationKillerV2:
         if len(target_expr.free_symbols) == 0:
             return target_expr, premise
 
+        # if total degree >= 2: return None directly for saving time
+        if total_degree(target_expr) >= 2:
+            return None, []
+
         # solve through equivalent exprs replacement
         expand_res = EquationKillerV2.get_all_equivalent_expr(
             target_expr, 
@@ -937,140 +991,24 @@ class EquationKillerV2:
             use_cache=True
         )
 
-
-        premise_ids = []
+        solved_sym = [sym for sym in problem.condition.value_of_sym
+                      if problem.condition.value_of_sym[sym] is not None]
+        _premise_ids = []
         for new_expr, premise_ids in expand_res:
             # if returns number, return directly
             if len(new_expr.free_symbols) == 0:
                 return new_expr, premise_ids
-            # else, try to get value of each symbol of new expr_expr
-            for sym in new_expr.free_symbols:
-                if problem.condition.value_of_sym[sym] is not None:
+            # if all symbols of new_expr are solved to num
+            if all([s in solved_sym for s in list(new_expr.free_symbols)]):
+                for sym in new_expr.free_symbols:
                     new_expr = new_expr.subs(sym, problem.condition.value_of_sym[sym])
-                    premise_ids.append(problem.condition.get_id_by_predicate_and_item(
+                    _premise_ids.append(problem.condition.get_id_by_predicate_and_item(
                         "Equation", sym - problem.condition.value_of_sym[sym]))
-                    
                 if len(new_expr.free_symbols) == 0:
-                    return new_expr, premise_ids
-
+                    return new_expr, premise_ids + _premise_ids
+                
         return None, []
-        # linear_exprs = []
-        # for expr in list(problem.condition.simplified_equation):
-        # # 检查表达式是否是线性的
-        #     poly = Poly(expr)
-        #     if poly.total_degree() == 1:
-        #         linear_exprs.append(expr)
-
-        # target_sym, mini_eqs, n_m = EquationKillerV2.get_minimum_target_equations(  # get mini equations
-        #     target_expr,
-        #     # list(problem.condition.simplified_equation)
-        #     linear_exprs
-        # )
-
-        # if len(mini_eqs) == 0:  # no mini equations, can't solve
-        #     return None, []
-
-        # eqs_for_cache = None
-        # if EquationKillerV2.use_cache:
-        #     eqs_for_cache = [str(mini_eqs[0])]
-        #     for eq in mini_eqs[1:]:
-        #         eqs_for_cache.append(str(eq))
-        #         premise += problem.condition.simplified_equation[eq]
-        #     eqs_for_cache = tuple(sorted(eqs_for_cache))
-
-        #     if eqs_for_cache in EquationKillerV2.cache_target:
-        #         value = EquationKillerV2.cache_target[eqs_for_cache]
-        #         if value is None:
-        #             return None, []
-        #         return value, premise
-        #     EquationKillerV2.cache_target[eqs_for_cache] = None
-
-        # head = 0  # can't solve
-        # tail = len(mini_eqs)  # can solve
-        # solved_mini_eqs = None
-        # solved_target_value = None
-        # while tail - head > 1:
-        #     solved = False
-        #     p = int((head + tail) / 2)
-        #     try_mini_eqs = copy.copy(mini_eqs[0:p + 1])
-            
-        #     # if too complex: return
-        #     all_symbols = set()
-        #     for expr in try_mini_eqs:
-        #         all_symbols.update(expr.free_symbols)
-        #     # if len(all_symbols) >= 4:
-        #     #     return None, []
-
-        #     # if EquationKillerV2.sym_simplify:
-        #     #     try:
-        #     #         EquationKillerV2.simplification_sym_replace(try_mini_eqs, target_sym)
-        #     #     except FunctionTimedOut:
-        #     #         msg = "Timeout when simplify equations by sym replace."
-        #     #         warnings.warn(msg)
-            
-        #     try:
-        #         results = EquationKillerV2.solve(try_mini_eqs)  # solve equations
-        #     except FunctionTimedOut:
-        #         msg = "Timeout when solve equations: {}".format(try_mini_eqs)
-        #         warnings.warn(msg)
-        #     else:
-        #         if target_sym in results:
-        #             solved = True
-        #             solved_mini_eqs = copy.copy(mini_eqs[0:p + 1])
-        #             solved_target_value = results[target_sym]
-
-        #     if solved:
-        #         tail = p
-        #         if not EquationKillerV2.accurate_mode:
-        #             break
-        #     else:
-        #         head = p
-
-        # if solved_target_value is None:  # no solved result
-        #     return None, []
-
-        # if EquationKillerV2.accurate_mode:
-        #     for removed_eq in copy.copy(solved_mini_eqs[1:]):
-        #         try_mini_eqs = copy.copy(solved_mini_eqs)
-        #         try_mini_eqs.remove(removed_eq)
-
-        #         if EquationKillerV2.sym_simplify:
-        #             try:
-        #                 EquationKillerV2.simplification_sym_replace(try_mini_eqs, target_sym)
-        #             except FunctionTimedOut:
-        #                 msg = "Timeout when simplify equations by sym replace."
-        #                 warnings.warn(msg)
-
-        #         try:
-        #             results = EquationKillerV2.solve(try_mini_eqs, target_sym)  # solve equations
-        #         except FunctionTimedOut:
-        #             msg = "Timeout when solve equations: {}".format(try_mini_eqs)
-        #             warnings.warn(msg)
-        #         else:
-        #             if target_sym in results:
-        #                 solved_mini_eqs.remove(removed_eq)
-
-        # for eq in solved_mini_eqs[1:]:
-        #     premise += problem.condition.simplified_equation[eq]
-
-        # eq = target_expr - solved_target_value
-        # value_added = False
-        # if len(eq.free_symbols) == 1:
-        #     try:
-        #         results = EquationKillerV2.solve(eq, list(eq.free_symbols)[0])  # solve equations
-        #     except FunctionTimedOut:
-        #         msg = "Timeout when solve equations: {}".format(target_expr - solved_target_value)
-        #         warnings.warn(msg)
-        #     else:
-        #         for sym in results:
-        #             problem.set_value_of_sym(sym, results[sym], premise)
-        #             value_added = True
-        # if not value_added:
-        #     problem.condition.add("Equation", target_expr - solved_target_value, premise, ("solve_eq", None, None))
-
-        # if EquationKillerV2.use_cache:
-        #     EquationKillerV2.cache_target[eqs_for_cache] = solved_target_value
-        # return solved_target_value, premise
+    
 
 
 class GeometryPredicateLogicExecutorV2:
@@ -1327,28 +1265,28 @@ class GeometryPredicateLogicExecutorV2:
             oppose = True
         r_ids = []
         r_items = []
-
+        
+        cached_eq_result = {}
         if not oppose:  # &
             for i in range(len(r1_items)):
                 letters = {}
                 for j in range(len(r1_vars)):
                     letters[r1_vars[j]] = r1_items[i][j]
                 eq = get_equation_from_tree(problem, r2_algebra[1], True, letters)
-                try:
-                    result, premise = EquationKillerV2.solve_target(eq, problem)
-                except FunctionTimedOut:
-                    msg = "Timeout when solve target: {}".format(str(eq))
-                    # warnings.warn(msg)
+                if eq in cached_eq_result:
+                    result, premise = cached_eq_result[eq]
                 else:
                     try:
-                        if result is not None and rough_equal(result, 0):  # meet constraints
-                            r_id = tuple(set(premise + list(r1_ids[i])))
-                            r_ids.append(r_id)
-                            r_items.append(r1_items[i])
-                    except Exception as e:
-                        print(e)
-                        print(result, type(result))
+                        result, premise = EquationKillerV2.solve_target(eq, problem)
+                        cached_eq_result[eq] = (result, premise)
+                    except FunctionTimedOut:
+                        msg = "Timeout when solve target: {}".format(str(eq))
+                        pass
 
+                if result is not None and rough_equal(result, 0):  # meet constraints
+                    r_id = tuple(set(premise + list(r1_ids[i])))
+                    r_ids.append(r_id)
+                    r_items.append(r1_items[i])
         else:  # &~
             for i in range(len(r1_items)):
                 letters = {}

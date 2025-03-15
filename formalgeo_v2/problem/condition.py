@@ -1,6 +1,6 @@
 import copy
 from formalgeo_v2.parse import parse_expr, get_expr_from_tree, get_equation_from_tree
-
+from sympy import simplify
 
 class Condition:
     def __init__(self):
@@ -68,6 +68,9 @@ class Condition:
         :return added: <bool>, indicate whether the addition was successful.
         :return _id: <int>, id of condition, if not added, return None.
         """
+        if predicate == 'Equation':
+            if 'I' in str(item) or 'log(' in str(item):
+                return False, None
 
         if not self.has(predicate, item):
             self.items.append((predicate, item, tuple(sorted(list(set(premise)))), theorem, self.step_count))

@@ -50,10 +50,8 @@ class TargetFinder():
         self.p_pos = allocater_states['p_pos']
         self.lines = allocater_states['lines']
         self.circles = allocater_states['circles']
-        self.points_on_circle = allocater_states['points_on_circle']
         # self.clauses = allocater_states['clauses_base'] + allocater_states['clauses']
-        self.clauses = allocater_states['clauses']
-        
+        # self.clauses = allocater_states['clauses']
         self.text_cdls = text_cdls
         self.constr_cdls = constr_cdls
         self.image_cdls = image_cdls
@@ -80,7 +78,7 @@ class TargetFinder():
             self.solver = FormalGeoSolver(
                 predicate_GDL,
                 theorem_GDL,
-                strategy="beam_search",
+                strategy="auto",
                 max_depth=self.max_depth, 
                 beam_size=6,
                 t_info=t_info,
@@ -96,7 +94,7 @@ class TargetFinder():
             "image_cdl": self.image_cdls,
             # "goal_cdl": f"Value(LengthOfLine({''.join(self.lines[0])}))",
             # `goal_cdl` is not used when searching
-            "goal_cdl": f"Value(x)",
+            "goal_cdl": f"Value(q)",
             "problem_answer": "45",
         }
 
@@ -117,8 +115,7 @@ class TargetFinder():
             "p_pos": self.p_pos,
             "lines": self.lines,
             "circles": self.circles,
-            "points_on_circle": self.points_on_circle,
-            "clauses": self.clauses
+            # "clauses": self.clauses
         }
         
     def add_new_symbol(self):
@@ -142,26 +139,28 @@ class TargetFinder():
         # lines / circles
         self.lines = [tuple([mapping[p] for p in l]) for l in self.lines]
         self.circles = [mapping[p] for p in self.circles]
-        self.points_on_circle = {mapping[k]: [mapping[x] for x in v] 
-                                 for k, v in self.points_on_circle.items()}
+        # self.points_on_circle = {mapping[k]: [mapping[x] for x in v] 
+        #                          for k, v in self.points_on_circle.items()}
         # clauses
-        self.clauses = [replace_for_clause(c, mapping) for c in self.clauses]
+        # self.clauses = [replace_for_clause(c, mapping) for c in self.clauses]
         self.text_cdls = [replace_for_clause(c, mapping) for c in self.text_cdls]
         self.constr_cdls = [replace_for_clause(c, mapping) for c in self.constr_cdls]
         self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
         return
     
     @staticmethod
-    def targets_filter_1(conditions_to_sample, value_of_sym):
+    def targets_filter_1(conditions_to_sample, value_of_sym, strict=False):
         # for potential calculation target: 
-        # 1. only has <= 2 vars (<=3 for lines)
+        # 1. only has <= 2 vars (<=3 for lines) | strict: only has 1 var
         # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
-        # 4. only has symbols begin with 'll_' or 'ma_', or like 'x'
+        # 4. only has symbols begin with 'll_' or 'ma_', or only has one symbol
         # 5. if has 2 vars: must have one same point for line, two for angle
-        # 6. remove angle measure that >= 180
+        # 6. remove angle / arc measure that >= 180
         # 7. if has 1 var and has no constant term, remove.
         # reserve all proving targets.
+        # 8. can not be `solve_eq` from `build_equivalence`
+        # 9. do not have symbols like 'rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq'
         new_targets = []
         for condition in conditions_to_sample:
             if condition[3][0] == 'prerequisite':
@@ -173,19 +172,24 @@ class TargetFinder():
                 f1 = len(syms) <= 2 or \
                     (len(syms) <= 3 and \
                     all(['ll_' in sym for sym in syms]))
+                if strict:
+                    f1 = len(syms) == 1
                 try:
-                    f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() <= 2
+                    if strict:
+                        f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() < 2
+                    else:
+                        f2 = condition[1].as_poly(*list(condition[1].free_symbols)).total_degree() <= 2
                 except:
                     f2 = False
                 f3 = True
-                # if len(syms) == 2:
-                #     if all([
-                #         value_of_sym[sym] is not None 
-                #         for sym in list(condition[1].free_symbols)
-                #     ]):
-                #         f3 = False
+                if len(syms) == 2:
+                    if all([
+                        value_of_sym[sym] is not None 
+                        for sym in list(condition[1].free_symbols)
+                    ]):
+                        f3 = False
                         
-                f4 = all(['ll_' in sym or 'ma_' in sym or str(sym) in ['x', 'y', 'z', 'a', 'b', 'c'] for sym in syms])
+                f4 = all(['ll_' in sym or 'ma_' in sym for sym in syms]) or len(syms) == 1
 
                 f5 = True
                 # if len(syms) == 2:
@@ -200,15 +204,22 @@ class TargetFinder():
                 #         if len(set(chars_1) & set(chars_2)) != 2:
                 #             f5 = False
                 f6 = True
-                if all(['ma_' in sym for sym in syms]):
-                    if len(syms) == 1:
+                if len(syms) == 1:
+                    if 'ma_' in syms[0] or 'mar_' in syms[0]:
                         f6 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
                 f7 = True
-                if len(syms) == 1:
-                    if condition[1].as_coefficients_dict().get(1, 0) == 0:
-                        f7 = False
+                # if len(syms) == 1:
+                #     if condition[1].as_coefficients_dict().get(1, 0) == 0:
+                #         f7 = False
+                f8 = True
+                # f8 = not 'build_equivalence' in condition[3]
 
-                if all([f1, f2, f3, f4, f5, f6, f7]):
+                f9 = True
+                if len(condition[1].free_symbols) == 1:
+                    sym = condition[1].free_symbols.pop()
+                    f9 = str(sym).split('_')[0] not in ['rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq']
+  
+                if all([f1, f2, f3, f4, f5, f6, f7, f9]):
                     new_targets.append(condition)
                     
             elif condition[0] in PREDICATES_REL + PREDICATES_REL_2 +  PREDICATES_ENT + ['Collinear', 'Cocircular']:
@@ -244,7 +255,7 @@ class TargetFinder():
 
 
     @staticmethod
-    def targets_filter_3(new_targets, theorems_for_targets, max_depth):
+    def targets_filter_3(new_targets, theorems_for_targets, max_depth, strict=False):
         # 1. sort by len of theorems (more but can not include too many 'solve_eq')
         # 2. sort by num of unsolved symbols (less)
         # 3. sort by token diversity of theorems (more)
@@ -281,27 +292,58 @@ class TargetFinder():
         return new_targets, idx_for_targets
     
     @staticmethod
-    def targets_into_groups(new_targets):
+    def targets_into_groups(new_targets, strict=False):
         # the third filter: 
         # classified into groups according to target type
         # choose only 2 targets for each 'prove' predicate name
         targets_angle = [t for t in new_targets 
-                         if 'Equation'==t[0] and 'ma_' in str(t[1])]
+                         if 'Equation'== t[0] and 'ma_' in str(t[1])]
         targets_line = [t for t in new_targets 
-                        if 'Equation'==t[0] and 'll_' in str(t[1])]
+                        if 'Equation'== t[0] and 'll_' in str(t[1])]
+        targets_value = [t for t in new_targets
+                         if 'Equation'== t[0] and len(t[1].free_symbols) == 1 and 
+                         'll_' not in str(t[1].free_symbols.pop()) and 
+                         'ma_' not in str(t[1].free_symbols.pop())]
         targets_prove = [t for t in new_targets
                          if 'Equation' != t[0]]
         prove_cnt_dict = defaultdict(int)
         _targets_prove = []
+        # filter prove target
         for t in targets_prove:
             prove_cnt_dict[t[0]] += 1
-            if prove_cnt_dict[t[0]] <= 2:
-                _targets_prove.append(t)
+            if strict:
+                if prove_cnt_dict[t[0]] <= 1:
+                    _targets_prove.append(t)
+            else:
+                if prove_cnt_dict[t[0]] <= 2:
+                    _targets_prove.append(t)
         targets_prove = _targets_prove
+
+        # filter value target:
+        # may has exprs correspond to same simplified expr: x-2 <=> (x-2)^2
+        # select into groups and choose targets with mini str len
+        sim_expr_2_targets = {}
+        for t in targets_value:
+            sym = t[1].free_symbols.pop()
+            
+            eq = Eq(t[1], 0)
+            res = solve(eq, dict=True)
+            if len(res) != 0:
+                new_expr = sym - res[0][sym]
+                if str(new_expr) not in sim_expr_2_targets:
+                    sim_expr_2_targets[str(new_expr)] = []
+                sim_expr_2_targets[str(new_expr)].append(t)
+        _targets_value = []
+        for expr_str, t_list in sim_expr_2_targets.items():
+            chosen_t = min(t_list, key=lambda x: len(str(x[1])))
+            _targets_value.append(chosen_t)
+        targets_value = _targets_value
+
         # return grouped targets
         targets_dict = {
             "line": targets_line,
             "angle": targets_angle,
+            "value": targets_value,
             "prove": targets_prove
         }
         return targets_dict
@@ -327,19 +369,31 @@ class TargetFinder():
                 if k == min_depth:
                     idx_list = list(v.keys())
                     start_idx = min(min(idx_list), start_idx)
-            
+                    
         conditions_to_sample = self.solver.problem.condition.items[start_idx:end_idx]
+
+        # add solved values
+        for sym, value in self.solver.problem.condition.value_of_sym.items():
+            if value is not None:
+                condition_idx = self.solver.problem.condition.get_id_by_predicate_and_item('Equation', sym - value)
+                condition_item = self.solver.problem.condition.items[condition_idx]
+                if condition_item not in conditions_to_sample:
+                    conditions_to_sample.append(condition_item)
         return conditions_to_sample
     
-    def find_target_and_solution(self, condition_graph: ConditionGraph):
+    def filter_conditions(self, condition_graph: ConditionGraph, strict=False):
         conditions_to_sample = self.get_conditions_to_sample()
         # filter 1
         new_targets = self.targets_filter_1(
             conditions_to_sample,
-            self.solver.problem.condition.value_of_sym
+            self.solver.problem.condition.value_of_sym,
+            strict=strict
         )
         # filter 2, if has too many targets, filter by more strict rules
-        new_targets = self.targets_filter_2(new_targets)
+        new_targets = self.targets_filter_2(
+            new_targets,
+            strict=strict
+        )
             
         # find solution / theorems for each target
         theorems_for_targets = {}
@@ -379,10 +433,19 @@ class TargetFinder():
         
         # filter 3, sort by rules
         new_targets, idx_for_targets = self.targets_filter_3(
-            new_targets, theorems_for_targets, self.max_depth
+            new_targets, theorems_for_targets, self.max_depth, strict=strict
         )
         # formulate into groups by target type
         targets_dict = self.targets_into_groups(new_targets)
+        return targets_dict, theorems_for_targets, solution_for_targets, solution_dict_for_targets
+    
+    def find_target_and_solution(self, condition_graph: ConditionGraph):
+        (
+            targets_dict,
+            theorems_for_targets,
+            solution_for_targets,
+            solution_dict_for_targets
+        ) = self.filter_conditions(condition_graph)
         types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
         if len(types_to_choose) == 0:
             return None, None, None, None, None, None, None
@@ -414,7 +477,7 @@ class TargetFinder():
         available_num = len(available_targets)
         
         return target_type, chosen_target, problem_level, chosen_solution, chosen_solution_dict, chosen_thoerems, available_num
-    
+
     @staticmethod
     def find_solution_for_target(
             problem: Problem,
@@ -639,7 +702,10 @@ class TargetFinder():
             else:
                 len_2 -= 1 
         expr = target[1].subs({sym_1: len_1, sym_2: len_2})
-        target_value = solve(Eq(expr, 0))[0]
+        res = solve(Eq(expr, 0))
+        if len(res) == 0:
+            return None
+        target_value = res[0]
         if 'sqrt' in str(target_value):
             target_value = re.sub(r'sqrt\(([^)]+)\)', r'√\1', str(target_value))
             
@@ -674,7 +740,10 @@ class TargetFinder():
         if flag_1 or flag_sqrt and self.solver.problem.p_pos is not None:
             value = random.randint(1, 10)
             expr = target[1].subs({other_sym: value})
-            target_value = solve(Eq(expr, 0))[0]
+            res = solve(Eq(expr, 0))
+            if len(res) == 0:
+                return None
+            target_value = res[0]
             target_str = f"find the length of {target_line}"
             target_cdl = f"Value(LengthOfLine({target_line}))"
             add_cdls = [f"Equal(LengthOfLine({other_line}),{value})"]
@@ -697,7 +766,10 @@ class TargetFinder():
                 {target_sym: expr_1, other_sym: expr_2}
             )
             expr = target[1].subs({target_sym: expr_1, other_sym: expr_2})
-            target_value = solve(Eq(expr, 0))[0]
+            res = solve(Eq(expr, 0))
+            if len(res) == 0:
+                return None
+            target_value = res[0]
             target_str = f"find the value of {str(new_sym)}"
             target_cdl = f"Value({str(new_sym)})"
             add_cdls = [
@@ -733,7 +805,10 @@ class TargetFinder():
         if flag_1 and not flag_2: # angle_1 = n (solved by symbolic), solve angle_2
             other_value = angle_1_val
             expr = target[1].subs({sym_1: other_value})
-            target_value = solve(Eq(expr, 0))[0]
+            res = solve(Eq(expr, 0))
+            if len(res) == 0:
+                return None
+            target_value = res[0]
             target_str = f"find the measure of \\angle {angle_2}"
             target_cdl = f"Value(MeasureOfAngle({angle_2}))"
             add_conditions = []
@@ -742,7 +817,10 @@ class TargetFinder():
         elif flag_2 and not flag_1: # angle_2 = n (solved by symbolic), solve angle_1
             other_value = angle_2_val
             expr = target[1].subs({sym_2: other_value})
-            target_value = solve(Eq(expr, 0))[0]
+            res = solve(Eq(expr, 0))
+            if len(res) == 0:
+                return None
+            target_value = res[0]
             target_str = f"find the measure of \\angle {angle_1}"
             target_cdl = f"Value(MeasureOfAngle({angle_1}))"
             add_conditions = []
@@ -760,7 +838,10 @@ class TargetFinder():
                 
                 other_sym = sym_1 if other_angle == angle_1 else sym_2
                 expr = target[1].subs({other_sym: other_value})
-                target_value = solve(Eq(expr, 0))[0]
+                res = solve(Eq(expr, 0))
+                if len(res) == 0:
+                    return None
+                target_value = res[0]
                 target_str = f"find the measure of \\angle {target_angle}"
                 target_cdl = f"Value(MeasureOfAngle({target_angle}))"
                 add_conditions = [f"\\angle {other_angle} = {other_value}°"]
@@ -785,7 +866,10 @@ class TargetFinder():
                         target[1], 
                         {sym_1: expr_1, sym_2: expr_2}
                     )
-                    target_value = solve(Eq(expr, 0))[0]
+                    res = solve(Eq(expr, 0))
+                    if len(res) == 0:
+                        return None
+                    target_value = res[0]
                     target_str = f"find the value of {str(new_sym)}"
                     target_cdl = f"Value({str(new_sym)})"
                     add_cdls = [
@@ -811,25 +895,93 @@ class TargetFinder():
         }
         return res_info
     
-    def create_question_one_symbol(self, target):
+    def create_question_one_symbol(self, target, angle_ids={}):
         sym = list(target[1].free_symbols)[0]
         
-        target_value = solve(Eq(target[1], 0))[0]
-        
+        res = solve(Eq(target[1], 0))
+        if len(res) == 0:
+            return None
+        target_value = res[0]
+        ps = str(sym).split('_')[-1].upper()
+
         if 'll' in str(sym):
-            line = str(sym).split('_')[-1].upper()
-            conclusion = f"{line} = {target_value}"
-            target_str = f"find the length of {str(sym).split('ll_')[-1].upper()}"
-            target_cdl = f"Value(LengthOfLine({str(sym)}))"
+            conclusion = f"{ps} = {target_value}"
+            target_str = f"find the length of {ps}"
+            target_cdl = f"Value(LengthOfLine({ps}))"
         elif 'ma' in str(sym):
-            angle = str(sym).split('_')[-1].upper()
-            conclusion = f"\\angle {angle} = {target_value}°"
-            target_str = f"find the measure of \\angle {str(sym).split('ma_')[-1].upper()}"
-            target_cdl = f"Value(MeasureOfAngle({''.join(angle)}))"
+            conclusion = f"\\angle {ps} = {target_value}°"
+            
+            angle_id = next((k for k in angle_ids if ps in angle_ids[k]), None)
+            if angle_id is None:
+                target_str = f"find the measure of \\angle {ps}"
+            else:
+                target_str = f"find the measure of \\angle {angle_id}"
+            target_cdl = f"Value(MeasureOfAngle({ps}))"
+        elif 'pt' in str(sym):
+            conclusion = f"perimeter of \\triangle {ps} = {target_value}"
+            target_str = f"find the perimeter of \\triangle {ps}"
+            target_cdl = f"Value(PerimeterOfTriangle({ps}))"
+        elif 'at' in str(sym):
+            conclusion = f"area of \\triangle {ps} = {target_value}"
+            target_str = f"find the area of \\triangle {ps}"
+            target_cdl = f"Value(AreaOfTriangle({ps}))"
+        elif 'ht' in str(sym):
+            conclusion = f"height of \\triangle {ps} = {target_value}"
+            target_str = f"find the height of \\triangle {ps}"
+            target_cdl = f"Value(HeightOfTriangle({ps}))"
+        elif 'pq' in str(sym):
+            conclusion = f"perimeter of {ps} = {target_value}"
+            target_str = f"find the perimeter of {ps}"
+            target_cdl = f"Value(PerimeterOfQuadrilateral({ps}))"
+        elif 'aq' in str(sym):
+            conclusion = f"area of {ps} = {target_value}"
+            target_str = f"find the area of {ps}"
+            target_cdl = f"Value(AreaOfQuadrilateral({ps}))"
+        elif 'hq' in str(sym):
+            conclusion = f"height of {ps} = {target_value}"
+            target_str = f"find the area of {ps}"
+            target_cdl = f"Value(AreaOfQuadrilateral({ps}))"
+        elif 'la' in str(sym):
+            conclusion = f"legnth of \\arc {ps[1:]} = {target_value}"
+            target_str = f"find the legnth of {ps[1:]}"
+            target_cdl = f"Value(LengthOfArc({ps}))"
+        elif 'mar' in str(sym):
+            conclusion = f"measure of \\arc {ps[1:]} = {target_value}"
+            target_str = f"find the measure of {ps[1:]}"
+            target_cdl = f"Value(MeasureOfArc({ps}))"
+        elif 'rc' in str(sym):
+            conclusion = f"radius of \\odot {ps} = {target_value}"
+            target_str = f"find the radius of \\odot {ps}"
+            target_cdl = f"Value(RadiusOfCircle({ps}))"
+        elif 'dc' in str(sym):
+            conclusion = f"diameter of \\odot {ps} = {target_value}"
+            target_str = f"find the diameter of \\odot {ps}"
+            target_cdl = f"Value(DiameterOfCircle({ps}))"
+        elif 'pc' in str(sym):
+            conclusion = f"perimeter of \\odot {ps} = {target_value}"
+            target_str = f"find the perimeter of \\odot {ps}"
+            target_cdl = f"Value(PerimeterOfCircle({ps}))"
+        elif 'ac' in str(sym):
+            conclusion = f"area of \\arc {ps} = {target_value}"
+            target_str = f"find the area of {ps}"
+            target_cdl = f"Value(AreaOfCircle({ps}))"
+        elif 'ps' in str(sym):
+            conclusion = f"perimeter of sector {ps} = {target_value}"
+            target_str = f"find the perimeter of sector {ps}"
+            target_cdl = f"Value(PerimeterOfSector({ps}))"
+        elif 'as' in str(sym):
+            conclusion = f"area of sector {ps} = {target_value}"
+            target_str = f"find the area of sector {ps}"
+            target_cdl = f"Value(AreaOfSector({ps}))"
+
         else:
             sym = str(sym)
             conclusion = f"{sym} = {target_value}"
-            target_str = f"find the value of {sym}"
+            target_str_list = [
+                f"find the value of {sym}",
+                f"find {sym}"
+            ]
+            target_str = random.choice(target_str_list)
             target_cdl = f"Value({sym})"
             
         res_info = {
@@ -884,7 +1036,7 @@ class TargetFinder():
     
 
 
-    def create_question(self, target: Tuple, used_symbols=None):
+    def create_question(self, target: Tuple, used_symbols=None, angle_ids={}):
         self.symbols = used_symbols if used_symbols is not None else []
         # create target and added conditions
         problem_text = random.choice([
@@ -897,7 +1049,7 @@ class TargetFinder():
 
         conditions = clause_to_nature_language(
             # self.problem_CDL['text_cdl'] + self.problem_CDL['image_cdl'],
-            self.problem_CDL['text_cdl'] + self.problem_CDL['construction_cdl'],
+            self.problem_CDL['text_cdl'] + self.problem_CDL['construction_cdl'] + self.problem_CDL['image_cdl'],
             self.natural_template,
             upper=False,
             replace_sym=True,
@@ -922,13 +1074,15 @@ class TargetFinder():
                     res_info = self.create_question_prove(target)
                     
             elif len(target[1].free_symbols) == 1:
-                res_info = self.create_question_one_symbol(target)
+                res_info = self.create_question_one_symbol(target, angle_ids=angle_ids)
             else:
                 res_info = self.create_question_prove(target)
                   
         else: # other predicates
             res_info = self.create_question_prove(target)
         
+        if res_info is None:
+            return [None] * 7
         (
             conclusion,
             add_cdls,

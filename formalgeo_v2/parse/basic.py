@@ -1,6 +1,7 @@
 import sympy
+import re
 from sympy import sin, cos, tan, sqrt, pi
-
+from latex2sympy2 import latex2sympy
 operation = ["Add", "Sub", "Mul", "Div", "Pow", "Mod", "Sqrt", "Sin", "Cos", "Tan"]
 
 
@@ -210,6 +211,11 @@ def get_expr_from_tree(problem, tree, replaced=False, letters=None):
 
 def parse_expr(problem, expr):
     """Parse expression to symbolic form."""
+    # 使用正则表达式的lookahead和lookbehind来找到数字与字母之间的位置
+    # expr = re.sub(r'(?<=\d)(?=[a-zA-Z])|(?<=[a-zA-Z])(?=\d)', '*', expr)
+    expr = re.sub(r'(?<=\d)(?=[a-zA-Z(])|(?<=[a-zA-Z)])(?=\d)', '*', expr)
+    if '\\frac' in expr or '\\sqrt' in expr:
+        expr = str(latex2sympy(expr))
     expr = sympy.parsing.parse_expr(expr)
 
     for sym in expr.free_symbols:

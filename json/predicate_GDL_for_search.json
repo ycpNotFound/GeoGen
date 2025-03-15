@@ -374,7 +374,8 @@
       "multi": [],
       "extend": [
         "PerpendicularBetweenLine(BD,AD)",
-        "PerpendicularBetweenLine(AD,CD)"
+        "PerpendicularBetweenLine(AD,CD)",
+        "Equal(LengthOfLine(AD),HeightOfTriangle(ABC))"
       ],
       "find": ["Polygon(ABC)"], 
       "construct": ["D"],
@@ -555,7 +556,8 @@
         "PerpendicularBetweenLine(BF,EF)",
         "PerpendicularBetweenLine(EF,CF)",
         "PerpendicularBetweenLine(DE,FE)",
-        "PerpendicularBetweenLine(FE,AE)"
+        "PerpendicularBetweenLine(FE,AE)",
+        "Equal(LengthOfLine(EF),HeightOfQuadrilateral(ABCD))"
       ],
       "find": ["Trapezoid(ABCD)", "Collinear(AEB)"], 
       "construct": ["F"],
