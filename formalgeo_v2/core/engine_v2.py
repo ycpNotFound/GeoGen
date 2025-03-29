@@ -158,7 +158,7 @@ class EquationKillerV2:
     use_cache = False  # whether to use cache to store solved target equations
     cache_eqs = None  # <dict>, {tuple(str(eqs),): [(sym_str, value)]}
     cache_target = None  # <dict>, {tuple(str(eqs),): value}
-    cache_equivalence = None  # <dict>, {sym: [(expr, [premise_id])]}
+    cache_equivalence = dict()  # <dict>, {sym: [(expr, [premise_id])]}
     cache_expanded_exprs = set() # <set>, {expr}
     cache_possible_values = dict()
 

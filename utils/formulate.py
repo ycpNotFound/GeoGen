@@ -224,9 +224,9 @@ def clause_to_nature_language(clauses,
             
             if 'Shape' in clause:
                 continue
-            elif 'Circle' in clause:
+            elif pred == 'Circle':
                 condition_i = f"\\odot {items[0]}"
-            elif 'Collinear' in clause:
+            elif pred == 'Collinear':
                 points = items[0]
                 condition_i = random.choice([
                     f"{', '.join(points)} lie on the same line",
@@ -235,7 +235,7 @@ def clause_to_nature_language(clauses,
                     f"{points[1]} lie on line {points[0]}{points[2]}",
                     f"{points[1]} is on the line {points[0]}{points[2]}"
                 ])
-            elif 'Cocircular' in clause:
+            elif pred == 'Cocircular':
                 if len(items) == 1:
                     condition_i = f'circle {items[0]}'
                 else:

@@ -289,6 +289,17 @@ def test_formulate():
     for res_i in res:
         print(res_i)
 
+def test_batch():
+    input_args_2 = list(range(100))
+    batch_size = 6
+    batches = []
+    for i in range(batch_size):
+        batch = input_args_2[i::6]
+        batches.append(batch)
+
+    for b in batches:
+        print(b)
+
 if __name__ == '__main__':
 
     
@@ -296,16 +307,4 @@ if __name__ == '__main__':
     # test_adjust_coef()
     # test_check_expr()
     # test_formulate()
-    dir_1 = 'datasets/fgo_search_train_v2'
-    dir_2 = 'datasets/fgo_search_train_v3'
-    files_1 = os.listdir(dir_1)
-    files_2 = os.listdir(dir_2)
-
-    import shutil
-    cnt = 0
-    for f_in_1 in tqdm(files_1):
-        if not os.path.exists(f"{dir_2}/{f_in_1}"):
-            cnt += 1
-            shutil.copy2(f"{dir_1}/{f_in_1}", f"{dir_2}/{f_in_1}")
-
-    print(cnt)
+    test_batch()

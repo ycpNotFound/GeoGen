@@ -726,7 +726,7 @@ class FormalGeoSolver:
 
 class Interactor:
 
-    def __init__(self, predicate_GDL, theorem_GDL, t_info=None, debug=False):
+    def __init__(self, predicate_GDL, theorem_GDL, p_pos=None, t_info=None, debug=False):
         """
         Initialize Interactor.
         :param predicate_GDL: predicate GDL.
@@ -734,6 +734,7 @@ class Interactor:
         """
         self.parsed_predicate_GDL = parse_predicate_gdl(predicate_GDL)
         self.parsed_theorem_GDL = parse_theorem_gdl(theorem_GDL, self.parsed_predicate_GDL)
+        self.p_pos = p_pos
         self.problem = None
         
         self.debug = debug
@@ -744,15 +745,16 @@ class Interactor:
         self.problem_a_paras = set()  # Area
         self.ignore_ops = ['Angle', 'Line', 'Point', 'Shape', 'Polygon', 'Triangle', 'Arc']
 
-    def load_problem(self, problem_CDL):
+    def load_problem(self, problem_CDL, solve_eq=True):
         """Load problem through problem_CDL."""
         start_time = time.time()
-        self.problem = Problem()
+        self.problem = Problem(p_pos=self.p_pos)
         self.problem.load_problem_by_fl(self.parsed_predicate_GDL,
                                         self.parsed_theorem_GDL,
                                         parse_problem_cdl(problem_CDL))  # load problem
-        EqKiller.solve_equations(self.problem)  # Solve the equations after initialization
-        self.problem.step("init_problem", time.time() - start_time)  # save applied theorem and update step
+        if solve_eq:
+            EqKiller.solve_equations(self.problem)  # Solve the equations after initialization
+            self.problem.step("init_problem", time.time() - start_time)  # save applied theorem and update step
 
     def apply_theorem(self, t_name, t_branch=None, t_para=None):
         """

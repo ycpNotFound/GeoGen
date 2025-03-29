@@ -904,11 +904,11 @@ class TargetFinder():
         target_value = res[0]
         ps = str(sym).split('_')[-1].upper()
 
-        if 'll' in str(sym):
+        if 'll_' in str(sym):
             conclusion = f"{ps} = {target_value}"
             target_str = f"find the length of {ps}"
             target_cdl = f"Value(LengthOfLine({ps}))"
-        elif 'ma' in str(sym):
+        elif 'ma_' in str(sym):
             conclusion = f"\\angle {ps} = {target_value}°"
             
             angle_id = next((k for k in angle_ids if ps in angle_ids[k]), None)
@@ -917,59 +917,59 @@ class TargetFinder():
             else:
                 target_str = f"find the measure of \\angle {angle_id}"
             target_cdl = f"Value(MeasureOfAngle({ps}))"
-        elif 'pt' in str(sym):
+        elif 'pt_' in str(sym):
             conclusion = f"perimeter of \\triangle {ps} = {target_value}"
             target_str = f"find the perimeter of \\triangle {ps}"
             target_cdl = f"Value(PerimeterOfTriangle({ps}))"
-        elif 'at' in str(sym):
+        elif 'at_' in str(sym):
             conclusion = f"area of \\triangle {ps} = {target_value}"
             target_str = f"find the area of \\triangle {ps}"
             target_cdl = f"Value(AreaOfTriangle({ps}))"
-        elif 'ht' in str(sym):
+        elif 'ht_' in str(sym):
             conclusion = f"height of \\triangle {ps} = {target_value}"
             target_str = f"find the height of \\triangle {ps}"
             target_cdl = f"Value(HeightOfTriangle({ps}))"
-        elif 'pq' in str(sym):
+        elif 'pq_' in str(sym):
             conclusion = f"perimeter of {ps} = {target_value}"
             target_str = f"find the perimeter of {ps}"
             target_cdl = f"Value(PerimeterOfQuadrilateral({ps}))"
-        elif 'aq' in str(sym):
+        elif 'aq_' in str(sym):
             conclusion = f"area of {ps} = {target_value}"
             target_str = f"find the area of {ps}"
             target_cdl = f"Value(AreaOfQuadrilateral({ps}))"
-        elif 'hq' in str(sym):
+        elif 'hq_' in str(sym):
             conclusion = f"height of {ps} = {target_value}"
             target_str = f"find the area of {ps}"
             target_cdl = f"Value(AreaOfQuadrilateral({ps}))"
-        elif 'la' in str(sym):
+        elif 'la_' in str(sym):
             conclusion = f"legnth of \\arc {ps[1:]} = {target_value}"
             target_str = f"find the legnth of {ps[1:]}"
             target_cdl = f"Value(LengthOfArc({ps}))"
-        elif 'mar' in str(sym):
+        elif 'mar_' in str(sym):
             conclusion = f"measure of \\arc {ps[1:]} = {target_value}"
             target_str = f"find the measure of {ps[1:]}"
             target_cdl = f"Value(MeasureOfArc({ps}))"
-        elif 'rc' in str(sym):
+        elif 'rc_' in str(sym):
             conclusion = f"radius of \\odot {ps} = {target_value}"
             target_str = f"find the radius of \\odot {ps}"
             target_cdl = f"Value(RadiusOfCircle({ps}))"
-        elif 'dc' in str(sym):
+        elif 'dc_' in str(sym):
             conclusion = f"diameter of \\odot {ps} = {target_value}"
             target_str = f"find the diameter of \\odot {ps}"
             target_cdl = f"Value(DiameterOfCircle({ps}))"
-        elif 'pc' in str(sym):
+        elif 'pc_' in str(sym):
             conclusion = f"perimeter of \\odot {ps} = {target_value}"
             target_str = f"find the perimeter of \\odot {ps}"
             target_cdl = f"Value(PerimeterOfCircle({ps}))"
-        elif 'ac' in str(sym):
+        elif 'ac_' in str(sym):
             conclusion = f"area of \\arc {ps} = {target_value}"
             target_str = f"find the area of {ps}"
             target_cdl = f"Value(AreaOfCircle({ps}))"
-        elif 'ps' in str(sym):
+        elif 'ps_' in str(sym):
             conclusion = f"perimeter of sector {ps} = {target_value}"
             target_str = f"find the perimeter of sector {ps}"
             target_cdl = f"Value(PerimeterOfSector({ps}))"
-        elif 'as' in str(sym):
+        elif 'as_' in str(sym):
             conclusion = f"area of sector {ps} = {target_value}"
             target_str = f"find the area of sector {ps}"
             target_cdl = f"Value(AreaOfSector({ps}))"

@@ -13,7 +13,7 @@ from utils.formulate import clause_to_nature_language
 from utils.symbolic import (build_point_map, parse_clause,
                             replace_points_for_clause)
 from utils.tools import read_json
-
+from tqdm import tqdm
 
 def rotate_combinations(lst):
     n = len(lst)
@@ -27,12 +27,14 @@ class Verifier():
                  theorem_GDL,
                  t_info,
                  natural_template,
+                 strict=False,
                  debug=False
                  ):
         self.predicate_GDL = predicate_GDL
         self.theorem_GDL = theorem_GDL
         self.t_info = t_info
         self.natural_template = natural_template
+        self.strict = strict
         self.debug = debug
         
         # build map: predicate to extend conclusions 
@@ -51,12 +53,24 @@ class Verifier():
                 'extend': info['extend'],
                 'multi': info['multi']
             }
+        # build attr_dict: ll_ -> LengthOfLine
+        self.attr_dict = self.build_attr_dict()
+
+    def build_attr_dict(self):
+        attr_dict = {}
+        for k, v in self.predicate_GDL['Attribution'].items():
+            sym = v['sym'] + '_'
+            predicate = k.split('(')[0]
+            attr_dict[sym] = predicate
+
+        return attr_dict
         
-    def init_problem(self, text_cdls, constr_cdls, image_cdls):
+    def init_problem(self, text_cdls, constr_cdls, image_cdls, p_pos=None, lines=None):
         self.solver = Interactor(
             self.predicate_GDL,
             self.theorem_GDL,
-            self.t_info,
+            p_pos=p_pos,
+            t_info=self.t_info,
             debug=self.debug
         )
         self.problem_CDL = {
@@ -64,10 +78,12 @@ class Verifier():
             "construction_cdl": constr_cdls,
             "text_cdl": text_cdls,
             "image_cdl": image_cdls,
-            "goal_cdl": f"Value(LengthOfLine(AB))",
+            "goal_cdl": f"Value(q)",
             "problem_answer": "0",
+            "point_positions": p_pos if p_pos else [],
+            "line_instances": lines if lines else [],
         }
-        self.solver.load_problem(self.problem_CDL)
+        self.solver.load_problem(self.problem_CDL, solve_eq=self.strict)
         self.predicate_names = list(self.solver.problem.condition.items_group.keys())
         self.predicate_names.remove('Equation')
         
@@ -107,7 +123,8 @@ class Verifier():
             eq_tree, attrs = parse_equal_predicate(clause)
             eq_expr = get_equation_from_tree(self.solver.problem, eq_tree[1])
         elif name == 'Equation':
-            eq_expr = clause.replace('Equation(', '').rstrip(')')
+            eq_expr = clause.replace('Equation(', '')
+            eq_expr = eq_expr[:-1]
             
         return str(eq_expr)
     
@@ -291,7 +308,7 @@ class Verifier():
             
         return True, None
     
-    def verify(self, solution_dict):
+    def verify_strict(self, solution_dict):
         for step, info in solution_dict.items():
             theorem = info['theorem']
             conditions = info['condition']
@@ -314,29 +331,136 @@ class Verifier():
             
         return True, None
     
+    def verify_premise_of_conditions(self, conditions):
+        # statements = clause_to_nature_language(
+        #     conditions, 
+        #     natural_template=self.natural_template
+        # )
+        for clause in conditions:
+            name = clause.split('(')[0]
+            if name in self.predicate_names:
+                items = self.solver.problem.condition.get_items_by_predicate(name)
+                _, para, _ = parse_geo_predicate(clause)
+                para = tuple(para)
+                # if has existed in conditions
+                if self.check_paras(name, para, items):
+                    return True, None
+                
+                # check the premise of clause
+                if not self.solver.problem.ee_check(name, para):
+                    w_msg = "EE check not passed: [{}, {}]".format(name, items)
+                    return False, w_msg
+                
+                if not self.solver.problem.fv_check(name, para):  # fv check
+                    w_msg = "FV check not passed: [{}, {}]".format(name, items)
+                    return False, w_msg
+                
+                # treated as True if premises of it exist, and add the clause into conditions
+                self.solver.problem.add(
+                    name, para, (-1, ), ('prerequisite', None, None), skip_check=True
+                )
+                return True, None
+                
+            elif name in ['Value', 'Equal', 'Equation']:
+                eq_str = self.clause_to_expr_str(clause)
+                symbols = [str(s) for s in list(simplify(eq_str).free_symbols)]
+                for sym in symbols:
+                    if not self.verify_symbol_existance(sym):
+                        msg = f"{sym} is not in existed symbols."
+                        return False, msg
+
+
+                return True, None
+                
+            else:
+                raise KeyError(name)
+            
+        return True, None
+        
+    def verify_symbol_existance(self, sym_str):
+        if str(sym_str) in [str(s) for s in self.solver.problem.condition.value_of_sym]:
+            return True
+        for sym_prefix, predicate in self.attr_dict.items():
+            if sym_prefix in sym_str:
+                para = tuple(sym_str.split(sym_prefix)[-1].upper())
+
+                res = self.solver.problem.ee_check(predicate, para)
+                if not res:
+                    return False
+                else:
+                    self.solver.problem.get_sym_of_attr(predicate, para)
+        return True
+
+    def verify_premise(self, solution_dict):
+        for step, info in solution_dict.items():
+            theorem = info['theorem']
+            conditions = info['condition']
+            conclusions = info['conclusion']
+            
+            # check condition existance
+            verify_flag, verify_msg = self.verify_premise_of_conditions(conditions)
+            if not verify_flag:
+                return False, verify_msg
+        
+                
+            # check conclustion existance
+            verify_flag, verify_msg = self.verify_premise_of_conditions(conclusions)
+            if not verify_flag:
+                return False, verify_msg
+            
+        return True, None
     
-if __name__ == '__main__':
-    test_solution_path = 'geo_synth_2/geosynth_ENT_1_REL_1/annotations/test_3.json'
-    test_data = read_json(test_solution_path)
-    test_solution_dict = test_data['llm_info']['solution_dict']
-    
+    def verify(self, solution_dict):
+        if self.strict:
+            return self.verify_strict(solution_dict)
+        else:
+            return self.verify_premise(solution_dict)
+
+def test_verify():
+    test_solution_dir = 'datasets/pgps/pgps_train_search'
+    symbolic_info = read_json('D:/Desktop/资源/几何答题/UniAll/total_geo_expand_train_symbolic.json')
+    symbolic_pgps_info = {
+        v['fgo_key']: v for k, v in symbolic_info.items()
+        if 'pgps' in k
+    }
     predicate_GDL_search = read_json('json/predicate_GDL_for_search.json')
     theorem_GDL_search = read_json('json/theorem_GDL_for_search.json')
     t_info = read_json("json/t_info_new.json")
     natural_template = read_json("json/predicates_to_nature_language.json")
+
+    cnt = 0
+    files = os.listdir(test_solution_dir)
+    for f in tqdm(files):
+        cnt += 1
+        
+        fgo_key = f.split('.')[0]
+        if fgo_key not in symbolic_pgps_info:
+            continue
+        # if fgo_key != 'img_1001_1':
+        #     continue
+        test_data = read_json(f"{test_solution_dir}/{f}")
+        test_symbolic_info = symbolic_pgps_info[fgo_key]
+        test_solution_dict = test_data['llm_info']['solution_dict']
+
+        strict = False
+        verifier = Verifier(
+            predicate_GDL=predicate_GDL_search,
+            theorem_GDL=theorem_GDL_search,
+            t_info=t_info,
+            natural_template=natural_template,
+            debug=True,
+            strict=strict
+        )
+        verifier.init_problem(
+            text_cdls=test_data['text_cdl'],
+            constr_cdls=test_data['construction_cdl'],
+            image_cdls=test_data['image_cdl'],
+            p_pos=test_symbolic_info['p_pos'] if 'p_pos' in test_symbolic_info else None,
+            lines=test_symbolic_info['lines'] if 'lines' in test_symbolic_info else None,
+        )
+        res, msg = verifier.verify(test_solution_dict)
+        # print(res)
+        # print(msg)
     
-    verifier = Verifier(
-        predicate_GDL=predicate_GDL_search,
-        theorem_GDL=theorem_GDL_search,
-        t_info=t_info,
-        natural_template=natural_template,
-        debug=True
-    )
-    verifier.init_problem(
-        text_cdls=test_data['text_cdl'],
-        constr_cdls=test_data['construction_cdl'],
-        image_cdls=test_data['image_cdl'],
-    )
-    res, msg = verifier.verify(test_solution_dict)
-    print(res)
-    print(msg)
+if __name__ == '__main__':
+    test_verify()
