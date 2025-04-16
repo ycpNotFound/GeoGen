@@ -173,7 +173,7 @@ class Problem:
                 elif item_1 == item_1_ccw and item_2 != item_2_ccw:
                     self.add(f"Mirror{predicate}", tuple(item_1_ccw + item_2_ccw), (-1,), ("prerequisite", None, None))
                 else:
-                    self.add(predicate, tuple(item_1_ccw + item_1_ccw), (-1,), ("prerequisite", None, None))
+                    self.add(predicate, tuple(item_1_ccw + item_2_ccw), (-1,), ("prerequisite", None, None))
             elif predicate in QUADS:
                 item = self.sort_counter_clockwise(item)
                 self.add(predicate, tuple(item), (-1,), ("prerequisite", None, None))

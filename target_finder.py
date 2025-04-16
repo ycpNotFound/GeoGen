@@ -73,19 +73,17 @@ class TargetFinder():
             self.max_depth = 9
             self.min_depth = 4
             
-        assert solver_type in ['formalgeo', 'intergps']
-        if solver_type == 'formalgeo':
-            self.solver = FormalGeoSolver(
-                predicate_GDL,
-                theorem_GDL,
-                strategy="auto",
-                max_depth=self.max_depth, 
-                beam_size=6,
-                t_info=t_info,
-                t_freq_info=t_freq_info,
-                p_pos=self.p_pos,
-                debug=debug
-            )
+        self.solver = FormalGeoSolver(
+            predicate_GDL,
+            theorem_GDL,
+            strategy="auto",
+            max_depth=self.max_depth, 
+            beam_size=6,
+            t_info=t_info,
+            t_freq_info=t_freq_info,
+            p_pos=self.p_pos,
+            debug=debug
+        )
         
         self.problem_CDL = {
             "problem_id": problem_id,
@@ -155,12 +153,8 @@ class TargetFinder():
         # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
         # 4. only has symbols begin with 'll_' or 'ma_', or only has one symbol
-        # 5. if has 2 vars: must have one same point for line, two for angle
-        # 6. remove angle / arc measure that >= 180
-        # 7. if has 1 var and has no constant term, remove.
-        # reserve all proving targets.
-        # 8. can not be `solve_eq` from `build_equivalence`
-        # 9. do not have symbols like 'rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq'
+        # 5. remove angle / arc measure that >= 180
+        # 6. do not have symbols like 'rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq'
         new_targets = []
         for condition in conditions_to_sample:
             if condition[3][0] == 'prerequisite':
@@ -192,34 +186,16 @@ class TargetFinder():
                 f4 = all(['ll_' in sym or 'ma_' in sym for sym in syms]) or len(syms) == 1
 
                 f5 = True
-                # if len(syms) == 2:
-                #     if all(['ll_' in sym for sym in syms]):
-                #         chars_1 = syms[0].split('_')[-1]
-                #         chars_2 = syms[1].split('_')[-1]
-                #         if len(set(chars_1) & set(chars_2)) != 1:
-                #             f5 = False
-                #     elif all(['ma_' in sym for sym in syms]):
-                #         chars_1 = syms[0].split('_')[-1]
-                #         chars_2 = syms[1].split('_')[-1]
-                #         if len(set(chars_1) & set(chars_2)) != 2:
-                #             f5 = False
-                f6 = True
                 if len(syms) == 1:
                     if 'ma_' in syms[0] or 'mar_' in syms[0]:
-                        f6 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
-                f7 = True
-                # if len(syms) == 1:
-                #     if condition[1].as_coefficients_dict().get(1, 0) == 0:
-                #         f7 = False
-                f8 = True
-                # f8 = not 'build_equivalence' in condition[3]
+                        f5 = abs(condition[1].as_coefficients_dict().get(1, 0)) < 180
 
-                f9 = True
+                f6 = True
                 if len(condition[1].free_symbols) == 1:
                     sym = condition[1].free_symbols.pop()
-                    f9 = str(sym).split('_')[0] not in ['rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq']
+                    f6 = str(sym).split('_')[0] not in ['rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq']
   
-                if all([f1, f2, f3, f4, f5, f6, f7, f9]):
+                if all([f1, f2, f3, f4, f5, f6]):
                     new_targets.append(condition)
                     
             elif condition[0] in PREDICATES_REL + PREDICATES_REL_2 +  PREDICATES_ENT + ['Collinear', 'Cocircular']:
@@ -229,7 +205,8 @@ class TargetFinder():
     
     @staticmethod
     def targets_filter_2(new_targets, strict=False):
-        # 1. if has too many 'solve_eq' targets like 'a+b-90=0', randon sample to 5
+        # if has too many 'solve_eq' targets like 'a+b-90=0', randon sample to 5
+        # if strict: remove all targets like 'a+b-90=0'
         solve_eq_targets = [
             t for t in new_targets if t[0] == 'Equation'
             and len(t[1].free_symbols) >= 2
@@ -439,13 +416,13 @@ class TargetFinder():
         targets_dict = self.targets_into_groups(new_targets)
         return targets_dict, theorems_for_targets, solution_for_targets, solution_dict_for_targets
     
-    def find_target_and_solution(self, condition_graph: ConditionGraph):
+    def find_target_and_solution(self, condition_graph: ConditionGraph, strict: bool):
         (
             targets_dict,
             theorems_for_targets,
             solution_for_targets,
             solution_dict_for_targets
-        ) = self.filter_conditions(condition_graph)
+        ) = self.filter_conditions(condition_graph, strict=strict)
         types_to_choose = [k for k in targets_dict if len(targets_dict[k]) != 0]
         if len(types_to_choose) == 0:
             return None, None, None, None, None, None, None
@@ -1131,7 +1108,7 @@ class TargetFinder():
         clause = f"{target[0]}({''.join(items)})"
         return clause
         
-    def formulate(self, image_based=True):
+    def formulate(self, image_based=True, strict=False):
         start_time = time.time()
         self.solver.init_search(self.problem_CDL)
         self.solver.search()
@@ -1152,7 +1129,7 @@ class TargetFinder():
             solution_dict,
             theorems,
             available_num
-        ) = self.find_target_and_solution(condition_graph)
+        ) = self.find_target_and_solution(condition_graph, strict=strict)
 
         if target is None:
             return None, None
@@ -1216,11 +1193,11 @@ def check_predicate_combs(pred_base_combs, pred_rel_combs):
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
                      n_more_lines,
-                     repeat_times):
+                     sampling_num):
     input_args = []
     for predicate_base in pred_base_combs:
         for predicate_rel in pred_rel_combs:
-            for _ in range(repeat_times):
+            for _ in range(sampling_num):
                 res = check_predicate_combs(predicate_base, predicate_rel)
                 if not res:
                     continue
@@ -1230,7 +1207,7 @@ def build_input_args(pred_base_combs,
     return input_args
 
 if __name__ == '__main__':
-    setup_seed(1234)
+    setup_seed(96)
     
     predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
     theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
@@ -1244,24 +1221,30 @@ if __name__ == '__main__':
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=1)
+                                    sampling_num=1)
     total_len = len(input_args_1)
     for predicate_base, predicate_rel, n_more_lines, color_config in input_args_1:
-        cnt += 1
-        if cnt < 167:
-            continue
+        # cnt += 1
+        # if cnt < 167:
+        #     continue
 
         # predicate_base = random.choices(PREDICATES_ENT, k=1)
         # predicate_rel = random.choices(PREDICATES_REL, k=1)
-        # predicate_base = [
-        #     # "Square",
-        #     "RightTriangle"
-        # ]
-        # predicate_rel = [
-        #     # 'IsMidpointOfLine', 
-        #     "IsMidpointOfArc"
-        #     # 'IsDiameterOfCircle'
-        # ]
+        predicate_base = [
+            # "Square",
+            # "RightTriangle"
+            # "IsoscelesTriangle"
+            "Parallelogram"
+            
+        ]
+        predicate_rel = [
+            # 'IsMidpointOfLine', 
+            # 'IsTangentOfCircle',
+            # "PerpendicularBetweenLine",
+            "IsBisectorOfAngle"
+            # 'IsDiameterOfCircle'
+            # 'PerpendicularBetweenLine'
+        ]
         cg = ClauseGenerator(predicate_GDL, theorem_GDL)
         cg.empty_states()
         c_cdls, t_cdls = cg.generate_clauses_from_predicates(
@@ -1316,8 +1299,6 @@ if __name__ == '__main__':
             allocator.formulated_cdls['construct_cdls'],
             allocator.image_cdls,
             replace_characters=False,
-            # solver_type='intergps',
-            solver_type='formalgeo',
             predicate_num=len(predicate_base) + len(predicate_rel),
             debug=True
         )

@@ -313,7 +313,7 @@ def check_predicate_combs(pred_base_combs, pred_rel_combs):
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
                      n_more_lines,
-                     repeat_times=None):
+                     sampling_num=None):
     rel_num = len(pred_rel_combs[0])
     pred_combs_num_dict = None
     if os.path.exists(f'json/pred_combs_rel_{rel_num}_num.json'):
@@ -325,10 +325,10 @@ def build_input_args(pred_base_combs,
             if pred_combs_num_dict is not None:
                 key = str(predicate_base + predicate_rel)
                 if key in pred_combs_num_dict:
-                    repeat_times = pred_combs_num_dict[key]
-            if repeat_times is None:
-                repeat_times = 1
-            for _ in range(repeat_times):
+                    sampling_num = pred_combs_num_dict[key]
+            if sampling_num is None:
+                sampling_num = 1
+            for _ in range(sampling_num):
                 color_config = np.random.choice(
                     PRESET_COLORS, p=PRESET_COLOR_PROBS)
                 res = check_predicate_combs(predicate_base, predicate_rel)
@@ -350,7 +350,7 @@ def task_1():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=5)
+                                    sampling_num=5)
     print('Num: ', len(input_args_1))
 
     
@@ -369,7 +369,7 @@ def task_2():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=2)
+                                    sampling_num=2)
     print('Num: ', len(input_args_1))
 
     
@@ -386,7 +386,7 @@ def run_task_stage_2():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=30)
+                                    sampling_num=30)
     task_name_1 = "geo_gen_ENT_1_REL_1_L_0"
     seed_1 = 114
     print(f'Task: {task_name_1}', len(input_args_1))
@@ -396,7 +396,7 @@ def run_task_stage_2():
     input_args_2 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=30)
+                                    sampling_num=30)
     task_name_2 = "geo_gen_ENT_1_REL_1_L_1"
     seed_2 = 115
     print(f'Task: {task_name_2}', len(input_args_2))
@@ -406,7 +406,7 @@ def run_task_stage_2():
     input_args_3 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=2,
-                                    repeat_times=30)
+                                    sampling_num=30)
     task_name_3 = "geo_gen_ENT_1_REL_1_L_2"
     seed_3 = 116
     print(f'Task: {task_name_3}', len(input_args_3))
@@ -416,7 +416,7 @@ def run_task_stage_2():
     input_args_4 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=30)
+                                    sampling_num=30)
     task_name_4 = "geo_gen_ENT_1_REL_2_L_0"
     seed_4 = 117
     print(f'Task: {task_name_4}', len(input_args_4))
@@ -426,7 +426,7 @@ def run_task_stage_2():
     input_args_5 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=30)
+                                    sampling_num=30)
     task_name_5 = "geo_gen_ENT_1_REL_2_L_1"
     seed_5 = 118
     print(f'Task: {task_name_5}', len(input_args_5))

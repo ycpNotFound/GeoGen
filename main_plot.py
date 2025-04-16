@@ -226,11 +226,11 @@ def run_task(seed,
 def build_input_args(pred_base_combs, 
                      pred_rel_combs, 
                      n_more_lines,
-                     repeat_times):
+                     sampling_num):
     input_args = []
     for predicate_base in pred_base_combs:
         for predicate_rel in pred_rel_combs:
-            for _ in range(repeat_times):
+            for _ in range(sampling_num):
                 color_config = np.random.choice(
                     PRESET_COLORS, p=PRESET_COLOR_PROBS)
                 input_args.append(
@@ -243,7 +243,7 @@ def task_0():
     task_name = "geo_gen_ENT_1_REL_0"
     input_args_list = []
     n_more_lines= 0     # add n more lines for figure
-    repeat_times = 3    # repeat for one set of preds, may vary from colors
+    sampling_num = 3    # repeat for one set of preds, may vary from colors
     num_process = 1     # num of process to generare
     
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT + PREDICATES_REL_2, 1))
@@ -251,11 +251,11 @@ def task_0():
     input_args_list += build_input_args(pred_base_combs, 
                                         pred_rel_combs, 
                                         n_more_lines=n_more_lines,
-                                        repeat_times=repeat_times)
+                                        sampling_num=sampling_num)
 
     
     print(f'======== Task: {task_name} ========')
-    return seed, task_name, input_args_list, repeat_times, num_process
+    return seed, task_name, input_args_list, sampling_num, num_process
 
 def task_1():
     seed = 1234
@@ -268,7 +268,7 @@ def task_1():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=1)
+                                    sampling_num=1)
     print('Num: ', len(input_args_1))
 
     
@@ -287,7 +287,7 @@ def task_2():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=1)
+                                    sampling_num=1)
     print('Num: ', len(input_args_1))
 
     
@@ -306,7 +306,7 @@ def task_stage_1():
     input_args_1 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=400)
+                                    sampling_num=400)
     task_name_1 = "geo_gen_ENT_1_REL_0_L_0"
     seed_1 = 114
     print(f'Task: {task_name_1}', len(input_args_1))
@@ -316,7 +316,7 @@ def task_stage_1():
     input_args_2 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=400)
+                                    sampling_num=400)
     task_name_2 = "geo_gen_ENT_1_REL_0_L_1"
     seed_2 = 115
     print(f'Task: {task_name_2}', len(input_args_2))
@@ -326,7 +326,7 @@ def task_stage_1():
     input_args_3 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=300)
+                                    sampling_num=300)
     task_name_3 = "geo_gen_ENT_1_REL_1_L_0"
     seed_3 = 116
     print(f'Task: {task_name_3}', len(input_args_3))
@@ -336,7 +336,7 @@ def task_stage_1():
     input_args_4 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=300)
+                                    sampling_num=300)
     task_name_4 = "geo_gen_ENT_1_REL_1_L_1"
     seed_4 = 117
     print(f'Task: {task_name_4}', len(input_args_4))
@@ -346,7 +346,7 @@ def task_stage_1():
     input_args_5 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=25)
+                                    sampling_num=25)
     task_name_5 = "geo_gen_ENT_1_REL_2_L_0_part_1"
     seed_5 = 118
     print(f'Task: {task_name_5}', len(input_args_5))
@@ -356,7 +356,7 @@ def task_stage_1():
     input_args_6 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=0,
-                                    repeat_times=25)
+                                    sampling_num=25)
     task_name_6 = "geo_gen_ENT_1_REL_2_L_0_part_2"
     seed_6 = 119
     print(f'Task: {task_name_6}', len(input_args_6))
@@ -366,7 +366,7 @@ def task_stage_1():
     input_args_7 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=25)
+                                    sampling_num=25)
     task_name_7 = "geo_gen_ENT_1_REL_2_L_1_part_1"
     seed_7 = 120
     print(f'Task: {task_name_7}', len(input_args_7))
@@ -376,7 +376,7 @@ def task_stage_1():
     input_args_8 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=25)
+                                    sampling_num=25)
     task_name_8 = "geo_gen_ENT_1_REL_2_L_1_part_2"
     seed_8 = 121
     print(f'Task: {task_name_8}', len(input_args_8))
@@ -386,7 +386,7 @@ def task_stage_1():
     input_args_9 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=2,
-                                    repeat_times=25)
+                                    sampling_num=25)
     task_name_9 = "geo_gen_ENT_1_REL_2_L_2_part_1"
     seed_9 = 122
     print(f'Task: {task_name_9}', len(input_args_9))
@@ -396,7 +396,7 @@ def task_stage_1():
     input_args_10 = build_input_args(pred_base_combs, 
                                     pred_rel_combs, 
                                     n_more_lines=1,
-                                    repeat_times=25)
+                                    sampling_num=25)
     task_name_10 = "geo_gen_ENT_1_REL_2_L_2_part_2"
     seed_10 = 123
     print(f'Task: {task_name_10}', len(input_args_10))

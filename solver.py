@@ -15,9 +15,6 @@ from formalgeo_v2.parse import (parse_predicate_gdl, parse_problem_cdl,
                              parse_theorem_gdl)
 from formalgeo_v2.problem import Problem
 from formalgeo_v2.tools import debug_print, get_used_pid_and_theorem
-from inter_gps_solver.extended_definition import ExtendedDefinition
-from inter_gps_solver.logic_parser import LogicParser
-from inter_gps_solver.logic_solver import LogicSolver
 from utils.symbolic import degree_of_expr, parse_clause
 
 
@@ -98,7 +95,8 @@ class FormalGeoSolver:
         self.problem_a_paras = None  # Area
 
         self.leveled_condition = {}
-        self.algebra_seen_syms = set()
+        self.algegra_para_fail_count = {}
+        self.max_algebra_iter_times = 0
         
     @make_timing_decorator('debug')
     def init_search(self, problem_CDL):
@@ -220,10 +218,12 @@ class FormalGeoSolver:
             beam_count = len(self.stack)
             if self.strategy == 'auto':
                 if depth_i == 0 or depth_i == 1:
-                    beam_count = 200
+                    beam_count = 300
                 elif depth_i == 2:
-                    beam_count = 100
+                    beam_count = 200
                 elif depth_i == 3:
+                    beam_count = 100
+                elif depth_i == 4:
                     beam_count = 50
                 else:
                     beam_count = self.beam_size
@@ -268,6 +268,9 @@ class FormalGeoSolver:
             
             if start_step == end_step:
                 # there's no more conclusions solved
+                break
+            if len(selections) + len(self.problem.condition.items) > 1000:
+                # there's too much conclusions, stop early
                 break
             else:
                 # save in `leveled_condition`
@@ -521,7 +524,7 @@ class FormalGeoSolver:
                 f2 = len(self.problem.condition.items_group['Rhombus']) > 0
                 if f1 or f2:
                     continue
-                pre_selections += random.sample(v, 2)
+                pre_selections += random.sample(v, min(sample_num_per_th, 2))
             else:
                 pre_selections += random.sample(
                     v, min(sample_num_per_th, len(v)))
@@ -553,7 +556,7 @@ class FormalGeoSolver:
         #     sample_num_per_th=sample_num_per_th
         # )
         debug_theorems = [
-            'similar_triangle_judgment_aa'
+            'midsegment_of_triangle_property_length'
         ]
         def process_related_pres(t_name, t_branch, t_letters):
             if t_name in debug_theorems:
@@ -610,8 +613,11 @@ class FormalGeoSolver:
         :param related_syms: <list>, related syms.
         :return selections: <list> of ((t_name, t_branch, t_para, t_timing), ((predicate, item, premise))).
         """
-        if sample_num_per_th is None:
+        if self.max_algebra_iter_times > 500:
+            sample_num_per_th = 1
+        elif sample_num_per_th is None:
             sample_num_per_th = self.beam_size 
+
         paras_of_attrs = {}  # <dict>, {attr: [para]}
         for sym in related_syms:
             attr, paras = self.problem.condition.attr_of_sym[sym]
@@ -640,9 +646,16 @@ class FormalGeoSolver:
 
         selections = []
         iter_times = 0
+        
+        debug_theorems = [
+            'midsegment_of_triangle_judgment_midpoint'
+        ]
         for related_attr in paras_of_attrs:
-            related_paras = set(paras_of_attrs[related_attr])
-            # related_theorems = self.p2t_map[related_attr]
+            related_paras = deepcopy(set(paras_of_attrs[related_attr]))
+            # down sampling
+            if self.max_algebra_iter_times > 500:
+                related_paras = set(random.sample(related_paras, len(related_paras)//2))
+
             related_theorems = self.pre_select_theorems_algebra(self.p2t_map[related_attr], sample_num_per_th)
             # if related_attr == 'MeasureOfAngle':
             #     a = 1
@@ -658,6 +671,8 @@ class FormalGeoSolver:
                         theorem_para = tuple([letters[i] for i in self.parsed_theorem_GDL[t_name]["vars"]])
                         premise = tuple(premise)
                         conclusions = []
+                        if t_name in debug_theorems:
+                            a = 1
                         for predicate, item in conclusion:  # add conclusion
                             if self.problem.check(predicate, item, premise, t_name):
                                 if predicate != "Equation":
@@ -669,6 +684,8 @@ class FormalGeoSolver:
                             # if len(selections) > self.beam_size:
                             #     return selections
         # debug_print(self.debug, f"Function [try_theorem_algebra] iter {iter_times} times.")
+        if iter_times > self.max_algebra_iter_times == 0:
+            self.max_algebra_iter_times = iter_times
         return selections
 
     def apply_and_check_goal(self, selection, depth):
@@ -683,7 +700,13 @@ class FormalGeoSolver:
         
         if 'square_property_cocircular' == t_msg[0]:
             a = 1
-        last_idx = len(self.problem.condition.items)    
+        last_idx = len(self.problem.condition.items)  
+        
+        debug_theorems = [
+            'midsegment_of_triangle_property_length'
+        ] 
+        if t_msg[0] in debug_theorems:
+            a = 1
         for predicate, item, premise in conclusions:
             update = self.problem.add(predicate, item, premise, t_msg, skip_check=True) or update
 

@@ -666,17 +666,21 @@ class Plotter():
             cv2.imwrite(f"{fig_dir}/{fig_name}.png", self.fig)
             
 if __name__ == '__main__':
-    setup_seed(124)
+    from tqdm import tqdm
     # dl = DatasetLoader(dataset_name="formalgeo7k", datasets_path="datasets")
     predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
     theorem_GDL = json.load(open('json/theorem_GDL.json', 'r', encoding='utf-8'))
-    for i in range(100):
+    for i in tqdm(range(100)):
         # clauses_base = random.choices(PREDICATES_ENT + PREDICATES_REL_2, k=1)
-        clauses_base = random.choices(PREDICATES_ENT, k=1)
-        clauses_rel = random.choices(PREDICATES_REL, k=2)
-        # clauses_base = [
-        #     "Trapezoid",
-        # ]
+        # clauses_base = random.choices(PREDICATES_ENT, k=1)
+        # clauses_rel = random.choices(PREDICATES_REL, k=2)
+        setup_seed(i)
+        clauses_base = [
+            "Parallelogram",
+        ]
+        clauses_rel = [
+            'IsBisectorOfAngle'
+        ]
         # clauses_rel = [
         #     'IsCircumcenterOfQuadrilateral', 
         #     'IsMidpointOfArc',
@@ -708,7 +712,7 @@ if __name__ == '__main__':
         print('c_cdls: ', c_cdls)
         print('t_cdls: ', t_cdls)
 
-        allocator = Allocator(states, c_cdls, t_cdls, allocate_value=True)
+        allocator = Allocator(states, c_cdls, t_cdls, allocate_value=False)
         print('---------- Formulated CDLs ----------')
         
             
@@ -725,12 +729,13 @@ if __name__ == '__main__':
                           allocator.formulated_cdls['construct_cdls'],
                           allocator.formulated_cdls['image_cdls'],
                           replace_characters=True,
+                          
                           debug=True)
         print('---------- Annotation Targets ----------')
         print(plotter.annotation_targets)
         
         plotter.plot()
-        plotter.save_fig('test', 'imgs_test')
+        plotter.save_fig(f'test_{i}', 'imgs_test')
         
         
         print('==============================================')

@@ -1010,7 +1010,8 @@ class Allocator():
         A, B, C, D = items[0]
         xa, ya = self.random_allocate_position() if A != 'a' else self.p_pos[A]
         xb, yb = self.random_allocate_position()
-        mode = random.choice([0, 1, 2])
+        # mode = random.choice([0, 1, 2])
+        mode = 0
         if mode == 0:
             interval = random.choice([(45, 80), (100, 135)])
             top_angle = - math.radians(random.uniform(interval[0], interval[1])) 
