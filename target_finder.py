@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Yicheng Pan
+# Licensed under the MIT License. See LICENSE file in the project root for details.
+
 import itertools
 import json
 import random
@@ -1207,6 +1210,7 @@ def build_input_args(pred_base_combs,
     return input_args
 
 if __name__ == '__main__':
+    # run this module for test and debug
     setup_seed(96)
     
     predicate_GDL = json.load(open('json/predicate_GDL.json', 'r', encoding='utf-8'))
