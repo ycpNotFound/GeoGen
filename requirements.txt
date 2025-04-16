@@ -1,0 +1,11 @@
+func_timeout==4.3.5
+graphviz==0.20.3
+latex2sympy2==1.9.1
+matplotlib==3.8.4
+networkx==3.2.1
+numpy==1.23.5
+openai==1.74.0
+opencv_contrib_python==4.6.0.66
+opencv_python==4.6.0.66
+sympy==1.11.1
+
