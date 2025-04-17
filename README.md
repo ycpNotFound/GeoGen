@@ -29,7 +29,7 @@ GeoGen/
 ├── generator.py        # Randomly sample premise and generate literals
 ├── allocator.py        # Assign coordinates for literals
 ├── plotter.py          # Draw with geometry diagram
-├── solver.py           # symbolic solver with our-implemented forward-search
+├── solver.py           # symbolic solver with our improved forward-search
 ├── target_finder.py    # Conduct reasoning, find target and create question & answer
 └── ...
 ```
