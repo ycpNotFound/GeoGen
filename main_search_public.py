@@ -1,5 +1,5 @@
 # Copyright (c) 2025 Yicheng Pan
-# Licensed under the MIT License. See LICENSE file in the project root for details.
+# Licensed under the MIT License. 
 
 import json
 import os
@@ -92,17 +92,19 @@ def search_one_sample(
         debug=debug
     )
 
+    # skip if `image_key` has been searched
     if os.path.exists(f"{save_dir}/{image_key}_0.json"):
         return True
 
-    
+    # forward search
     target_finder.solver.init_search(target_finder.problem_CDL)
     target_finder.solver.search()
 
     # construct condition graph
     condition_graph = ConditionGraph(target_finder.solver.problem.condition.items)
     condition_graph.construct_graph()
-
+    
+    # find targets and solutions
     (
         targets_dict,
         theorems_for_targets,
@@ -118,6 +120,7 @@ def search_one_sample(
             solution_dict_for_targets
         ) = target_finder.filter_conditions(condition_graph, strict=False)
 
+    # choose top-5 for calculate, top-2 for proving
     chosen_targets = []
     type_list = ['value', 'line', 'angle']
     # type_list = ['line', 'angle'， ‘]
@@ -131,7 +134,7 @@ def search_one_sample(
 
     chosen_targets = chosen_targets[:5] + targets_dict['prove'][:2]
     used_symbols = [str(s) for s in list(target_finder.solver.problem.condition.value_of_sym.keys())]
-    a = 1
+
     # create question for every target
     for i, chosen_target in enumerate(chosen_targets):
         chosen_thoerems = theorems_for_targets[chosen_target]

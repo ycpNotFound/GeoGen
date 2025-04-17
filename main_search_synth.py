@@ -1,5 +1,5 @@
 # Copyright (c) 2025 Yicheng Pan
-# Licensed under the MIT License. See LICENSE file in the project root for details.
+# Licensed under the MIT License. 
 
 import itertools
 import json
@@ -218,7 +218,7 @@ def run_task(seed,
                 pbar.update()
             for args in input_args_list:
                 pred_base, pred_rel, n_more_lines, color_config = args
-                current_cnt = cnt  # 保存当前cnt的值
+                current_cnt = cnt  
                 # future = executor.submit(
                 #     generate_one_sample, 
                     
@@ -253,7 +253,7 @@ def run_task(seed,
                 except Exception as e:
                     print(f"Error occurred for sub task {cnt}: {str(e)}")
                     tb = traceback.format_exc()
-                    print(tb)
+                    # print(tb)
                     info = {
                         "key": cnt,
                         "pred_base": pred_base,
@@ -366,6 +366,10 @@ def run_task_all(args):
     save_dir = args.save_dir
     use_default = args.use_default_sampling_num
     print('Saving reuslts to: ', save_dir)
+
+    # Traverse each combination of predicates, change the number of additional line segments added, and repeat a certain number of times. 
+
+    # `use_default` means using default setting of the number of repetitions, based on the number of expansion targets for each combination of predicates. The more targets that can expand output, the more sampling repetitions are.
 
     pred_base_combs = list(itertools.permutations(PREDICATES_ENT, 1))
     pred_rel_combs = list(itertools.permutations(PREDICATES_REL, 1))
