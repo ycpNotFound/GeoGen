@@ -74,3 +74,5 @@ python main_search_synth.py \
 GeoGen is based on [FormalGeo](https://github.com/FormalGeo/FormalGeo), released under the MIT License. We extend its symbolic reasoning engine to support automatic diagram generation and reasoning path synthesis.
 
 We also draw inspiration from [AlphaGeometry](https://github.com/google-deepmind/alphageometry) in designing our pipeline.
+
+We train our model by [ms-swift](https://github.com/modelscope/ms-swift)
