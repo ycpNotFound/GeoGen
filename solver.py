@@ -307,10 +307,12 @@ class FormalGeoSolver:
         while len(self.stack) > 0:
             beam_count = len(self.stack)
             if cur_depth == 0 or cur_depth == 1:
-                beam_count = 200
+                beam_count = 400
             elif cur_depth == 2:
-                beam_count = 100
+                beam_count = 200
             elif cur_depth == 3:
+                beam_count = 100
+            elif cur_depth == 4:
                 beam_count = 50
             else:
                 beam_count = self.beam_size
@@ -591,8 +593,8 @@ class FormalGeoSolver:
                     selections.append(((t_name, t_branch, t_para), tuple(conclusions)))
 
         if len(related_pres) > 1000 and self.debug:
-            if len(self.problem.condition.items) > 300:
-                related_pres = random.sample(related_pres, 300)
+            # if len(self.problem.condition.items) > 300:
+            #     related_pres = random.sample(related_pres, 300)
             with tqdm(total=len(related_pres)) as pbar:
                 for t_name, t_branch, t_letters in related_pres:
                     if 'similar_arc' in t_name:
@@ -706,7 +708,7 @@ class FormalGeoSolver:
         last_idx = len(self.problem.condition.items)  
         
         debug_theorems = [
-            'midsegment_of_triangle_property_length'
+            'equilateral_triangle_property_center_coincidence'
         ] 
         if t_msg[0] in debug_theorems:
             a = 1

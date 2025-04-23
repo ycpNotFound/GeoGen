@@ -110,14 +110,15 @@ class Problem:
         sorted_points = sorted_points[start_idx:] + sorted_points[:start_idx]
         return tuple(sorted_points)
     
-    def sort_by_x_collinear(self, points):
+    def sort_by_xy_collinear(self, points):
         if self.p_pos is None or any(p not in self.p_pos for p in points):
             return points
         x1, x2 = self.p_pos[points[0]][0], self.p_pos[points[1]][0]
-        if abs(x1 - x2) < 1:
-            sorted_points = sorted(points, key=lambda x: self.p_pos[x][1])
-        else: 
+        y1, y2 = self.p_pos[points[0]][1], self.p_pos[points[1]][1]
+        if abs(x1 - x2) > abs(y1 - y2):
             sorted_points = sorted(points, key=lambda x: self.p_pos[x][0])
+        else: 
+            sorted_points = sorted(points, key=lambda x: self.p_pos[x][1])
         return tuple(sorted_points)
 
     def load_problem_by_fl(self, parsed_predicate_GDL, parsed_theorem_GDL, parsed_problem_CDL):
@@ -450,6 +451,8 @@ class Problem:
             for l in collinear_ls:
                 if len(set(l) & set((p1, p2, p3))) == 3:
                     return True
+            if any([p not in self.p_pos for p in [p1, p2, p3]]):
+                return False
             if self.p_pos is not None:
                 pos_1 = self.p_pos[p1]
                 pos_2 = self.p_pos[p2]
@@ -639,7 +642,7 @@ class Problem:
                 p1 = tuple(set(item) - set(ps_co))[0]
                 p2 = tuple(set(ps) - set(ps_co))[0]
                 for p in ps_co:
-                    new_item = self.sort_by_x_collinear((p1, p, p2))
+                    new_item = self.sort_by_xy_collinear((p1, p, p2))
                     new_item_rev = tuple(list(new_item)[::-1])
                     _pre = self.condition.get_id_by_predicate_and_item('Collinear', ps)
                     self.condition.add('Collinear', new_item, (_id, _pre), ("extended", None, None))
@@ -711,7 +714,9 @@ class Problem:
                 if len(set(collinear_ps) & set([item[0], item[1], item[3]])) == 3:
                     return False
         elif predicate == 'Collinear':
-            item = self.sort_by_x_collinear(item)
+            if item == ('N', 'B', 'C'):
+                a = 1
+            item = self.sort_by_xy_collinear(item)
         elif predicate == 'Angle':
             if self.p_pos is not None:
                 # check the points in angle are counter clockwise
@@ -731,6 +736,14 @@ class Problem:
             points = tuple(item)[:3]
             points_ccw = self.sort_counter_clocksiwe_angle(points)
             item = points_ccw + (points[1], )
+        elif predicate == 'CongruentBetweenArc':
+            arc_1, arc_2 = tuple(item)[:3], tuple(item)[3:]
+            if len(set(arc_1) & set(arc_2)) == 3:
+                return False
+            if self.p_pos is not None:
+                arc_1 = (arc_2[0], ) + self.sort_counter_clockwise_arc(arc_1[0], arc_1[1], arc_1[2])
+                arc_2 = (arc_2[0], ) + self.sort_counter_clockwise_arc(arc_2[0], arc_2[1], arc_2[2])
+                item = arc_1 + arc_2
 
         elif predicate == 'Equation':
             if 'I' in str(item) or 'log(' in str(item):

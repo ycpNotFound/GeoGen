@@ -149,13 +149,27 @@ class TargetFinder():
         self.image_cdls = [replace_for_clause(c, mapping)for c in self.image_cdls]
         return
     
+    def view_conditions_by_theorem(self, theorem):
+        conditions = [
+            c for c in self.solver.problem.condition.items
+            if c[3][0] == theorem
+        ]
+        return conditions
+    
+    def view_conditions_by_predicate(self, predicate):
+        conditions = [
+            c for c in self.solver.problem.condition.items
+            if c[0] == predicate
+        ]
+        return conditions
+    
     @staticmethod
     def targets_filter_1(conditions_to_sample, value_of_sym, strict=False):
         # for potential calculation target: 
         # 1. only has <= 2 vars (<=3 for lines) | strict: only has 1 var
         # 2. only has linear term, degree <= 2
         # 3. if has 2 vars, can not be both solved value
-        # 4. only has symbols begin with 'll_' or 'ma_', or only has one symbol
+        # 4. only has symbols begin with 'll_' or 'ma_' or 'mar_', or only has one symbol
         # 5. remove angle / arc measure that >= 180
         # 6. do not have symbols like 'rst', 'rmt', 'rsq', 'rmq', 'rsa', 'ht', 'hq'
         new_targets = []

@@ -268,7 +268,9 @@
         "Equal(LengthOfArc(OAM),LengthOfArc(OMB))",
         "Equal(MeasureOfArc(OAM),MeasureOfArc(OMB))",
         "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OAM),2))",
-        "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OMB),2))"
+        "Equal(LengthOfArc(OAB),Mul(LengthOfArc(OMB),2))",
+        "Equal(MeasureOfArc(OAB),Mul(MeasureOfArc(OAM),2))",
+        "Equal(MeasureOfArc(OAB),Mul(MeasureOfArc(OMB),2))"
       ],
       "find": ["Circle(O)", "Cocircular(O,AB)", "Arc(OAB)"], 
       "construct": ["M"],

@@ -93,8 +93,8 @@ def search_one_sample(
     )
 
     # skip if `image_key` has been searched
-    if os.path.exists(f"{save_dir}/{image_key}_0.json"):
-        return True
+    # if os.path.exists(f"{save_dir}/{image_key}_0.json"):
+    #     return True
 
     # forward search
     target_finder.solver.init_search(target_finder.problem_CDL)
@@ -265,8 +265,10 @@ def search_test(args):
         cnt += 1
         # if cnt < 55:
         #     continue
+        if image_idx != 'img_1574.png':
+            continue
         info = data[image_idx]
-        print(f'------------- {cnt} -------------')
+        print(f'------------- {image_idx} -------------')
 
         res = search_one_sample(
             image_idx, 
@@ -306,7 +308,7 @@ def get_args():
     parser.add_argument('--save_dir', type=str, default='results_expand/geo3k')
     parser.add_argument('--num_process', type=int, default=6)
     parser.add_argument('--seed', type=int, default=1234)
-    parser.add_argument('--debug', type=bool, default=False)
+    parser.add_argument('--debug', type=bool, default=True)
     args = parser.parse_args()
     return args
 

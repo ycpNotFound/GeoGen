@@ -205,6 +205,20 @@
       ]
     }
   },
+  "perpendicular_judgment_extend(AB,CM)": {
+    "1": {
+      "premise": "Collinear(AMB)&PerpendicularBetweenLine(AM,CM)",
+      "conclusion": [
+        "PerpendicularBetweenLine(CM,BM)"
+      ]
+    },
+    "2": {
+      "premise": "Collinear(AMB)&PerpendicularBetweenLine(CM,BM)",
+      "conclusion": [
+        "PerpendicularBetweenLine(AM,CM)"
+      ]
+    }
+  },
   "perpendicular_bisector_judgment_per_and_mid(CO,AB)": {
     "1": {
       "premise": "Collinear(AOB)&Angle(AOC)&Equal(MeasureOfAngle(AOC),90)&Equal(LengthOfLine(AO),LengthOfLine(BO))",
@@ -1008,6 +1022,73 @@
         "Equal(MeasureOfAngle(CAB),60)",
         "Equal(MeasureOfAngle(ABC),60)",
         "Equal(MeasureOfAngle(BCA),60)"
+      ]
+    }
+  },
+  "equilateral_triangle_property_height(ABC)": {
+    "1": {
+      "premise": "EquilateralTriangle(ABC)",
+      "conclusion": [
+        "Equal(HeightOfTriangle(ABC),HeightOfTriangle(BCA))",
+        "Equal(HeightOfTriangle(ABC),HeightOfTriangle(CAB))"
+      ]
+    }
+  },
+  "equilateral_triangle_property_center_coincidence(O,ABC)": {
+    "1": {
+      "premise": "EquilateralTriangle(ABC)&IsCircumcenterOfTriangle(O,ABC)",
+      "conclusion": [
+        "IsIncenterOfTriangle(O,ABC)",
+        "IsCentroidOfTriangle(O,ABC)",
+        "IsOrthocenterOfTriangle(O,ABC)"
+      ]
+    },
+    "2": {
+      "premise": "EquilateralTriangle(ABC)&IsIncenterOfTriangle(O,ABC)",
+      "conclusion": [
+        "IsCircumcenterOfTriangle(O,ABC)",
+        "IsCentroidOfTriangle(O,ABC)",
+        "IsOrthocenterOfTriangle(O,ABC)"
+      ]
+    },
+    "3": {
+      "premise": "EquilateralTriangle(ABC)&IsCentroidOfTriangle(O,ABC)",
+      "conclusion": [
+        "IsIncenterOfTriangle(O,ABC)",
+        "IsCircumcenterOfTriangle(O,ABC)",
+        "IsOrthocenterOfTriangle(O,ABC)"
+      ]
+    },
+    "4": {
+      "premise": "EquilateralTriangle(ABC)&IsOrthocenterOfTriangle(O,ABC)",
+      "conclusion": [
+        "IsIncenterOfTriangle(O,ABC)",
+        "IsCentroidOfTriangle(O,ABC)",
+        "IsCircumcenterOfTriangle(O,ABC)"
+      ]
+    }
+  },
+  "equilateral_triangle_property_height_devide(O,ABC)": {
+    "1": {
+      "premise": "EquilateralTriangle(ABC)&IsOrthocenterOfTriangle(O,ABC)&Line(AO)",
+      "conclusion": [
+        "Equal(LengthOfLine(AO),Mul(HeightOfTriangle(ABC),2/3))"
+      ]
+    }
+  },
+  "equilateral_triangle_property_height_devide_2(OD,ABC)": {
+    "1": {
+      "premise": "EquilateralTriangle(ABC)&IsOrthocenterOfTriangle(O,ABC)&Line(OD)&Collinear(BDC)&PerpendicularBetweenLine(OD,DC)",
+      "conclusion": [
+        "Equal(LengthOfLine(OD),Mul(HeightOfTriangle(ABC),1/3))",
+        "IsPerpendicularBisectorOfLine(OD,BC)"
+      ]
+    },
+    "2": {
+      "premise": "EquilateralTriangle(ABC)&IsOrthocenterOfTriangle(O,ABC)&Line(OD)&Collinear(BDC)&PerpendicularBetweenLine(BD,OD)",
+      "conclusion": [
+        "Equal(LengthOfLine(OD),Mul(HeightOfTriangle(ABC),1/3))",
+        "IsPerpendicularBisectorOfLine(OD,BC)"
       ]
     }
   },
@@ -1896,6 +1977,27 @@
       ]
     },
     "3": {
+      "premise": "Arc(OAB)&Cocircular(O,ADB)&Collinear(AMB)&Collinear(OMD)&Equal(MeasureOfAngle(OMB),90)",
+      "conclusion": [
+        "IsMidpointOfArc(D,OAB)",
+        "IsPerpendicularBisectorOfLine(OM,AB)"
+      ]
+    },
+    "4": {
+      "premise": "Arc(OAB)&Cocircular(O,ADB)&Collinear(AMB)&Collinear(OMD)&PerpendicularBetweenLine(AM,MO)",
+      "conclusion": [
+        "IsMidpointOfArc(D,OAB)",
+        "IsPerpendicularBisectorOfLine(OM,AB)"
+      ]
+    },
+    "5": {
+      "premise": "Arc(OAB)&Cocircular(O,ADB)&Collinear(AMB)&Collinear(OMD)&PerpendicularBetweenLine(OM,MB)",
+      "conclusion": [
+        "IsMidpointOfArc(D,OAB)",
+        "IsPerpendicularBisectorOfLine(OM,AB)"
+      ]
+    },
+    "6": {
       "premise": "Arc(OAB)&Cocircular(O,ADB)&Collinear(AMB)&Collinear(OMD)&Equal(LengthOfLine(AM),LengthOfLine(MB))",
       "conclusion": [
         "IsMidpointOfArc(D,OAB)",

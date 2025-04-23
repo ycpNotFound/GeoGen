@@ -51989,14 +51989,17 @@
     "img_629.png": {
         "image_cdl": [
             "PerpendicularBetweenLine(AB,CB)",
-            "Equal(LengthOfLine(AC),10)"
+            "Equal(LengthOfLine(AC),10)",
+            "IsCentroidOfTriangle(C,ADE)"
         ],
         "construction_cdl": [
             "Collinear(ABD)",
             "Shape(AB,BC,CA)",
             "Shape(AD,DE,EA)"
         ],
-        "text_cdl": [],
+        "text_cdl": [
+            "EquilateralTriangle(ADE)"
+        ],
         "p_created": [
             "A",
             "B",
@@ -82773,7 +82776,15 @@
             "Equal(LengthOfLine(DL),6)",
             "Equal(LengthOfLine(CN),7)",
             "Equal(LengthOfLine(BN),x)",
-            "Equal(LengthOfLine(AB),13)"
+            "Equal(LengthOfLine(AB),13)",
+            "IsTangentOfCircle(AM,Q)",
+            "IsTangentOfCircle(AL,Q)",
+            "IsTangentOfCircle(BM,Q)",
+            "IsTangentOfCircle(BN,Q)",
+            "IsTangentOfCircle(CN,Q)",
+            "IsTangentOfCircle(CP,Q)",
+            "IsTangentOfCircle(DP,Q)",
+            "IsTangentOfCircle(DL,Q)"
         ],
         "construction_cdl": [
             "Collinear(DPC)",

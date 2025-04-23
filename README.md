@@ -2,7 +2,15 @@
 
 A pipeline for the automatic construction of geometry problems along with step-by-step solutions.
 
-<!-- This repo is the implementation of our paper:  -->
+
+## Resources
+
+📄 Paper: [Enhancing the Geometric Problem-Solving Ability of Multimodal LLMsvia Symbolic-Neural Integration](https://arxiv.org/pdf/2504.12773)  
+🧠 Dataset on Hugging Face: [GeoExpand & GeoSynth](https://huggingface.co/datasets/ycpNotFound/GeoGen)  
+
+[![arXiv](https://img.shields.io/badge/arXiv-2404.12345-B31B1B.svg)](https://arxiv.org/pdf/2504.12773)
+[![Hugging Face](https://img.shields.io/badge/HuggingFace-Dataset-yellow.svg)](https://huggingface.co/datasets/ycpNotFound/GeoGen)
+
 
 ## Features
 

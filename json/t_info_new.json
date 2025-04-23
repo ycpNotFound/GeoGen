@@ -71,6 +71,10 @@
     1,
     16
   ],
+  "perpendicular_judgment_extend": [
+    1,
+    10
+  ],
   "perpendicular_bisector_judgment_per_and_mid": [
     1,
     31
@@ -406,6 +410,22 @@
   "equilateral_triangle_property_angle": [
     1,
     67
+  ],
+  "equilateral_triangle_property_height": [
+    1,
+    20
+  ],
+  "equilateral_triangle_property_center_coincidence": [
+    1,
+    20
+  ],
+  "equilateral_triangle_property_height_devide": [
+    1,
+    20
+  ],
+  "equilateral_triangle_property_height_devide_2": [
+    1,
+    20
   ],
   "quadrilateral_property_angle_sum": [
     1,
