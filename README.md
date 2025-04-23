@@ -5,8 +5,8 @@ A pipeline for the automatic construction of geometry problems along with step-b
 
 ## Resources
 
-📄 Paper: [Enhancing the Geometric Problem-Solving Ability of Multimodal LLMsvia Symbolic-Neural Integration](https://arxiv.org/pdf/2504.12773)  
-🧠 Dataset on Hugging Face: [GeoExpand & GeoSynth](https://huggingface.co/datasets/ycpNotFound/GeoGen)  
+Paper: [Enhancing the Geometric Problem-Solving Ability of Multimodal LLMs via Symbolic-Neural Integration](https://arxiv.org/pdf/2504.12773)  
+Dataset: [GeoExpand & GeoSynth](https://huggingface.co/datasets/ycpNotFound/GeoGen)  
 
 [![arXiv](https://img.shields.io/badge/arXiv-2404.12345-B31B1B.svg)](https://arxiv.org/pdf/2504.12773)
 [![Hugging Face](https://img.shields.io/badge/HuggingFace-Dataset-yellow.svg)](https://huggingface.co/datasets/ycpNotFound/GeoGen)
@@ -19,6 +19,8 @@ A pipeline for the automatic construction of geometry problems along with step-b
 - GeoGen is inspired by [AlphaGeometry](https://github.com/google-deepmind/alphageometry), and leverages [FormalGeo](https://github.com/FormalGeo/FormalGeo) as the underlying symbolic system.
 
 ![Framework of our GeoGen pipeline.](GeoGen.jpg)
+
+> As the symbolic system relies on manually defined theorem rules, and symbolic annotations may be missing in the dataset, some types of geometry problems may remain unsolvable. We welcome issues and feedback to help us identify and address such limitations.
 
 ## Getting Started
 
@@ -74,7 +76,7 @@ python main_search_synth.py \
     --seed 1234 \
     --debug False \
     --use_default_sampling_num True
-    # you can disable this para and modify the sampling num in python sript.
+    # you can disable this param and modify the sampling num in python sript.
 ```
 
 ## Acknowledgement
@@ -83,4 +85,4 @@ GeoGen is based on [FormalGeo](https://github.com/FormalGeo/FormalGeo), released
 
 We also draw inspiration from [AlphaGeometry](https://github.com/google-deepmind/alphageometry) in designing our pipeline.
 
-We train our model by [ms-swift](https://github.com/modelscope/ms-swift)
+We gratefully acknowledge the use of [ms-swift](https://github.com/modelscope/ms-swift) for model training.
