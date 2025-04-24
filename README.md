@@ -61,8 +61,7 @@ python main_search_public.py \
     --dataset_name geo3k \ # or pgps9k 
     --save_dir /path/to/your/dir \
     --num_process 12 \
-    --seed 1234 \
-    --debug False
+    --seed 1234 
 ```
 
 ## Synthesize Geometry Diagram and Create Q&A
@@ -74,8 +73,7 @@ python main_search_synth.py \
     --save_dir /path/to/your/dir \
     --num_process 12 \
     --seed 1234 \
-    --debug False \
-    --use_default_sampling_num True
+    --use_default_sampling_num
     # you can disable this param and modify the sampling num in python sript.
 ```
 

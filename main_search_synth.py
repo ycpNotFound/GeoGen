@@ -492,8 +492,8 @@ def get_args():
     parser.add_argument('--save_dir', type=str, default="results_synth")
     parser.add_argument('--num_process', type=int, default=6)
     parser.add_argument('--seed', type=int, default=1234)
-    parser.add_argument('--debug', type=bool, default=False)
-    parser.add_argument('--use_default_sampling_num', type=bool, default=True)
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--use_default_sampling_num', action='store_true')
     args = parser.parse_args()
     return args
 
