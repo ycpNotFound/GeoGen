@@ -6301,9 +6301,6 @@
             "Equal(LengthOfLine(AB),LengthOfLine(DC))"
         ],
         "construction_cdl": [
-            "Collinear(CD)",
-            "Collinear(AB)",
-            "Collinear(AC)",
             "Collinear(GBD)",
             "Collinear(BEC)",
             "Collinear(AED)",
@@ -10589,7 +10586,6 @@
             "Equal(MeasureOfAngle(QRS),13x+24)"
         ],
         "construction_cdl": [
-            "Collinear(QR)",
             "Collinear(BRSF)",
             "Collinear(AQE)"
         ],
@@ -12912,8 +12908,7 @@
         ],
         "construction_cdl": [
             "Collinear(BCD)",
-            "Collinear(EFG)",
-            "Collinear(CF)"
+            "Collinear(EFG)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -19220,7 +19215,6 @@
             "Equal(MeasureOfArc(HBC),112)"
         ],
         "construction_cdl": [
-            "Collinear(CD)",
             "Collinear(EAB)",
             "Cocircular(H,CB)"
         ],
@@ -32981,9 +32975,6 @@
         "construction_cdl": [
             "Collinear(ACE)",
             "Collinear(BDF)",
-            "Collinear(AB)",
-            "Collinear(CD)",
-            "Collinear(EF)",
             "Shape(AB,BD,DC,CA)",
             "Shape(AB,BF,FE,EA)",
             "Shape(CD,DF,FE,EC)"
@@ -42867,7 +42858,6 @@
             "Equal(MeasureOfAngle(FCB),14x-5)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(EFG)",
             "Collinear(BCD)"
         ],
@@ -51051,7 +51041,6 @@
             "Equal(MeasureOfAngle(CFG),120)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(EFG)",
             "Collinear(BCD)"
         ],
@@ -55986,7 +55975,6 @@
             "Equal(MeasureOfAngle(EFG),17x)"
         ],
         "construction_cdl": [
-            "Collinear(EF)",
             "Collinear(HFGI)",
             "Collinear(BEDC)"
         ],
@@ -60393,7 +60381,6 @@
         ],
         "construction_cdl": [
             "Collinear(DFJ)",
-            "Collinear(DG)",
             "Collinear(CGI)",
             "Collinear(EFG)",
             "Collinear(EDC)",
@@ -65290,8 +65277,7 @@
         ],
         "construction_cdl": [
             "Collinear(BCD)",
-            "Collinear(EFG)",
-            "Collinear(CF)"
+            "Collinear(EFG)"
         ],
         "text_cdl": [
             "ParallelBetweenLine(BC,EF)"
@@ -78118,8 +78104,7 @@
         ],
         "construction_cdl": [
             "Collinear(IDEJ)",
-            "Collinear(GABCH)",
-            "Collinear(BD)"
+            "Collinear(GABCH)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -88800,7 +88785,6 @@
             "Equal(MeasureOfAngle(FDC),4x)"
         ],
         "construction_cdl": [
-            "Collinear(FD)",
             "Collinear(EFH)",
             "Collinear(ADC)"
         ],
@@ -92313,7 +92297,6 @@
             "Equal(MeasureOfAngle(EFC),x+84)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(GFE)",
             "Collinear(BCD)"
         ],
@@ -95135,9 +95118,6 @@
             "Equal(MeasureOfAngle(TQR),MeasureOfAngle(URJ))"
         ],
         "construction_cdl": [
-            "Collinear(PS)",
-            "Collinear(QT)",
-            "Collinear(RU)",
             "Collinear(PQRJ)",
             "Collinear(STU)",
             "Shape(PQ,QT,TS,SP)",
@@ -99249,7 +99229,6 @@
             "Equal(MeasureOfAngle(BGH),2x-15)"
         ],
         "construction_cdl": [
-            "Collinear(GH)",
             "Collinear(BGE)",
             "Collinear(AHD)"
         ],
@@ -106679,7 +106658,6 @@
             "Equal(MeasureOfArc(IGE),60)"
         ],
         "construction_cdl": [
-            "Collinear(DG)",
             "Collinear(FED)",
             "Cocircular(I,EGF)"
         ],
@@ -112944,7 +112922,7 @@
     "img_3149.png": {
         "image_cdl": [],
         "construction_cdl": [
-            "Collinear(BC)"
+            "Collinear(ABCD)"
         ],
         "text_cdl": [
             "IsMidpointOfLine(C,DA)",
@@ -112998,7 +112976,6 @@
         ],
         "construction_cdl": [
             "Collinear(ADEF)",
-            "Collinear(DI)",
             "Collinear(CDJ)",
             "Collinear(EIH)",
             "Shape(DI,IE,ED)"
@@ -114528,9 +114505,6 @@
         "construction_cdl": [
             "Collinear(FGH)",
             "Collinear(LKJ)",
-            "Collinear(FL)",
-            "Collinear(GK)",
-            "Collinear(HJ)",
             "Shape(FG,GK,KL,LF)",
             "Shape(FH,HJ,JL,LF)",
             "Shape(GH,HJ,JK,KG)"
@@ -119228,7 +119202,6 @@
             "Equal(MeasureOfAngle(GFC),12x+6)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(DCB)",
             "Collinear(GFE)"
         ],
@@ -129849,8 +129822,7 @@
         ],
         "construction_cdl": [
             "Collinear(BTC)",
-            "Collinear(DUVE)",
-            "Collinear(TU)"
+            "Collinear(DUVE)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -133975,7 +133947,6 @@
         ],
         "construction_cdl": [
             "Collinear(ACG)",
-            "Collinear(CD)",
             "Collinear(BDH)"
         ],
         "text_cdl": [
@@ -137617,7 +137588,6 @@
             "Equal(MeasureOfAngle(USR),13x)"
         ],
         "construction_cdl": [
-            "Collinear(SU)",
             "Collinear(BTUF)",
             "Collinear(ARSE)"
         ],
@@ -140506,7 +140476,6 @@
             "Equal(MeasureOfAngle(CFE),2x+20)"
         ],
         "construction_cdl": [
-            "Collinear(FC)",
             "Collinear(EFG)",
             "Collinear(DCB)"
         ],
@@ -171669,7 +171638,6 @@
             "Equal(MeasureOfAngle(KJH),116)"
         ],
         "construction_cdl": [
-            "Collinear(HJ)",
             "Collinear(CKJ)",
             "Cocircular(D,LJK)"
         ],
@@ -173841,7 +173809,6 @@
             "Equal(MeasureOfAngle(BIA),40)"
         ],
         "construction_cdl": [
-            "Collinear(IC)",
             "Collinear(GIB)",
             "Collinear(ECB)",
             "Collinear(FIA)",
@@ -176036,8 +176003,6 @@
             "Equal(MeasureOfArc(EMN),92)"
         ],
         "construction_cdl": [
-            "Collinear(MP)",
-            "Collinear(PN)",
             "Cocircular(E,LNM)"
         ],
         "text_cdl": [],
@@ -181617,7 +181582,6 @@
             "Equal(MeasureOfArc(GDB),9x+20)"
         ],
         "construction_cdl": [
-            "Collinear(CB)",
             "Cocircular(G,DBA)"
         ],
         "text_cdl": [],
@@ -197578,7 +197542,6 @@
         ],
         "construction_cdl": [
             "Collinear(AEG)",
-            "Collinear(DE)",
             "Collinear(BDH)"
         ],
         "text_cdl": [
@@ -219412,8 +219375,6 @@
             "Equal(MeasureOfAngle(JHI),85)"
         ],
         "construction_cdl": [
-            "Collinear(HJ)",
-            "Collinear(ED)",
             "Collinear(IHEB)",
             "Collinear(LJDA)",
             "Shape(DJ,JH,HE,ED)"
@@ -220485,7 +220446,6 @@
         ],
         "construction_cdl": [
             "Collinear(EGH)",
-            "Collinear(GC)",
             "Collinear(ACD)"
         ],
         "text_cdl": [],
@@ -227197,8 +227157,7 @@
         ],
         "construction_cdl": [
             "Collinear(BCD)",
-            "Collinear(EFG)",
-            "Collinear(CF)"
+            "Collinear(EFG)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -228356,7 +228315,6 @@
             "Equal(MeasureOfAngle(DEH),2x-5)"
         ],
         "construction_cdl": [
-            "Collinear(ED)",
             "Collinear(CEH)",
             "Collinear(ADG)"
         ],
@@ -235111,8 +235069,7 @@
         ],
         "construction_cdl": [
             "Collinear(EFH)",
-            "Collinear(DBC)",
-            "Collinear(FB)"
+            "Collinear(DBC)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -235711,7 +235668,6 @@
         ],
         "construction_cdl": [
             "Collinear(DCH)",
-            "Collinear(BC)",
             "Collinear(EABI)"
         ],
         "text_cdl": [],
@@ -238222,8 +238178,6 @@
             "Equal(MeasureOfArc(ELN),86)"
         ],
         "construction_cdl": [
-            "Collinear(NM)",
-            "Collinear(LM)",
             "Cocircular(E,QNL)"
         ],
         "text_cdl": [],
@@ -242789,7 +242743,6 @@
             "Equal(MeasureOfAngle(DCF),4x+11)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(EFG)",
             "Collinear(BCD)"
         ],
@@ -247502,8 +247455,7 @@
         ],
         "construction_cdl": [
             "Collinear(EFG)",
-            "Collinear(BCD)",
-            "Collinear(CF)"
+            "Collinear(BCD)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -247581,8 +247533,7 @@
         ],
         "construction_cdl": [
             "Collinear(CBD)",
-            "Collinear(EFG)",
-            "Collinear(BF)"
+            "Collinear(EFG)"
         ],
         "text_cdl": [],
         "p_created": [
@@ -248592,7 +248543,6 @@
             "Equal(MeasureOfAngle(CFG),x)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(EFG)",
             "Collinear(BCD)"
         ],
@@ -253436,7 +253386,6 @@
             "Equal(MeasureOfAngle(CFE),9x+4)"
         ],
         "construction_cdl": [
-            "Collinear(CF)",
             "Collinear(EFG)",
             "Collinear(BCD)"
         ],
@@ -255127,7 +255076,6 @@
             "Equal(MeasureOfAngle(GBC),33)"
         ],
         "construction_cdl": [
-            "Collinear(BC)",
             "Collinear(BGH)",
             "Collinear(BEF)",
             "Shape(BC,CG,GB)",
@@ -259778,7 +259726,6 @@
         "construction_cdl": [
             "Collinear(IJH)",
             "Collinear(EJL)",
-            "Collinear(DI)",
             "Shape(DI,IJ,JE,ED)"
         ],
         "text_cdl": [],

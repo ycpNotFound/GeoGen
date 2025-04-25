@@ -228,13 +228,20 @@ def clause_to_nature_language(clauses,
                 condition_i = f"\\odot {items[0]}"
             elif pred == 'Collinear':
                 points = items[0]
-                condition_i = random.choice([
-                    f"{', '.join(points)} lie on the same line",
-                    f"{', '.join(points)} are collinear",
-                    f"{', '.join(points)} are in one line",
-                    f"{points[1]} lie on line {points[0]}{points[2]}",
-                    f"{points[1]} is on the line {points[0]}{points[2]}"
-                ])
+                if len(points) != 3:
+                    condition_i = random.choice([
+                        f"{', '.join(points)} lie on the same line",
+                        f"{', '.join(points)} are collinear",
+                        f"{', '.join(points)} are in one line",
+                    ])
+                else:
+                    condition_i = random.choice([
+                        f"{', '.join(points)} lie on the same line",
+                        f"{', '.join(points)} are collinear",
+                        f"{', '.join(points)} are in one line",
+                        f"{points[1]} lie on line {points[0]}{points[2]}",
+                        f"{points[1]} is on the line {points[0]}{points[2]}"
+                    ])
             elif pred == 'Cocircular':
                 if len(items) == 1:
                     condition_i = f'circle {items[0]}'

@@ -118,7 +118,7 @@ def search_one_sample(
         solution_dict_for_targets
     ) = target_finder.filter_conditions(condition_graph, strict=True)
     
-    if sum([len(v) for v in targets_dict.values()]) == 0:
+    if sum([len(v) for v in targets_dict.values()]) < 5:
         (
             targets_dict,
             theorems_for_targets,
@@ -270,7 +270,7 @@ def search_test(args):
         cnt += 1
         # if cnt < 55:
         #     continue
-        if image_idx != 'img_1475.png':
+        if image_idx != 'img_2260.png':
             continue
         info = data[image_idx]
         print(f'------------- {image_idx} -------------')
