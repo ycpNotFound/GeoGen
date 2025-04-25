@@ -59,6 +59,12 @@ def search_one_sample_with_timeout(
         print(f"Timeout: {str(image_idx)}")
         return False
     
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(tb)
+        print(f"Error: {image_idx}")
+        return False
+    
 
 def search_one_sample(
     image_idx,
@@ -71,128 +77,122 @@ def search_one_sample(
     natural_template,
     debug=False
 ):
-    try:
-        image_key = image_idx.split('.png')[0]
-        geo_states = {
-            "p_pos": info['p_pos'] if 'p_pos' in info else None,
-            "lines": info['lines'] if 'lines' in info else None,
-            "circles": info['circles'] if 'circles' in info else None
-        }
-            
-        target_finder = TargetFinder(
-            predicate_GDL,
-            theorem_GDL,
-            t_info,
-            t_freq_info,
-            geo_states,
-            info['text_cdl'],
-            info['construction_cdl'],
-            info['image_cdl'],
-            replace_characters=False,
-            solver_type='formalgeo',
-            debug=debug
-        )
-
-        # skip if `image_key` has been searched
-        # if os.path.exists(f"{save_dir}/{image_key}_0.json"):
-        #     return True
-
-        # forward search
-        target_finder.solver.init_search(target_finder.problem_CDL)
-        target_finder.solver.search()
-
-        # construct condition graph
-        condition_graph = ConditionGraph(target_finder.solver.problem.condition.items)
-        condition_graph.construct_graph()
+    image_key = image_idx.split('.png')[0]
+    geo_states = {
+        "p_pos": info['p_pos'] if 'p_pos' in info else None,
+        "lines": info['lines'] if 'lines' in info else None,
+        "circles": info['circles'] if 'circles' in info else None
+    }
         
-        # find targets and solutions
+    target_finder = TargetFinder(
+        predicate_GDL,
+        theorem_GDL,
+        t_info,
+        t_freq_info,
+        geo_states,
+        info['text_cdl'],
+        info['construction_cdl'],
+        info['image_cdl'],
+        replace_characters=False,
+        solver_type='formalgeo',
+        debug=debug
+    )
+
+    # skip if `image_key` has been searched
+    if os.path.exists(f"{save_dir}/{image_key}_0.json") and not debug:
+        return True
+
+    # forward search
+    target_finder.solver.init_search(target_finder.problem_CDL)
+    target_finder.solver.search()
+
+    # construct condition graph
+    condition_graph = ConditionGraph(target_finder.solver.problem.condition.items)
+    condition_graph.construct_graph()
+    
+    # find targets and solutions
+    (
+        targets_dict,
+        theorems_for_targets,
+        solution_for_targets,
+        solution_dict_for_targets
+    ) = target_finder.filter_conditions(condition_graph, strict=True)
+    
+    if sum([len(v) for v in targets_dict.values()]) == 0:
         (
             targets_dict,
             theorems_for_targets,
             solution_for_targets,
             solution_dict_for_targets
-        ) = target_finder.filter_conditions(condition_graph, strict=True)
-        
-        if sum([len(v) for v in targets_dict.values()]) == 0:
-            (
-                targets_dict,
-                theorems_for_targets,
-                solution_for_targets,
-                solution_dict_for_targets
-            ) = target_finder.filter_conditions(condition_graph, strict=False)
+        ) = target_finder.filter_conditions(condition_graph, strict=False)
 
-        # choose top-5 for calculate, top-2 for proving
-        chosen_targets = []
-        type_list = ['value', 'line', 'angle']
-        # type_list = ['line', 'angle'， ‘]
-        while any([len(targets_dict[t]) > 0 for t in type_list]):  # 只要有一个列表不为空就继续循环
-            for type_i in type_list:
-                if targets_dict[type_i]:  # 检查列表是否为空
-                    element = targets_dict[type_i].pop(0)
-                    chosen_targets.append(element)
-                else:
-                    pass
-
-        chosen_targets = chosen_targets[:5] + targets_dict['prove'][:2]
-        used_symbols = [str(s) for s in list(target_finder.solver.problem.condition.value_of_sym.keys())]
-
-        # create question for every target
-        for i, chosen_target in enumerate(chosen_targets):
-            chosen_thoerems = theorems_for_targets[chosen_target]
-            chosen_solution = solution_for_targets[chosen_target]
-            chosen_solution_dict = solution_dict_for_targets[chosen_target]
-            (
-                conclusion, 
-                add_cdls,
-                add_conditions, 
-                target_value, 
-                target_cdl, 
-                problem_text, 
-                cap_str
-            ) = target_finder.create_question(
-                chosen_target, 
-                used_symbols=used_symbols,
-                angle_ids=info['angle_ids'] if 'angle_ids' in info else {}
-            )
-            if conclusion is None:
-                continue
-            if len(add_conditions) != 0:
-                chosen_solution += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
+    # choose top-5 for calculate, top-2 for proving
+    chosen_targets = []
+    type_list = ['value', 'line', 'angle']
+    # type_list = ['line', 'angle'， ‘]
+    while any([len(targets_dict[t]) > 0 for t in type_list]):  # 只要有一个列表不为空就继续循环
+        for type_i in type_list:
+            if targets_dict[type_i]:  # 检查列表是否为空
+                element = targets_dict[type_i].pop(0)
+                chosen_targets.append(element)
             else:
-                chosen_solution += f"\n<therefore> {conclusion}."
+                pass
 
-            
-            # problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
-            data_info = {
+    chosen_targets = chosen_targets[:5] + targets_dict['prove'][:2]
+    used_symbols = [str(s) for s in list(target_finder.solver.problem.condition.value_of_sym.keys())]
+
+    # create question for every target
+    for i, chosen_target in enumerate(chosen_targets):
+        chosen_thoerems = theorems_for_targets[chosen_target]
+        chosen_solution = solution_for_targets[chosen_target]
+        chosen_solution_dict = solution_dict_for_targets[chosen_target]
+        (
+            conclusion, 
+            add_cdls,
+            add_conditions, 
+            target_value, 
+            target_cdl, 
+            problem_text, 
+            cap_str
+        ) = target_finder.create_question(
+            chosen_target, 
+            used_symbols=used_symbols,
+            angle_ids=info['angle_ids'] if 'angle_ids' in info else {}
+        )
+        if conclusion is None:
+            continue
+        if len(add_conditions) != 0:
+            chosen_solution += f"\n<because> {', '.join(add_conditions)}, <therefore> {conclusion}."
+        else:
+            chosen_solution += f"\n<therefore> {conclusion}."
+
+        
+        # problem_text = problem_CDL['problem_text_en'].split('Find')[0] + problem_text
+        data_info = {
+            "key": image_key,
+            "solved": True,
+            "source": f"pgps9k_{image_key}",
+            "construction_cdl": info['construction_cdl'],
+            "text_cdl": info['text_cdl'],
+            "image_cdl": info['image_cdl'],
+            "positions": [],
+            "goal_cdl": '',
+            "theorems": chosen_thoerems,
+            "llm_info": {
                 "key": image_key,
-                "solved": True,
-                "source": f"pgps9k_{image_key}",
-                "construction_cdl": info['construction_cdl'],
-                "text_cdl": info['text_cdl'],
-                "image_cdl": info['image_cdl'],
-                "positions": [],
-                "goal_cdl": '',
-                "theorems": chosen_thoerems,
-                "llm_info": {
-                    "key": image_key,
-                    "problem_level": len(chosen_thoerems),
-                    "problem_text": problem_text,
-                    "problem_answer": str(target_value),
-                    "solution_dict": chosen_solution_dict,
-                    "solution_str": chosen_solution,
-                    "cap_str": cap_str
-                }
+                "problem_level": len(chosen_thoerems),
+                "problem_text": problem_text,
+                "problem_answer": str(target_value),
+                "solution_dict": chosen_solution_dict,
+                "solution_str": chosen_solution,
+                "cap_str": cap_str
             }
-            with open(f"{save_dir}/{image_key}_{i}.json", 'w', encoding='utf-8') as f:
-                json.dump(data_info, f, indent=4, ensure_ascii=False)
-                
-        return
+        }
+        with open(f"{save_dir}/{image_key}_{i}.json", 'w', encoding='utf-8') as f:
+            json.dump(data_info, f, indent=4, ensure_ascii=False)
+            
+    return
 
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(tb)
-        print(f"Error: {image_idx}")
-        return False
 
 def search_main(args):
     data = get_data(args.dataset_name)
@@ -270,7 +270,7 @@ def search_test(args):
         cnt += 1
         # if cnt < 55:
         #     continue
-        if image_idx != 'img_1574.png':
+        if image_idx != 'img_1475.png':
             continue
         info = data[image_idx]
         print(f'------------- {image_idx} -------------')
@@ -310,7 +310,7 @@ def get_args():
                         default='pgps9k',
                         # default='geo3k', 
                         choices=['pgps9k', 'geo3k'])
-    parser.add_argument('--save_dir', type=str, default='results_expand/geo3k')
+    parser.add_argument('--save_dir', type=str, default='results_expand/pgps9k')
     parser.add_argument('--num_process', type=int, default=6)
     parser.add_argument('--seed', type=int, default=1234)
     parser.add_argument('--debug', action='store_true')

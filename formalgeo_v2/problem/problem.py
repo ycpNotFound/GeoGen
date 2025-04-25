@@ -148,8 +148,15 @@ class Problem:
                 # correct measure of arc
                 if type(item[0]) == tuple and item[0][0] == 'MeasureOfArc':
                     if type(item[1]) == str:
-                        center = item[0][1][0]
-                        pa, pb = item[0][1][1:]
+                        if len(item[0][1]) == 2:
+                            center = self.condition.get_items_by_predicate('Circle')[0][0]
+                            pa, pb = item[0][1]
+                        elif len(item[0][1]) >= 4:
+                            center = item[0][1][0]
+                            pa, pb = item[0][1][1], item[0][1][-1]
+                        else:
+                            center = item[0][1][0]
+                            pa, pb = item[0][1][1:]
                         new_points = (center, ) + self.sort_counter_clockwise_arc(center, pa, pb)
                         new_item_r = ('MeasureOfArc', new_points)
                         item = (new_item_r, item[1])
@@ -198,6 +205,8 @@ class Problem:
     def same_side_for_parallel(self, item):
         # AB // CD, AC in one side, BD in the other side
         A, B, C, D = item
+        if self.p_pos is None or any([p not in self.p_pos for p in item]):
+            return (A, B, C, D), (C, D, A, B)
         AB = [self.p_pos[B][0] - self.p_pos[A][0],
                   self.p_pos[B][1] - self.p_pos[A][1]]
         CD = [self.p_pos[D][0] - self.p_pos[C][0],
@@ -718,7 +727,7 @@ class Problem:
                 a = 1
             item = self.sort_by_xy_collinear(item)
         elif predicate == 'Angle':
-            if self.p_pos is not None:
+            if self.p_pos is not None and all(p in self.p_pos for p in item):
                 # check the points in angle are counter clockwise
                 # self.p_pos: {'p': [x, y]}
                 p1, p2, p3 = item

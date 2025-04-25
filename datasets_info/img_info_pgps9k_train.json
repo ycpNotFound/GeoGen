@@ -2717,9 +2717,7 @@
             "Shape(XY,YZ,ZX)"
         ],
         "text_cdl": [
-            "IsBisectorOfAngle(W,XZY)",
-            "IsBisectorOfAngle(W,YXZ)",
-            "IsBisectorOfAngle(W,ZXY)"
+            "IsIncenterOfTriangle(W,XYZ)"
         ],
         "p_created": [
             "D"
@@ -2752,6 +2750,10 @@
             "D": [
                 245.9736842105263,
                 132.0
+            ],
+            "W": [
+                244.2,
+                128.4
             ]
         },
         "lines": [
@@ -3269,8 +3271,8 @@
             "Cocircular(Q,JNMLK)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(KN,C)",
-            "IsDiameterOfCircle(JL,C)"
+            "IsDiameterOfCircle(KN,Q)",
+            "IsDiameterOfCircle(JL,Q)"
         ],
         "p_created": [],
         "p_pos": {
@@ -4706,9 +4708,9 @@
             "Shape(EH,HF,FE)"
         ],
         "text_cdl": [
-            "Similar(Triangle(ABC),Triangle(DEF))",
-            "IsMedianOfTriangle(BG,Triangle(ABC))",
-            "IsMedianOfTriangle(EH,Triangle(DEF))",
+            "SimilarBetweenTriangle(ABC,DEF)",
+            "IsMedianOfTriangle(BG,ABC)",
+            "IsMedianOfTriangle(EH,DEF)",
             "Equal(LengthOfLine(BC),30)",
             "Equal(LengthOfLine(BG),15)",
             "Equal(LengthOfLine(EF),15)"
@@ -5232,7 +5234,9 @@
             "Shape(CH,HG,GJ,JC)",
             "Shape(EF,FG,GH,HE)"
         ],
-        "text_cdl": [],
+        "text_cdl": [
+            "IsIncenterOfTriangle(G,AEC)"
+        ],
         "p_created": [],
         "p_pos": {
             "E": [
@@ -6315,7 +6319,7 @@
         ],
         "text_cdl": [
             "ParallelBetweenLine(AC,BD)",
-            "Equal(Add(MeasureOfAngle(1),MeasureOfAngle(3)),90)"
+            "Equal(Add(MeasureOfAngle(EBA),MeasureOfAngle(ACE)),90)"
         ],
         "p_created": [
             "F",
@@ -6432,9 +6436,9 @@
             "Shape(AE,ED,DB,BA)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(AB), LengthOfLine(BD))",
-            "Equal(MeasureOfAngle(EAF), Sub(Mul(12, x), 8))",
-            "Equal(MeasureOfAngle(FDE), Add(Mul(3, x), 8))"
+            "Equal(LengthOfLine(AB),LengthOfLine(BD))",
+            "Equal(MeasureOfAngle(EAF),Sub(Mul(12,x),8))",
+            "Equal(MeasureOfAngle(FDE),Add(Mul(3,x),8))"
         ],
         "p_created": [],
         "p_pos": {
@@ -6805,8 +6809,8 @@
             "Shape(AC,CB,BA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(AB),176)",
-            "Equal(MeasureOfArc(BC),42)"
+            "Equal(MeasureOfArc(DAB),176)",
+            "Equal(MeasureOfArc(DBC),42)"
         ],
         "p_created": [
             "D"
@@ -8267,9 +8271,9 @@
             "Collinear(ACE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(BCA), Mul(2, x))",
-            "Equal(MeasureOfAngle(DCB), Sub(Mul(3, x), 20))",
-            "Equal(MeasureOfAngle(ECD), Sub(x, 4))"
+            "Equal(MeasureOfAngle(BCA),Mul(2,x))",
+            "Equal(MeasureOfAngle(DCB),Sub(Mul(3,x),20))",
+            "Equal(MeasureOfAngle(ECD),Sub(x,4))"
         ],
         "p_created": [
             "A",
@@ -9459,7 +9463,7 @@
             "Shape(CG,GH,HD,DC)"
         ],
         "text_cdl": [
-            "Similarity(Parallelogram(ABFE), Parallelogram(CDHG))"
+            "SimilarBetweenQuadrilateral(ABFE,CDHG)"
         ],
         "p_created": [
             "A",
@@ -10345,7 +10349,7 @@
             "Shape(BN,NC,CB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(AE),75)"
+            "Equal(MeasureOfArc(NAE),75)"
         ],
         "p_created": [],
         "p_pos": {
@@ -10802,7 +10806,7 @@
             "Cocircular(F,ACB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(AB),x)"
+            "Equal(MeasureOfArc(FAB),x)"
         ],
         "p_created": [
             "D",
@@ -11428,7 +11432,7 @@
         "text_cdl": [
             "Parallelogram(JBKL)",
             "Parallelogram(ABCD)",
-            "Similarity(Parallelogram(JBKL), Parallelogram(ABCD))"
+            "SimilarBetweenQuadrilateral(JBKL,ABCD)"
         ],
         "p_created": [],
         "p_pos": {
@@ -14136,7 +14140,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(AGB),30)",
-            "Perpendicular(Line(CG),Line(GD))"
+            "PerpendicularBetweenLine(CG,DG)"
         ],
         "p_created": [],
         "p_pos": {
@@ -16140,7 +16144,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(DFA),50)",
-            "Perpendicular(Line(CF),Line(FB))"
+            "PerpendicularBetweenLine(CF,BF)"
         ],
         "p_created": [],
         "p_pos": {
@@ -18008,14 +18012,14 @@
         "image_cdl": [
             "ParallelBetweenLine(DE,CF)",
             "Equal(LengthOfLine(DC),LengthOfLine(EF))",
-            "Equal(MeasureOfAngle(FCD),65)"
+            "Equal(MeasureOfAngle(DCF),65)"
         ],
         "construction_cdl": [
             "Shape(CF,FE,ED,DC)"
         ],
         "text_cdl": [
             "IsoscelesTrapezoid(CDEF)",
-            "Equal(MeasureOfAngle(None),65)"
+            "Equal(MeasureOfAngle(DCF),65)"
         ],
         "p_created": [],
         "p_pos": {
@@ -18308,7 +18312,7 @@
             "Shape(GJ,JH,HG)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(GH),78)"
+            "Equal(MeasureOfArc(BGH),78)"
         ],
         "p_created": [
             "A",
@@ -18978,7 +18982,7 @@
             "Shape(KT,TS,SR,RK)"
         ],
         "text_cdl": [
-            "IntersectAt(IsPerpendicularBisectorOfLine(_,RS),IsPerpendicularBisectorOfLine(_,RT),IsPerpendicularBisectorOfLine(_,ST),K)"
+            "IsCircumcenterOfTriangle(K,RST)"
         ],
         "p_created": [
             "A",
@@ -19485,7 +19489,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(MPL),65)",
-            "Perpendicular(Line(NP),Line(PL))"
+            "PerpendicularBetweenLine(NP,PL)"
         ],
         "p_created": [],
         "p_pos": {
@@ -19865,7 +19869,9 @@
             "Shape(QY,YT,TS,SQ)",
             "Shape(QY,YT,TW,WQ)"
         ],
-        "text_cdl": [],
+        "text_cdl": [
+            "IsIncenterOfTriangle(G,AEC)"
+        ],
         "p_created": [],
         "p_pos": {
             "T": [
@@ -21064,7 +21070,7 @@
         ],
         "text_cdl": [
             "IsoscelesTriangle(JMN)",
-            "Equal(LengthOfLine(JM), LengthOfLine(MN))"
+            "Equal(LengthOfLine(JM),LengthOfLine(MN))"
         ],
         "p_created": [],
         "p_pos": {
@@ -25986,8 +25992,8 @@
             "Shape(AD,DC,CB,BA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(AB),120)",
-            "IsDiameterOfCircle(AC)"
+            "Equal(MeasureOfArc(FAB),120)",
+            "IsDiameterOfCircle(AC,F)"
         ],
         "p_created": [
             "E",
@@ -26658,7 +26664,7 @@
             "Shape(CD,DE,EH,HC)"
         ],
         "text_cdl": [
-            "Similar(Triangle(CBH),Triangle(FEH))",
+            "SimilarBetweenTriangle(BCH,EFH)",
             "Parallelogram(ADEG)",
             "Equal(LengthOfLine(CH),7)",
             "Equal(LengthOfLine(FH),10)",
@@ -29334,7 +29340,7 @@
         ],
         "text_cdl": [
             "IsMidpointOfLine(M,PQ)",
-            "IsDiameterOfCircle(_,O,13)",
+            "Equal(DiameterOfCircle(O),13)",
             "Equal(LengthOfLine(RM),4)"
         ],
         "p_created": [],
@@ -31973,8 +31979,8 @@
         ],
         "text_cdl": [
             "Rhombus(WXYZ)",
-            "Equal(MeasureOfAngle(XYZ), Mul(MeasureOfAngle(WZY), 5))",
-            "Equal(LengthOfLine(YZ), 12)"
+            "Equal(MeasureOfAngle(XYZ),Mul(MeasureOfAngle(WZY),5))",
+            "Equal(LengthOfLine(YZ),12)"
         ],
         "p_created": [
             "A"
@@ -32650,7 +32656,7 @@
         ],
         "text_cdl": [
             "Equal(LengthOfLine(GK),14)",
-            "Equal(MeasureOfArc(FGHK),142)"
+            "Equal(MeasureOfArc(FKG),142)"
         ],
         "p_created": [],
         "p_pos": {
@@ -34648,8 +34654,8 @@
             "Shape(KP,PR,RK)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),Add(Mul(1/3,x),5))",
-            "Equal(MeasureOfAngle(None),Mul(1/2,x))"
+            "Equal(MeasureOfAngle(PRK),Add(Mul(1/3,x),5))",
+            "Equal(MeasureOfAngle(RKP),Mul(1/2,x))"
         ],
         "p_created": [],
         "p_pos": {
@@ -34717,7 +34723,7 @@
         ],
         "text_cdl": [
             "Rectangle(ABCD)",
-            "Equal(MeasureOfArc(BC),70)"
+            "Equal(MeasureOfArc(EBC),70)"
         ],
         "p_created": [
             "E"
@@ -35153,10 +35159,8 @@
             "Cocircular(S,BCEA)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(DS,S)",
-            "Equal(LengthOfLine(DS),30)",
-            "IsDiameterOfCircle(RR,R)",
-            "Equal(LengthOfLine(RR),20)",
+            "Equal(DiameterOfCircle(S),30)",
+            "Equal(DiameterOfCircle(R),20)",
             "Equal(LengthOfLine(DS),9)"
         ],
         "p_created": [
@@ -36252,8 +36256,8 @@
             "Shape(XZ,ZY,YX)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))"
+            "Equal(MeasureOfAngle(BAC),MeasureOfAngle(YXZ))",
+            "Equal(MeasureOfAngle(ACB),MeasureOfAngle(XZY))"
         ],
         "p_created": [],
         "p_pos": {
@@ -36909,9 +36913,7 @@
             "Shape(DR,RT,TS,SD)"
         ],
         "text_cdl": [
-            "IsPerpendicularBisectorOfLine(MeetsAt(RS_perpendicular_bisector,RST),RT)",
-            "IsPerpendicularBisectorOfLine(MeetsAt(ST_perpendicular_bisector,RST),RS)",
-            "IsPerpendicularBisectorOfLine(MeetsAt(TR_perpendicular_bisector,RST),ST)"
+            "IsCircumcenterOfTriangle(D,RST)"
         ],
         "p_created": [
             "A",
@@ -38241,7 +38243,7 @@
             "Shape(AC,CB,BA)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(AB,Q)",
+            "IsDiameterOfCircle(AB,D)",
             "Equal(LengthOfLine(AC),8)",
             "Equal(LengthOfLine(BC),15)"
         ],
@@ -41518,8 +41520,7 @@
             "Shape(AE,ED,DB,BA)"
         ],
         "text_cdl": [
-            "Parallelogram(ABCD)",
-            "MeasureOfAngle(3)"
+            "Parallelogram(ABCD)"
         ],
         "p_created": [
             "A",
@@ -43361,8 +43362,7 @@
             "Cocircular(C,HGFED)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(Diameter,C)",
-            "Equal(LengthOfLine(Diameter),32)",
+            "Equal(DiameterOfCircle(C),32)",
             "Equal(MeasureOfAngle(DCH),45)"
         ],
         "p_created": [],
@@ -46185,8 +46185,8 @@
             "Shape(RU,US,SR)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(QR),40)",
-            "Equal(MeasureOfArc(TS),110)"
+            "Equal(MeasureOfArc(AQR),40)",
+            "Equal(MeasureOfArc(ATS),110)"
         ],
         "p_created": [
             "A"
@@ -47916,9 +47916,9 @@
         "text_cdl": [
             "IsDiameterOfCircle(YZ,T)",
             "IsDiameterOfCircle(WX,T)",
-            "Measures(YZ,8)",
-            "Measures(WX,8)",
-            "MeasuresArc(YX,120)"
+            "Equal(LengthOfLine(YZ),8)",
+            "Equal(LengthOfLine(WX),8)",
+            "Equal(MeasureOfArc(TYX),120)"
         ],
         "p_created": [],
         "p_pos": {
@@ -48060,10 +48060,8 @@
             "Cocircular(M,AQBS)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(D1,L)",
-            "Equal(LengthOfLine(D1),20)",
-            "IsDiameterOfCircle(D2,M)",
-            "Equal(LengthOfLine(D2),13)",
+            "Equal(DiameterOfCircle(L),20)",
+            "Equal(DiameterOfCircle(M),13)",
             "Equal(LengthOfLine(QR),4)"
         ],
         "p_created": [
@@ -48227,7 +48225,7 @@
         ],
         "construction_cdl": [],
         "text_cdl": [
-            "Equal(PerimeterOfShape(),90)"
+            "Equal(Add(LengthOfLine(GH),LengthOfLine(GM),LengthOfLine(HJ),LengthOfLine(LM),LengthOfLine(JK)),90)"
         ],
         "p_created": [],
         "p_pos": {
@@ -49139,7 +49137,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(CBA),Sub(Mul(2,x),4))",
-            "Equal(MeasureOfAngle(10),Add(Mul(2,x),4))"
+            "Equal(MeasureOfAngle(EBA),Add(Mul(2,x),4))"
         ],
         "p_created": [
             "A",
@@ -52251,9 +52249,9 @@
             "Shape(KP,PL,LN,NK)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(JL), LengthOfLine(LM))",
-            "Equal(LengthOfLine(KN), Sub(Mul(3,x),2))",
-            "Equal(LengthOfLine(KP), Add(Mul(2,x),1))"
+            "Equal(LengthOfLine(JL),LengthOfLine(LM))",
+            "Equal(LengthOfLine(KN),Sub(Mul(3,x),2))",
+            "Equal(LengthOfLine(KP),Add(Mul(2,x),1))"
         ],
         "p_created": [],
         "p_pos": {
@@ -52422,7 +52420,7 @@
         ],
         "text_cdl": [
             "Kite(ABCD)",
-            "Equal(AreaOfFigure($),104)"
+            "Equal(AreaOfQuadrilateral(ABCD),104)"
         ],
         "p_created": [
             "A",
@@ -53569,7 +53567,7 @@
         ],
         "text_cdl": [
             "Rhombus(ABCD)",
-            "Equal(AreaOfShape($),96)"
+            "Equal(AreaOfQuadrilateral(ABCD),96)"
         ],
         "p_created": [
             "A",
@@ -59040,9 +59038,9 @@
             "Shape(FJ,JH,HG,GF)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(KFG), MeasureOfArc(KFJ))",
-            "Equal(MeasureOfAngle(KFJ), Sub(Mul(6,x),5))",
-            "Equal(MeasureOfAngle(KHJ), Add(Mul(7,x),4))"
+            "Equal(MeasureOfArc(KFG),MeasureOfArc(KFJ))",
+            "Equal(MeasureOfAngle(KFJ),Sub(Mul(6,x),5))",
+            "Equal(MeasureOfAngle(KHJ),Add(Mul(7,x),4))"
         ],
         "p_created": [],
         "p_pos": {
@@ -59574,7 +59572,7 @@
         ],
         "text_cdl": [
             "Equal(LengthOfLine(WX),LengthOfLine(ZY))",
-            "Equal(MeasureOfArc(ZW),120)"
+            "Equal(MeasureOfArc(AZW),120)"
         ],
         "p_created": [],
         "p_pos": {
@@ -60391,9 +60389,7 @@
             "Equal(MeasureOfAngle(FGI),130)",
             "Equal(MeasureOfAngle(EFJ),110)",
             "Equal(MeasureOfAngle(DGF),30)",
-            "Equal(MeasureOfAngle(DEF),MeasureOfAngle(8))",
-            "Equal(MeasureOfAngle(8),MeasureOfAngle(GCD))",
-            "Equal(MeasureOfAngle(GCD),MeasureOfAngle(1))"
+            "Equal(MeasureOfAngle(FED),MeasureOfAngle(DCG))"
         ],
         "construction_cdl": [
             "Collinear(DFJ)",
@@ -60491,12 +60487,14 @@
         ],
         "circles": [],
         "angle_ids": {
-            "5": "m \\angle DFG",
+            "1": "m \\angle DCG",
             "2": "m \\angle DGC",
-            "7": "m \\angle EFD",
             "3": "m \\angle GDC",
+            "4": "m \\angle GDF",
+            "5": "m \\angle DFG",
             "6": "m \\angle EDF",
-            "4": "m \\angle GDF"
+            "7": "m \\angle EFD",
+            "8": "m \\angle FED"
         },
         "text_list": {
             "prob_1084": "Find m \\angle 3.",
@@ -62421,7 +62419,7 @@
             "Shape(WY,YZ,ZW)"
         ],
         "text_cdl": [
-            "CongruentBetweenTriangle(WXY, WXZ)"
+            "CongruentBetweenTriangle(WXY,WXZ)"
         ],
         "p_created": [],
         "p_pos": {
@@ -64006,8 +64004,8 @@
         ],
         "text_cdl": [
             "Parallelogram(MNPQ)",
-            "Equal(MeasureOfAngle(None),Mul(10,x))",
-            "Equal(MeasureOfAngle(None),Mul(20,x))"
+            "Equal(MeasureOfAngle(NMQ),Mul(10,x))",
+            "Equal(MeasureOfAngle(PNM),Mul(20,x))"
         ],
         "p_created": [],
         "p_pos": {
@@ -65595,8 +65593,8 @@
             "Cocircular(S,MLPN)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(LM), 16)",
-            "Equal(LengthOfLine(PN), Mul(4,x))"
+            "Equal(LengthOfLine(LM),16)",
+            "Equal(LengthOfLine(PN),Mul(4,x))"
         ],
         "p_created": [],
         "p_pos": {
@@ -67964,8 +67962,8 @@
             "Shape(AD,DC,CB,BA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),80)",
-            "Equal(MeasureOfAngle(None),40)"
+            "Equal(MeasureOfAngle(CBA),80)",
+            "Equal(MeasureOfAngle(DCB),40)"
         ],
         "p_created": [],
         "p_pos": {
@@ -68029,8 +68027,8 @@
             "Shape(EG,GF,FE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(FE),118)",
-            "Equal(MeasureOfArc(AB),108)",
+            "Equal(MeasureOfArc(HFE),118)",
+            "Equal(MeasureOfArc(HAB),108)",
             "Equal(MeasureOfAngle(EGB),52)",
             "Equal(MeasureOfAngle(EFB),30)"
         ],
@@ -68457,8 +68455,8 @@
             "Cocircular(A,NRP)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(NR),62)",
-            "Equal(MeasureOfArc(NP),108)"
+            "Equal(MeasureOfArc(ANR),62)",
+            "Equal(MeasureOfArc(ANP),108)"
         ],
         "p_created": [
             "A"
@@ -69053,7 +69051,7 @@
             "Shape(DI,IH,HE,ED)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(12),64)"
+            "Equal(MeasureOfAngle(HIK),64)"
         ],
         "p_created": [
             "A",
@@ -69241,7 +69239,7 @@
             "Shape(NR,RQ,QP,PN)"
         ],
         "text_cdl": [
-            "IsMidsegmentOfTrapezoid(QR,LMNP)"
+            "IsMidsegmentOfQuadrilateral(QR,LMNP)"
         ],
         "p_created": [],
         "p_pos": {
@@ -69700,12 +69698,9 @@
             "Shape(GY,YX,XG)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(DiameterA,A)",
-            "Equal(LengthOfLine(DiameterA),10)",
-            "IsDiameterOfCircle(DiameterB,B)",
-            "Equal(LengthOfLine(DiameterB),30)",
-            "IsDiameterOfCircle(DiameterC,C)",
-            "Equal(LengthOfLine(DiameterC),10)",
+            "Equal(DiameterOfCircle(A),10)",
+            "Equal(DiameterOfCircle(B),30)",
+            "Equal(DiameterOfCircle(C),10)",
             "Equal(LengthOfLine(AZ),LengthOfLine(CW))",
             "Equal(LengthOfLine(CW),2)"
         ],
@@ -69935,7 +69930,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(ADC),104)",
-            "Equal(MeasureOfAngle(14),118)"
+            "Equal(MeasureOfAngle(IEF),118)"
         ],
         "p_created": [
             "A",
@@ -71037,7 +71032,7 @@
     },
     "img_871.png": {
         "image_cdl": [
-            "Equal(\\Phi D,16)"
+            "Equal(DiameterOfCircle(D),16)"
         ],
         "construction_cdl": [
             "Cocircular(D,BAC)",
@@ -71047,7 +71042,9 @@
             "Shape(BD,DC,CB)",
             "Shape(AC,CD,DB,BA)"
         ],
-        "text_cdl": [],
+        "text_cdl": [
+            "EquilateralTriangle(ABC)"
+        ],
         "p_created": [
             "A",
             "B",
@@ -71243,10 +71240,10 @@
             "Shape(AV,VB,BW,WA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(UY),56)",
-            "Equal(MeasureOfArc(XZ),56)",
-            "Equal(MeasureOfArc(UV),56)",
-            "Equal(MeasureOfArc(XW),56)"
+            "Equal(MeasureOfArc(AUY),56)",
+            "Equal(MeasureOfArc(AXZ),56)",
+            "Equal(MeasureOfArc(AUV),56)",
+            "Equal(MeasureOfArc(AXW),56)"
         ],
         "p_created": [
             "B",
@@ -75434,8 +75431,7 @@
             "Shape(AD,DC,CB,BA)"
         ],
         "text_cdl": [
-            "Rhombus(ABCD)",
-            "Diagonal(AC, ABCD)"
+            "Rhombus(ABCD)"
         ],
         "p_created": [
             "F"
@@ -76669,7 +76665,9 @@
             "Shape(GF,FH,HJ,JG)",
             "Shape(GK,KH,HJ,JG)"
         ],
-        "text_cdl": [],
+        "text_cdl": [
+            "IsCircumcenterOfTriangle(H,EFG)"
+        ],
         "p_created": [],
         "p_pos": {
             "F": [
@@ -78532,7 +78530,7 @@
             "Shape(MZ,ZX,XJ,JM)"
         ],
         "text_cdl": [
-            "IsConcurrentAt(XYZ_Bisectors,M)"
+            "IsIncenterOfTriangle(M,XYZ)"
         ],
         "p_created": [],
         "p_pos": {
@@ -79443,7 +79441,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(LHI),110)",
-            "Equal(MeasureOfAngle(12),55)"
+            "Equal(MeasureOfAngle(HEF),55)"
         ],
         "p_created": [
             "A",
@@ -80636,9 +80634,9 @@
             "Shape(PS,SR,RQ,QP)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(PQ), LengthOfLine(RQ))",
-            "Equal(MeasureOfArc(PQS), 45)",
-            "Equal(MeasureOfArc(SR), 75)"
+            "Equal(LengthOfLine(PQ),LengthOfLine(RQ))",
+            "Equal(MeasureOfArc(APS),45)",
+            "Equal(MeasureOfArc(ASR),75)"
         ],
         "p_created": [
             "A",
@@ -83341,7 +83339,7 @@
             "Shape(AC,CD,DE,EA)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(SideOfSquare, Q)"
+            "IsDiameterOfCircle(AC,B)"
         ],
         "p_created": [
             "A",
@@ -88988,9 +88986,9 @@
             "Collinear(ACF)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(11),Add(x,40))",
-            "Equal(MeasureOfAngle(12),Add(x,10))",
-            "Equal(MeasureOfAngle(13),Add(Mul(3,x),30))"
+            "Equal(MeasureOfAngle(ECB),Add(x,40))",
+            "Equal(MeasureOfAngle(ACB),Add(x,10))",
+            "Equal(MeasureOfAngle(DCF),Add(Mul(3,x),30))"
         ],
         "p_created": [
             "A",
@@ -89157,7 +89155,7 @@
         ],
         "text_cdl": [
             "Square(FGHJ)",
-            "Circle(K, FGHJ)"
+            "Circle(K,FGHJ)"
         ],
         "p_created": [],
         "p_pos": {
@@ -89367,8 +89365,8 @@
         ],
         "text_cdl": [
             "CongruentBetweenTriangle(ABD,CDB)",
-            "Equal(MeasureOfAngle(None),Add(Mul(2,x),14))",
-            "Equal(MeasureOfAngle(None),Sub(Mul(3,x),15))",
+            "Equal(MeasureOfAngle(BAD),Add(Mul(2,x),14))",
+            "Equal(MeasureOfAngle(DCB),Sub(Mul(3,x),15))",
             "Equal(MeasureOfAngle(DBA),49)"
         ],
         "p_created": [],
@@ -89667,8 +89665,8 @@
             "Shape(CE,EI,IC)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(11),62)",
-            "Equal(MeasureOfAngle(14),38)"
+            "Equal(MeasureOfAngle(ACD),62)",
+            "Equal(MeasureOfAngle(FEG),38)"
         ],
         "p_created": [
             "A",
@@ -89795,8 +89793,8 @@
             "Shape(ST,TU,US)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(TR),100)",
-            "Perpendicular(Line(SR),Line(QT))"
+            "Equal(MeasureOfArc(ATR),100)",
+            "PerpendicularBetweenLine(SU,QU)"
         ],
         "p_created": [
             "A"
@@ -90570,8 +90568,8 @@
             "Shape(UW,WY,YZ,ZU)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(PQ), LengthOfLine(QR))",
-            "Equal(LengthOfLine(QR), LengthOfLine(RS))"
+            "Equal(LengthOfLine(PQ),LengthOfLine(QR))",
+            "Equal(LengthOfLine(QR),LengthOfLine(RS))"
         ],
         "p_created": [
             "A",
@@ -94496,7 +94494,7 @@
             "Shape(QR,RS,SQ)"
         ],
         "text_cdl": [
-            "Similar(Triangle(LMN),Triangle(QRS))",
+            "SimilarBetweenTriangle(LMN,QRS)",
             "Equal(LengthOfLine(QR),35)",
             "Equal(LengthOfLine(RS),37)",
             "Equal(LengthOfLine(SQ),12)",
@@ -95133,11 +95131,8 @@
             "Equal(LengthOfLine(QR),15)",
             "Equal(LengthOfLine(ST),11)",
             "Equal(LengthOfLine(PQ),9)",
-            "Equal(MeasureOfAngle(SPQ),MeasureOfAngle(1))",
-            "Equal(MeasureOfAngle(1),MeasureOfAngle(TQR))",
-            "Equal(MeasureOfAngle(TQR),MeasureOfAngle(2))",
-            "Equal(MeasureOfAngle(2),MeasureOfAngle(URJ))",
-            "Equal(MeasureOfAngle(URJ),MeasureOfAngle(3))"
+            "Equal(MeasureOfAngle(SPQ),MeasureOfAngle(TQR))",
+            "Equal(MeasureOfAngle(TQR),MeasureOfAngle(URJ))"
         ],
         "construction_cdl": [
             "Collinear(PS)",
@@ -95150,8 +95145,8 @@
             "Shape(QR,RU,UT,TQ)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(SPQ),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
+            "Equal(MeasureOfAngle(SPQ),MeasureOfAngle(TQR))",
+            "Equal(MeasureOfAngle(TQR),MeasureOfAngle(URJ))",
             "Equal(LengthOfLine(PQ),9)",
             "Equal(LengthOfLine(QR),15)",
             "Equal(LengthOfLine(ST),11)"
@@ -95260,7 +95255,11 @@
             ]
         ],
         "circles": [],
-        "angle_ids": {},
+        "angle_ids": {
+            "1": "m \\angle SPQ",
+            "2": "m \\angle TQR",
+            "3": "m \\angle URJ"
+        },
         "text_list": {
             "prob_1823": "m \\angle 1 = m \\angle 2 = m \\angle 3, and PQ = 9, QR = 15, and ST = 11. What is the length of TU?",
             "prob_5676": "m \\angle 1 = m \\angle 2 = m \\angle 3, and PQ = 9, QR = 15, and ST = 11. What is the length of US?"
@@ -97409,7 +97408,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(AFC),Add(Mul(a,12),45))",
-            "Perpendicular(FC,FD)"
+            "PerpendicularBetweenLine(CF,DF)"
         ],
         "p_created": [
             "G",
@@ -97685,7 +97684,7 @@
             "Shape(RS,ST,TU,UR)"
         ],
         "text_cdl": [
-            "Perpendicular(SV,RT)",
+            "PerpendicularBetweenLine(SV,RV)",
             "Equal(LengthOfLine(VR),LengthOfLine(VT))"
         ],
         "p_created": [
@@ -98319,9 +98318,7 @@
     },
     "img_3366.png": {
         "image_cdl": [
-            "Equal(MeasureOfAngle(BEG),MeasureOfAngle(4))",
-            "Equal(MeasureOfAngle(4),MeasureOfAngle(EGH))",
-            "Equal(MeasureOfAngle(EGH),MeasureOfAngle(5))"
+            "Equal(MeasureOfAngle(BEG),MeasureOfAngle(EGH))"
         ],
         "construction_cdl": [
             "Collinear(DBC)",
@@ -98334,7 +98331,7 @@
             "Equal(MeasureOfAngle(BCH),100)",
             "Equal(MeasureOfAngle(DBE),40)",
             "Equal(MeasureOfAngle(BEG),110)",
-            "Equal(MeasureOfAngle(None),110)"
+            "Equal(MeasureOfAngle(EGH),110)"
         ],
         "p_created": [
             "A",
@@ -98419,13 +98416,15 @@
         ],
         "circles": [],
         "angle_ids": {
+            "1": "m \\angle CHG",
+            "2": "m \\angle BCH",
+            "3": "m \\angle CBE",
+            "4":"m \\angle BEG",
+            "5": "m \\angle EGH",
+            "6": "m \\angle CHI",
             "7": "m \\angle BCA",
             "8": "m \\angle DBE",
-            "3": "m \\angle CBE",
-            "2": "m \\angle BCH",
             "9": "m \\angle FEG",
-            "1": "m \\angle CHG",
-            "6": "m \\angle CHI",
             "10": "m \\angle JGH"
         },
         "text_list": {
@@ -98724,9 +98723,9 @@
             "Shape(XY,YZ,ZX)"
         ],
         "text_cdl": [
-            "SimilarTo(Triangle(STU),Triangle(XYZ))",
-            "IsAltitudeOfTriangle(UA,Triangle(STU))",
-            "IsAltitudeOfTriangle(ZB,Triangle(XYZ))",
+            "SimilarBetweenTriangle(STU,XYZ)",
+            "IsAltitudeOfTriangle(UA,UST)",
+            "IsAltitudeOfTriangle(ZB,ZXY)",
             "Equal(LengthOfLine(US),8.5)",
             "Equal(LengthOfLine(UA),6)",
             "Equal(LengthOfLine(ZB),11.4)"
@@ -101070,7 +101069,7 @@
             "Shape(AE,EP,PF,FA)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(EP), 4)"
+            "Equal(LengthOfLine(EP),4)"
         ],
         "p_created": [],
         "p_pos": {
@@ -101389,7 +101388,7 @@
             "Shape(HJ,JK,KA,AH)"
         ],
         "text_cdl": [
-            "MeetsAt(IsBisectorOfAngle(GK,GHJ), IsBisectorOfAngle(HK,HGJ), IsBisectorOfAngle(JK,JGH), K)"
+            "IsIncenterOfTriangle(K,GHJ)"
         ],
         "p_created": [],
         "p_pos": {
@@ -103301,7 +103300,7 @@
     "img_3960.png": {
         "image_cdl": [
             "PerpendicularBetweenLine(AB,DB)",
-            "Equal(\\Phi C,20)",
+            "Equal(DiameterOfCircle(C),20)",
             "Equal(LengthOfLine(BD),LengthOfLine(DE))",
             "Equal(LengthOfLine(DE),LengthOfLine(BA))",
             "Equal(LengthOfLine(BA),LengthOfLine(AE))"
@@ -103652,7 +103651,7 @@
             "Shape(AG,GE,EA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),75)"
+            "Equal(MeasureOfAngle(GEA),75)"
         ],
         "p_created": [
             "A",
@@ -103918,9 +103917,9 @@
             "Shape(AY,YX,XW,WA)"
         ],
         "text_cdl": [
-            "Similar(Triangle(SRY),Triangle(WXQ))",
-            "IsAltitudeOfTriangle(RT,Triangle(SRY))",
-            "IsAltitudeOfTriangle(XV,Triangle(WXQ))",
+            "SimilarBetweenTriangle(SRY,QXW)",
+            "IsAltitudeOfTriangle(RT,RYS)",
+            "IsAltitudeOfTriangle(XV,XWQ)",
             "Equal(LengthOfLine(RT),5)",
             "Equal(LengthOfLine(RQ),4)",
             "Equal(LengthOfLine(QY),6)",
@@ -105017,8 +105016,8 @@
             "Shape(CF,FG,GD,DC)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(AF), 9)",
-            "Equal(LengthOfLine(GE), 2.4)"
+            "Equal(LengthOfLine(AF),9)",
+            "Equal(LengthOfLine(GE),2.4)"
         ],
         "p_created": [],
         "p_pos": {
@@ -108178,7 +108177,7 @@
         ],
         "text_cdl": [
             "Rhombus(PQRS)",
-            "CyclicQuadrilateral(PQRS)"
+            "IsCircumcenterOfQuadrilateral(A,PQRS)"
         ],
         "p_created": [
             "A"
@@ -108409,8 +108408,8 @@
             "Collinear(DEF)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(DEB), MeasureOfAngle(8))",
-            "Equal(MeasureOfAngle(AEB), 29)"
+            "Equal(MeasureOfAngle(DEB),MeasureOfAngle(FEC))",
+            "Equal(MeasureOfAngle(AEB),29)"
         ],
         "p_created": [
             "A",
@@ -109035,9 +109034,9 @@
             "Shape(AB,BC,CA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),33)",
-            "Equal(MeasureOfAngle(None),47)",
-            "Equal(LengthOfLine(b),14)"
+            "Equal(MeasureOfAngle(CAB),33)",
+            "Equal(MeasureOfAngle(ABC),47)",
+            "Equal(b,14)"
         ],
         "p_created": [],
         "p_pos": {
@@ -109878,8 +109877,8 @@
             "Collinear(ACD)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(ACB),Mul(MeasureOfAngle(2),1/2))",
-            "Equal(MeasureOfAngle(BCF),Mul(MeasureOfAngle(3),2/3))",
+            "Equal(MeasureOfAngle(ACB),Mul(MeasureOfAngle(BCF),1/2))",
+            "Equal(MeasureOfAngle(BCF),Mul(MeasureOfAngle(FCE),2/3))",
             "Equal(MeasureOfAngle(ACB),24)"
         ],
         "p_created": [
@@ -111377,8 +111376,8 @@
         ],
         "construction_cdl": [],
         "text_cdl": [
-            "Equal(LengthOfLine(XY), LengthOfLine(WX))",
-            "Equal(LengthOfLine(YZ), LengthOfLine(WX))"
+            "Equal(LengthOfLine(XY),LengthOfLine(WX))",
+            "Equal(LengthOfLine(YZ),LengthOfLine(WX))"
         ],
         "p_created": [],
         "p_pos": {
@@ -112294,8 +112293,8 @@
             "Shape(QT,TS,SR,RQ)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(QT), LengthOfLine(TS))",
-            "Equal(LengthOfLine(RS), LengthOfLine(TS))"
+            "Equal(LengthOfLine(QT),LengthOfLine(TS))",
+            "Equal(LengthOfLine(RS),LengthOfLine(TS))"
         ],
         "p_created": [],
         "p_pos": {
@@ -112504,7 +112503,7 @@
             "Shape(JM,ML,LJ)"
         ],
         "text_cdl": [
-            "SimilarTriangles(KJL,EDC)"
+            "SimilarBetweenTriangle(KJL,EDC)"
         ],
         "p_created": [],
         "p_pos": {
@@ -115089,7 +115088,7 @@
             "Shape(UV,VW,WU)"
         ],
         "text_cdl": [
-            "SimilarTo(Triangle(RST),Triangle(UVW))",
+            "SimilarBetweenTriangle(RST,UVW)",
             "IsMedianOfTriangle(TA,RST)",
             "IsMedianOfTriangle(WB,UVW)",
             "Equal(LengthOfLine(TA),8)",
@@ -116210,9 +116209,9 @@
             "Shape(OS,SR,RT,TO)"
         ],
         "text_cdl": [
-            "IsAltitudeOfTriangle(QS,R)",
-            "IsAltitudeOfTriangle(PT,R)",
-            "Equal(MeasureOfAngle(None),55)"
+            "IsAltitudeOfTriangle(QS,QPR)",
+            "IsAltitudeOfTriangle(PT,PRQ)",
+            "Equal(MeasureOfAngle(PRQ),55)"
         ],
         "p_created": [],
         "p_pos": {
@@ -116959,7 +116958,7 @@
             "Shape(CD,DJ,JF,FC)"
         ],
         "text_cdl": [
-            "IsIncenterOfAngle(J,ABC)"
+            "IsIncenterOfTriangle(J,ABC)"
         ],
         "p_created": [],
         "p_pos": {
@@ -117519,7 +117518,7 @@
         "text_cdl": [
             "IsMedianOfTriangle(NQ,PNR)",
             "IsMedianOfTriangle(VX,WVY)",
-            "Similar(Triangle(PNR),Triangle(WVY))",
+            "SimilarBetweenTriangle(NPR,VWY)",
             "Equal(LengthOfLine(NQ),8)",
             "Equal(LengthOfLine(RN),12)",
             "Equal(LengthOfLine(YV),Sub(Mul(7,x),1))",
@@ -117808,7 +117807,7 @@
         ],
         "text_cdl": [
             "Equal(LengthOfLine(JK),10)",
-            "Equal(MeasureOfArc(PJLK),134)"
+            "Equal(MeasureOfArc(PJK),134)"
         ],
         "p_created": [],
         "p_pos": {
@@ -118346,9 +118345,9 @@
             "Shape(PT,TR,RP)"
         ],
         "text_cdl": [
-            "Similar(Triangle(JKL),Triangle(NPR))",
-            "IsAltitudeOfTriangle(KM,Triangle(JKL))",
-            "IsAltitudeOfTriangle(PT,Triangle(NPR))",
+            "SimilarBetweenTriangle(KJL,PNR)",
+            "IsAltitudeOfTriangle(KM,KJL)",
+            "IsAltitudeOfTriangle(PT,PNR)",
             "Equal(LengthOfLine(KL),28)",
             "Equal(LengthOfLine(KM),18)",
             "Equal(LengthOfLine(PT),15.75)"
@@ -118929,9 +118928,9 @@
             "Shape(CE,EH,HI,IC)"
         ],
         "text_cdl": [
-            "Similar(Triangle(ABC),Triangle(DEF))",
-            "IsAltitudeOfTriangle(BG,Triangle(ABC))",
-            "IsAltitudeOfTriangle(EH,Triangle(DEF))",
+            "SimilarBetweenTriangle(ABC,DEF)",
+            "IsAltitudeOfTriangle(BG,BCA)",
+            "IsAltitudeOfTriangle(EH,EDF)",
             "Equal(LengthOfLine(BG),3)",
             "Equal(LengthOfLine(BF),4)",
             "Equal(LengthOfLine(FC),2)",
@@ -119822,7 +119821,7 @@
         ],
         "text_cdl": [
             "IsCentroidOfTriangle(P,DEF)",
-            "Perpendicular(EH,DF)",
+            "PerpendicularBetweenLine(EH,FH)",
             "Equal(LengthOfLine(DH),9)",
             "Equal(LengthOfLine(DG),7.5)",
             "Equal(LengthOfLine(EP),8)",
@@ -122141,8 +122140,8 @@
             "Cocircular(R,AEDB)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(CR), LengthOfLine(RF))",
-            "Equal(LengthOfLine(ED), 30)"
+            "Equal(LengthOfLine(CR),LengthOfLine(RF))",
+            "Equal(LengthOfLine(ED),30)"
         ],
         "p_created": [],
         "p_pos": {
@@ -122280,8 +122279,7 @@
             "Cocircular(G,ABD)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(ADB),MeasureOfArc(AB))",
-            "Equal(MeasureOfArc(AB),102)"
+            "Equal(MeasureOfArc(GAB),102)"
         ],
         "p_created": [
             "E",
@@ -124376,7 +124374,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(AQB),50)",
-            "Equal(MeasureOfAngle(None),40)"
+            "Equal(MeasureOfAngle(DFC),40)"
         ],
         "p_created": [
             "H"
@@ -127762,8 +127760,8 @@
             "Collinear(ACE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(11),Sub(x,4))",
-            "Equal(MeasureOfAngle(12),Sub(Mul(2,x),5))"
+            "Equal(MeasureOfAngle(BCA),Sub(x,4))",
+            "Equal(MeasureOfAngle(BCE),Sub(Mul(2,x),5))"
         ],
         "p_created": [
             "A",
@@ -131394,7 +131392,7 @@
         ],
         "text_cdl": [
             "IsoscelesTrapezoid(PQRS)",
-            "Equal(MeasureOfAngle(None),106)"
+            "Equal(MeasureOfAngle(SRQ),106)"
         ],
         "p_created": [],
         "p_pos": {
@@ -131874,9 +131872,9 @@
             "Cocircular(Z,XSTY)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(PZ), LengthOfLine(ZQ))",
-            "Equal(LengthOfLine(XY), Sub(Mul(4,a), 5))",
-            "Equal(LengthOfLine(ST), Add(Mul(-5,a), 13))"
+            "Equal(LengthOfLine(PZ),LengthOfLine(ZQ))",
+            "Equal(LengthOfLine(XY),Sub(Mul(4,a),5))",
+            "Equal(LengthOfLine(ST),Add(Mul(-5,a),13))"
         ],
         "p_created": [],
         "p_pos": {
@@ -132384,7 +132382,7 @@
             "Cocircular(F,CBDA)"
         ],
         "text_cdl": [
-            "IsDiameterOfCircle(AB,Q)",
+            "IsDiameterOfCircle(AB,F)",
             "Equal(LengthOfLine(CE),LengthOfLine(ED))"
         ],
         "p_created": [
@@ -133689,7 +133687,7 @@
             "Shape(CF,FD,DG,GC)"
         ],
         "text_cdl": [
-            "IntersectAt(IsPerpendicularBisectorOfLine(_,AB), IsPerpendicularBisectorOfLine(_,BC), IsPerpendicularBisectorOfLine(_,CA), D)"
+            "IsCircumcenterOfTriangle(D,ABC)"
         ],
         "p_created": [],
         "p_pos": {
@@ -136093,7 +136091,7 @@
             "Shape(BD,DC,CB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
+            "Equal(MeasureOfAngle(BAC),MeasureOfAngle(ACB))",
             "Equal(MeasureOfAngle(BDA),MeasureOfAngle(BDC))"
         ],
         "p_created": [],
@@ -137368,7 +137366,7 @@
             "Shape(BE,ED,DB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),30)"
+            "Equal(MeasureOfAngle(DAC),30)"
         ],
         "p_created": [
             "E",
@@ -137907,7 +137905,7 @@
         ],
         "text_cdl": [
             "Equal(LengthOfLine(AE),13.1)",
-            "Perpendicular(Line(AC),Line(BD))",
+            "PerpendicularBetweenLine(AC,DC)",
             "Equal(LengthOfLine(BC),6.8)"
         ],
         "p_created": [],
@@ -138092,7 +138090,7 @@
             "Shape(QS,ST,TR,RQ)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(SRQ),Add(Power(x,2),6))",
+            "Equal(MeasureOfAngle(SRQ),Add(Pow(x,2),6))",
             "Equal(MeasureOfAngle(RST),Sub(36,x))"
         ],
         "p_created": [],
@@ -138620,7 +138618,9 @@
             "Shape(MN,NQ,QP,PM)",
             "Shape(PM,MQ,QC,CP)"
         ],
-        "text_cdl": [],
+        "text_cdl": [
+            "IsCircumcenterOfTriangle(Q,MNP)"
+        ],
         "p_created": [
             "A",
             "B",
@@ -141487,8 +141487,8 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(BDC),25)",
-            "Equal(MeasureOfArc(AB),130)",
-            "Equal(MeasureOfArc(CD),130)"
+            "Equal(MeasureOfArc(EAB),130)",
+            "Equal(MeasureOfArc(ECD),130)"
         ],
         "p_created": [
             "E"
@@ -141703,8 +141703,8 @@
             "Collinear(ACE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(17),Add(Mul(x,2),7))",
-            "Equal(MeasureOfAngle(18),Add(x,30))"
+            "Equal(MeasureOfAngle(DCA),Add(Mul(x,2),7))",
+            "Equal(MeasureOfAngle(BCE),Add(x,30))"
         ],
         "p_created": [
             "A",
@@ -142616,7 +142616,7 @@
             "Shape(EH,HG,GF,FE)"
         ],
         "text_cdl": [
-            "Similar(Parallelogram(ABCD), Parallelogram(EFGH))"
+            "SimilarBetweenQuadrilateral(ADCB,EHGF)"
         ],
         "p_created": [],
         "p_pos": {
@@ -142708,7 +142708,7 @@
             "Shape(BC,CD,DB)"
         ],
         "text_cdl": [
-            "IsAltitudeOfTriangle(CD,ABC)",
+            "IsAltitudeOfTriangle(CD,CAB)",
             "Equal(MeasureOfAngle(ACB),90)",
             "Equal(LengthOfLine(AD),12)",
             "Equal(LengthOfLine(BD),3)"
@@ -143254,7 +143254,7 @@
             "Equal(LengthOfLine(QT),Add(x,6))",
             "Equal(LengthOfLine(SR),12)",
             "Equal(LengthOfLine(PS),27)",
-            "Equal(LengthOfLine(TR),Subtract(x,4))"
+            "Equal(LengthOfLine(TR),Sub(x,4))"
         ],
         "p_created": [],
         "p_pos": {
@@ -143409,7 +143409,7 @@
             "Shape(PS,SQ,QP)"
         ],
         "text_cdl": [
-            "Area(Triangle(PQS), 300)"
+            "Equal(AreaOfTriangle(PQS),300)"
         ],
         "p_created": [
             "A"
@@ -144232,7 +144232,7 @@
     },
     "img_3632.png": {
         "image_cdl": [
-            "Equal(\\Phi B,16)",
+            "Equal(DiameterOfCircle(B),16)",
             "Equal(MeasureOfAngle(CBD),60)"
         ],
         "construction_cdl": [
@@ -145505,7 +145505,7 @@
             "Shape(BA,AD,DC,CB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),76)",
+            "Equal(MeasureOfAngle(CBA),76)",
             "IsBisectorOfAngle(AD,ABC)",
             "IsBisectorOfAngle(DC,CBA)"
         ],
@@ -146321,7 +146321,7 @@
             "Equal(LengthOfLine(FJ),LengthOfLine(FH))",
             "Equal(LengthOfLine(GF),LengthOfLine(GH))",
             "Equal(MeasureOfAngle(GHJ),152)",
-            "Equal(MeasureOfAngle(None),32)"
+            "Equal(MeasureOfAngle(HGF),32)"
         ],
         "p_created": [],
         "p_pos": {
@@ -146936,9 +146936,7 @@
             "Shape(LS,SM,MQ,QL)"
         ],
         "text_cdl": [
-            "IsBisectorOfAngle(L,M,N,P)",
-            "IsBisectorOfAngle(L,N,P,M)",
-            "IsBisectorOfAngle(L,P,M,N)"
+            "IsIncenterOfTriangle(L,MNP)"
         ],
         "p_created": [
             "A",
@@ -147386,7 +147384,7 @@
             "Shape(DB,BE,EA,AD)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),10)"
+            "Equal(MeasureOfAngle(CAH),10)"
         ],
         "p_created": [
             "C",
@@ -148228,7 +148226,7 @@
         ],
         "text_cdl": [
             "Parallelogram(ABCD)",
-            "Equal(AreaOfShape($),148)"
+            "Equal(AreaOfQuadrilateral(ABCD),148)"
         ],
         "p_created": [
             "A",
@@ -150135,7 +150133,7 @@
         ],
         "text_cdl": [
             "Square(ABCD)",
-            "Radius(_,6)"
+            "Equal(RadiusOfCircle(B),6)"
         ],
         "p_created": [
             "A",
@@ -151382,7 +151380,7 @@
             "Shape(AD,DC,CE,EA)"
         ],
         "text_cdl": [
-            "Perpendicular(Line(DB),Line(AC))",
+            "PerpendicularBetweenLine(DB,AB)",
             "Equal(LengthOfLine(BA),LengthOfLine(BC))"
         ],
         "p_created": [
@@ -152624,8 +152622,8 @@
             "Shape(BA,AD,DC,CB)"
         ],
         "text_cdl": [
-            "IsBisectorOfAngle(AD, BAC)",
-            "IsBisectorOfAngle(CD, BCA)"
+            "IsBisectorOfAngle(AD,BAC)",
+            "IsBisectorOfAngle(CD,BCA)"
         ],
         "p_created": [],
         "p_pos": {
@@ -153154,8 +153152,8 @@
             "Collinear(DCB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(15),x)",
-            "Equal(MeasureOfAngle(16),Sub(Mul(6,x),290))"
+            "Equal(MeasureOfAngle(ACD),x)",
+            "Equal(MeasureOfAngle(ECB),Sub(Mul(6,x),290))"
         ],
         "p_created": [
             "A",
@@ -158027,7 +158025,7 @@
     },
     "img_522.png": {
         "image_cdl": [
-            "Equal(\\Phi G,14)"
+            "Equal(DiameterOfCircle(G),14)"
         ],
         "construction_cdl": [
             "Collinear(AGD)",
@@ -162374,7 +162372,7 @@
             "Shape(BE,ED,DC,CB)"
         ],
         "text_cdl": [
-            "IsAltitudeOfTriangle(EC,AED)",
+            "IsAltitudeOfTriangle(EC,EDA)",
             "Equal(MeasureOfAngle(BCE),Add(Mul(2,x),7))",
             "Equal(MeasureOfAngle(ACB),Add(Mul(3,x),13))"
         ],
@@ -164285,7 +164283,7 @@
         "image_cdl": [
             "Equal(LengthOfLine(MN),2x+1)",
             "Equal(LengthOfLine(PQ),3x-7)",
-            "Equal(MeasureOfArc(KMN),MeasureOfArc(KPQ))"
+            "Equal(MeasureOfArc(JMN),MeasureOfArc(KPQ))"
         ],
         "construction_cdl": [
             "Cocircular(K,PQ)",
@@ -164293,7 +164291,7 @@
         ],
         "text_cdl": [
             "Equal(RadiusOfCircle(J),RadiusOfCircle(K))",
-            "Equal(MeasureOfArc(MN),MeasureOfArc(PQ))"
+            "Equal(MeasureOfArc(JMN),MeasureOfArc(KPQ))"
         ],
         "p_created": [],
         "p_pos": {
@@ -165326,7 +165324,7 @@
         ],
         "text_cdl": [
             "Equal(RadiusOfCircle(L),32)",
-            "PerpendicularTo(Line(LH),Line(GJ))",
+            "PerpendicularBetweenLine(LK,JK)",
             "Equal(LengthOfLine(GJ),40)"
         ],
         "p_created": [],
@@ -166156,7 +166154,7 @@
             "Cocircular(C,RQP)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(PQ),Add(Mul(5,x),17))"
+            "Equal(MeasureOfArc(CPQ),Add(Mul(5,x),17))"
         ],
         "p_created": [
             "A",
@@ -166426,7 +166424,7 @@
             "Shape(OS,SR,RP,PO)"
         ],
         "text_cdl": [
-            "IsMidsegmentOfTrapezoid(RS,MNOP)"
+            "IsMidsegmentOfQuadrilateral(RS,MNOP)"
         ],
         "p_created": [],
         "p_pos": {
@@ -166704,9 +166702,9 @@
             "Shape(DF,FE,ED)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),108)",
-            "Equal(MeasureOfAngle(None),26)",
-            "Equal(LengthOfLine(f),20)"
+            "Equal(MeasureOfAngle(FED),108)",
+            "Equal(MeasureOfAngle(DFE),26)",
+            "Equal(f,20)"
         ],
         "p_created": [],
         "p_pos": {
@@ -166903,10 +166901,10 @@
         ],
         "text_cdl": [
             "IsoscelesTrapezoid(TWYZ)",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),Mul(30,x))",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),Mul(20,x))"
+            "Equal(MeasureOfAngle(TZY),MeasureOfAngle(ZYW))",
+            "Equal(MeasureOfAngle(TZY),Mul(30,x))",
+            "Equal(MeasureOfAngle(WTZ),MeasureOfAngle(YWT))",
+            "Equal(MeasureOfAngle(WTZ),Mul(20,x))"
         ],
         "p_created": [],
         "p_pos": {
@@ -168974,7 +168972,7 @@
             "Shape(CQ,QR,RC)"
         ],
         "text_cdl": [
-            "IsAltitudeOfTriangle(CP,ABC)",
+            "IsAltitudeOfTriangle(CP,CAB)",
             "IsBisectorOfAngle(CQ,ACB)",
             "IsMidpointOfLine(R,AB)",
             "Equal(MeasureOfAngle(APC),Add(72,x))"
@@ -170427,7 +170425,7 @@
         ],
         "text_cdl": [
             "ParallelBetweenLine(FB,EC)",
-            "IsBisectorOfAngle(AD,A)",
+            "IsBisectorOfAngle(AD,CAE)",
             "Equal(LengthOfLine(BF),6)",
             "Equal(LengthOfLine(CE),10)",
             "Equal(LengthOfLine(AD),5)"
@@ -174881,7 +174879,7 @@
             "Shape(DE,EF,FD)"
         ],
         "text_cdl": [
-            "Similar(Triangle(ABC),Triangle(DEF))",
+            "SimilarBetweenTriangle(ABC,DEF)",
             "Equal(LengthOfLine(AB),5)",
             "Equal(LengthOfLine(BC),6)",
             "Equal(LengthOfLine(AC),7)",
@@ -175380,9 +175378,9 @@
             "Shape(CE,ED,DF,FC)"
         ],
         "text_cdl": [
-            "IsMedianOfTriangle(AE, ABC)",
-            "IsMedianOfTriangle(BF, ABC)",
-            "IsMedianOfTriangle(CG, ABC)"
+            "IsMedianOfTriangle(AE,ABC)",
+            "IsMedianOfTriangle(BF,ABC)",
+            "IsMedianOfTriangle(CG,ABC)"
         ],
         "p_created": [
             "D"
@@ -175760,7 +175758,7 @@
             "Shape(HL,LK,KJ,JH)"
         ],
         "text_cdl": [
-            "IsMidsegmentOfTrapezoid(LH,FGJK)"
+            "IsMidsegmentOfQuadrilateral(LH,FGJK)"
         ],
         "p_created": [],
         "p_pos": {
@@ -176505,8 +176503,8 @@
             "Collinear(ACE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(13),Add(Mul(2,x),94))",
-            "Equal(MeasureOfAngle(14),Add(Mul(7,x),49))"
+            "Equal(MeasureOfAngle(BCA),Add(Mul(2,x),94))",
+            "Equal(MeasureOfAngle(DCE),Add(Mul(7,x),49))"
         ],
         "p_created": [
             "A",
@@ -179734,8 +179732,8 @@
             "Shape(FL,LK,KF)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(FH), LengthOfLine(FL))",
-            "Equal(LengthOfLine(FK), 17)"
+            "Equal(LengthOfLine(FH),LengthOfLine(FL))",
+            "Equal(LengthOfLine(FK),17)"
         ],
         "p_created": [],
         "p_pos": {
@@ -180573,7 +180571,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(EDA),96)",
-            "Equal(MeasureOfAngle(12),42)"
+            "Equal(MeasureOfAngle(KHI),42)"
         ],
         "p_created": [
             "A",
@@ -180953,9 +180951,9 @@
             "Shape(JL,LM,MJ)"
         ],
         "text_cdl": [
-            "IsAltitudeOfTriangle(AB,DAC)",
-            "IsAltitudeOfTriangle(JK,MJL)",
-            "Similar(Triangle(DAC),Triangle(MJL))",
+            "IsAltitudeOfTriangle(AB,ACD)",
+            "IsAltitudeOfTriangle(JK,JLM)",
+            "SimilarBetweenTriangle(DAC,MJL)",
             "Equal(LengthOfLine(AB),9)",
             "Equal(LengthOfLine(AC),Sub(Mul(4,x),8))",
             "Equal(LengthOfLine(JK),21)",
@@ -182717,7 +182715,7 @@
         "text_cdl": [
             "Equal(MeasureOfAngle(EBA),37)",
             "Equal(MeasureOfAngle(FBC),37)",
-            "Perpendicular(Line(BA),Line(BC))"
+            "PerpendicularBetweenLine(AB,CB)"
         ],
         "p_created": [
             "D",
@@ -184838,7 +184836,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(UOW),50)",
-            "Bisects(OV,Angle(UOW))"
+            "IsBisectorOfAngle(OV,UOW)"
         ],
         "p_created": [
             "A",
@@ -187186,9 +187184,7 @@
             "Equal(MeasureOfAngle(YZX),65)",
             "Equal(MeasureOfAngle(VWX),67)",
             "Equal(MeasureOfAngle(XYZ),58)",
-            "Equal(MeasureOfAngle(ZWX),MeasureOfAngle(8))",
-            "Equal(MeasureOfAngle(8),MeasureOfAngle(WZX))",
-            "Equal(MeasureOfAngle(WZX),MeasureOfAngle(9))"
+            "Equal(MeasureOfAngle(XWZ),MeasureOfAngle(WZX))"
         ],
         "construction_cdl": [
             "Collinear(VXZ)",
@@ -187252,7 +187248,9 @@
             "5": "m \\angle WXV",
             "6": "m \\angle WXZ",
             "4": "m \\angle WVX",
-            "7": "m \\angle YXZ"
+            "7": "m \\angle YXZ",
+            "8": "m \\angle XWZ",
+            "9": "m \\angle WZX"
         },
         "text_list": {
             "prob_4564": "Find m \\angle 5.",
@@ -187487,9 +187485,9 @@
             "Collinear(ABC)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(14),Add(x,25))",
-            "Equal(MeasureOfAngle(15),Add(Mul(4,x),50))",
-            "Equal(MeasureOfAngle(16),Add(x,45))"
+            "Equal(MeasureOfAngle(DBC),Add(x,25))",
+            "Equal(MeasureOfAngle(EBD),Add(Mul(4,x),50))",
+            "Equal(MeasureOfAngle(EBA),Add(x,45))"
         ],
         "p_created": [
             "A",
@@ -190567,7 +190565,7 @@
         "text_cdl": [
             "IsMedianOfTriangle(AD,ACB)",
             "IsMedianOfTriangle(CE,ACB)",
-            "Perpendicular(AD,CE)",
+            "PerpendicularBetweenLine(AF,EF)",
             "Equal(LengthOfLine(AB),10)",
             "Equal(LengthOfLine(CE),9)"
         ],
@@ -191190,7 +191188,7 @@
             "Equal(LengthOfLine(QR),547)",
             "Equal(LengthOfLine(RS),593)",
             "Equal(LengthOfLine(PS),756)",
-            "Equal(MeasureOfAngle(None),58)"
+            "Equal(MeasureOfAngle(QPS),58)"
         ],
         "p_created": [],
         "p_pos": {
@@ -193828,7 +193826,7 @@
         ],
         "text_cdl": [
             "Rhombus(WXYZ)",
-            "Equal(AreaOfShape(WXYZ),100)",
+            "Equal(AreaOfQuadrilateral(WXYZ),100)",
             "Equal(LengthOfLine(XZ),10)"
         ],
         "p_created": [
@@ -195656,8 +195654,8 @@
             "Cocircular(G,ADECB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(BC),30)",
-            "Equal(MeasureOfArc(AD),20)"
+            "Equal(MeasureOfArc(GBC),30)",
+            "Equal(MeasureOfArc(GAD),20)"
         ],
         "p_created": [
             "F",
@@ -196839,7 +196837,7 @@
         ],
         "text_cdl": [
             "RightTriangle(BCA)",
-            "IsAltitudeOfTriangle(CD,ABC)"
+            "IsAltitudeOfTriangle(CD,CAB)"
         ],
         "p_created": [],
         "p_pos": {
@@ -197187,7 +197185,7 @@
             "Cocircular(A,EF)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(EF), Mul(8, Pi))"
+            "Equal(MeasureOfArc(AEF),Mul(8,Pi))"
         ],
         "p_created": [
             "A"
@@ -201771,9 +201769,9 @@
             "Cocircular(Z,VWXYU)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(WZX), MeasureOfAngle(XZY))",
-            "Equal(MeasureOfAngle(VZU), Mul(4, x))",
-            "Equal(MeasureOfAngle(UZY), Add(Mul(2, x), 24))",
+            "Equal(MeasureOfAngle(WZX),MeasureOfAngle(XZY))",
+            "Equal(MeasureOfAngle(VZU),Mul(4,x))",
+            "Equal(MeasureOfAngle(UZY),Add(Mul(2,x),24))",
             "IsDiameterOfCircle(VY,Z)",
             "IsDiameterOfCircle(WU,Z)"
         ],
@@ -205125,9 +205123,7 @@
             "Equal(MeasureOfAngle(XWZ),23)",
             "Equal(MeasureOfAngle(WZX),24)",
             "Equal(MeasureOfAngle(ZXY),105)",
-            "Equal(MeasureOfAngle(ZYX),MeasureOfAngle(1))",
-            "Equal(MeasureOfAngle(1),MeasureOfAngle(XZY))",
-            "Equal(MeasureOfAngle(XZY),MeasureOfAngle(2))"
+            "Equal(MeasureOfAngle(ZYX),MeasureOfAngle(XZY))"
         ],
         "construction_cdl": [
             "Shape(WZ,ZX,XW)",
@@ -205178,6 +205174,8 @@
         ],
         "circles": [],
         "angle_ids": {
+            "1": "m \\angle ZYX",
+            "2": "m \\angle XZY",
             "3": "m \\angle ZXW"
         },
         "text_list": {
@@ -212199,8 +212197,8 @@
             "Shape(JM,MK,KJ)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))"
+            "Equal(MeasureOfAngle(FEG),MeasureOfAngle(MKJ))",
+            "Equal(MeasureOfAngle(GFE),MeasureOfAngle(JMK))"
         ],
         "p_created": [],
         "p_pos": {
@@ -212814,9 +212812,9 @@
             "Cocircular(B,DAEJGI)"
         ],
         "text_cdl": [
-            "HasDiameterOfCircle(A, 8)",
-            "HasDiameterOfCircle(B, 18)",
-            "HasDiameterOfCircle(C, 11)"
+            "Equal(DiameterOfCircle(A),8)",
+            "Equal(DiameterOfCircle(B),18)",
+            "Equal(DiameterOfCircle(C),11)"
         ],
         "p_created": [
             "D",
@@ -212913,9 +212911,9 @@
             "Shape(BZ,ZX,XV,VB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(XZ),100)",
-            "Perpendicular(Line(XY),Line(ST))",
-            "Perpendicular(Line(ZW),Line(ST))"
+            "Equal(MeasureOfArc(VXZ),100)",
+            "PerpendicularBetweenLine(XA,AT)",
+            "PerpendicularBetweenLine(SB,BW)"
         ],
         "p_created": [
             "A",
@@ -213128,7 +213126,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(AED),95)",
-            "Equal(MeasureOfArc(AD),120)"
+            "Equal(MeasureOfArc(FAD),120)"
         ],
         "p_created": [
             "F"
@@ -216113,8 +216111,8 @@
             "Shape(AB,BC,CA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),76)",
-            "Equal(MeasureOfAngle(None),Div(MeasureOfAngle(B),2))"
+            "Equal(MeasureOfAngle(ABC),125)",
+            "Equal(MeasureOfAngle(CAB),Div(MeasureOfAngle(ABC),2))"
         ],
         "p_created": [],
         "p_pos": {
@@ -216996,7 +216994,7 @@
         ],
         "text_cdl": [
             "Equal(MeasureOfAngle(BCE),Add(141,x))",
-            "Equal(MeasureOfAngle(10),Add(25,x))"
+            "Equal(MeasureOfAngle(DCE),Add(25,x))"
         ],
         "p_created": [
             "A",
@@ -217123,8 +217121,8 @@
             "Shape(PS,SR,RP)"
         ],
         "text_cdl": [
-            "Equal(RadiusOfCircle(P), 5)",
-            "Equal(LengthOfLine(PR), 3)"
+            "Equal(RadiusOfCircle(P),5)",
+            "Equal(LengthOfLine(PR),3)"
         ],
         "p_created": [],
         "p_pos": {
@@ -217641,8 +217639,8 @@
             "Shape(MP,PN,NM)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))"
+            "Equal(MeasureOfAngle(NMP),MeasureOfAngle(HGJ))",
+            "Equal(MeasureOfAngle(PNM),MeasureOfAngle(JHG))"
         ],
         "p_created": [],
         "p_pos": {
@@ -218089,9 +218087,9 @@
             "Shape(BP,PT,TS,SB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(APQ), MeasureOfArc(ARS))",
-            "Equal(MeasureOfAngle(APT), Add(Mul(6,x),11))",
-            "Equal(MeasureOfAngle(TSA), Add(Mul(9,x),19))"
+            "Equal(MeasureOfArc(APQ),MeasureOfArc(ARS))",
+            "Equal(MeasureOfAngle(APT),Add(Mul(6,x),11))",
+            "Equal(MeasureOfAngle(TSA),Add(Mul(9,x),19))"
         ],
         "p_created": [
             "B"
@@ -219685,8 +219683,8 @@
             "Shape(SU,UT,TS)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None), MeasureOfAngle(S))",
-            "Equal(MeasureOfAngle(None), MeasureOfAngle(T))"
+            "Equal(MeasureOfAngle(QPR),MeasureOfAngle(TSU))",
+            "Equal(MeasureOfAngle(RQP),MeasureOfAngle(UTS))"
         ],
         "p_created": [],
         "p_pos": {
@@ -221752,7 +221750,7 @@
     },
     "img_2595.png": {
         "image_cdl": [
-            "Equal(\\Phi F,15)"
+            "Equal(DiameterOfCircle(F),15)"
         ],
         "construction_cdl": [
             "Cocircular(F,BAEDC)",
@@ -222402,7 +222400,7 @@
             "Shape(XT,TY,YW,WX)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(WXY), MeasureOfAngle(TXY))"
+            "Equal(MeasureOfAngle(WXY),MeasureOfAngle(TXY))"
         ],
         "p_created": [],
         "p_pos": {
@@ -226303,8 +226301,8 @@
             "Collinear(ACE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(11), Mul(4, x))",
-            "Equal(MeasureOfAngle(12), Sub(Mul(2, x), 6))"
+            "Equal(MeasureOfAngle(ACD),Mul(4,x))",
+            "Equal(MeasureOfAngle(ECD),Sub(Mul(2,x),6))"
         ],
         "p_created": [
             "A",
@@ -227084,7 +227082,7 @@
         ],
         "text_cdl": [
             "Parallelogram(ABCD)",
-            "Equal(AreaOfShape($),153)"
+            "Equal(AreaOfQuadrilateral(ABCD),153)"
         ],
         "p_created": [
             "A",
@@ -227598,7 +227596,7 @@
             "Equal(LengthOfLine(AC),9)",
             "Equal(LengthOfLine(DE),9)",
             "ParallelBetweenLine(AC,ED)",
-            "AngleBisectorOfLine(BF,Angle(ABC))"
+            "IsBisectorOfAngle(BF,ABC)"
         ],
         "p_created": [],
         "p_pos": {
@@ -228773,7 +228771,7 @@
             "Shape(WY,YX,XB,BW)"
         ],
         "text_cdl": [
-            "IsConcurrentAt(IsBisectorOfAngle(XW,XYZ), IsBisectorOfAngle(YW,YXZ), IsBisectorOfAngle(ZW,ZXY), W)"
+            "IsIncenterOfTriangle(W,XYZ)"
         ],
         "p_created": [],
         "p_pos": {
@@ -230433,7 +230431,7 @@
             "Equal(LengthOfLine(BY),2.5)",
             "Equal(LengthOfLine(CZ),2.5)",
             "Equal(LengthOfLine(AX),2.5)",
-            "IsDiameterOfCircle(_,G,5)"
+            "Equal(DiameterOfCircle(G),5)"
         ],
         "p_created": [],
         "p_pos": {
@@ -232690,7 +232688,7 @@
             "Shape(AD,DB,BA)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(CAD), MeasureOfAngle(DAB))"
+            "Equal(MeasureOfAngle(CAD),MeasureOfAngle(DAB))"
         ],
         "p_created": [],
         "p_pos": {
@@ -233040,8 +233038,8 @@
             "Collinear(BCE)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(19),Add(100,Mul(20,x)))",
-            "Equal(MeasureOfAngle(20),Mul(20,x))"
+            "Equal(MeasureOfAngle(ECA),Add(100,Mul(20,x)))",
+            "Equal(MeasureOfAngle(BCA),Mul(20,x))"
         ],
         "p_created": [
             "A",
@@ -233278,8 +233276,8 @@
             "Shape(QS,SR,RQ)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))",
-            "Equal(MeasureOfAngle(None),MeasureOfAngle(None))"
+            "Equal(MeasureOfAngle(RQS),MeasureOfAngle(HTV))",
+            "Equal(MeasureOfAngle(SRQ),MeasureOfAngle(VHT))"
         ],
         "p_created": [],
         "p_pos": {
@@ -236914,7 +236912,7 @@
         "text_cdl": [
             "Parallelogram(ABCD)",
             "Parallelogram(FGHJ)",
-            "Similar(Parallelogram(ABCD),Parallelogram(FGHJ))"
+            "SimilarBetweenQuadrilateral(ADCB,FJHG)"
         ],
         "p_created": [],
         "p_pos": {
@@ -242726,7 +242724,7 @@
             "Shape(SZ,ZU,UT,TS)"
         ],
         "text_cdl": [
-            "Equal(ArcMeasure(TR),ArcMeasure(TV))",
+            "Equal(MeasureOfArc(ZTR),MeasureOfArc(ZTV))",
             "Equal(LengthOfLine(SZ),Add(x,4))",
             "Equal(LengthOfLine(UZ),Sub(Mul(2,x),1))"
         ],
@@ -243866,9 +243864,9 @@
             "Shape(EH,HG,GE)"
         ],
         "text_cdl": [
-            "Similar(Triangle(ACB),Triangle(EFG))",
-            "IsAltitudeOfTriangle(AD,Triangle(ACB))",
-            "IsAltitudeOfTriangle(EH,Triangle(EFG))",
+            "SimilarBetweenTriangle(ABC,EFG)",
+            "IsAltitudeOfTriangle(AD,ABC)",
+            "IsAltitudeOfTriangle(EH,EGF)",
             "Equal(LengthOfLine(AC),17)",
             "Equal(LengthOfLine(AD),15)",
             "Equal(LengthOfLine(EH),7.5)"
@@ -245313,7 +245311,7 @@
             "Cocircular(D,AECB)"
         ],
         "text_cdl": [
-            "Equal(MeasureOfArc(AC),160)",
+            "Equal(MeasureOfArc(DAC),160)",
             "Equal(MeasureOfAngle(BEC),38)"
         ],
         "p_created": [
@@ -248011,8 +248009,8 @@
             "Cocircular(W,AEDB)"
         ],
         "text_cdl": [
-            "Equal(LengthOfLine(CW), LengthOfLine(WF))",
-            "Equal(LengthOfLine(ED), 30)"
+            "Equal(LengthOfLine(CW),LengthOfLine(WF))",
+            "Equal(LengthOfLine(ED),30)"
         ],
         "p_created": [],
         "p_pos": {
@@ -249195,7 +249193,7 @@
         ],
         "text_cdl": [
             "Kite(ABCD)",
-            "Equal(AreaOfFigure($),92)"
+            "Equal(AreaOfQuadrilateral(ABCD),92)"
         ],
         "p_created": [
             "A",
@@ -252609,7 +252607,7 @@
             "Shape(BD,DE,EC,CB)"
         ],
         "text_cdl": [
-            "SimilarBetweenTriangle(UnknownTriangle1,UnknownTriangle2)"
+            "SimilarBetweenTriangle(ABC,ADE)"
         ],
         "p_created": [
             "A",
@@ -256956,7 +256954,7 @@
         ],
         "text_cdl": [
             "Trapezoid(ABCD)",
-            "Equal(AreaOfShape(?),78)"
+            "Equal(AreaOfQuadrilateral(ABCD),78)"
         ],
         "p_created": [
             "A",
@@ -260727,7 +260725,7 @@
             "Shape(PS,SR,RQ,QP)"
         ],
         "text_cdl": [
-            "IsMidsegmentOfTrapezoid(MN,PQRS)"
+            "IsMidsegmentOfQuadrilateral(MN,PQRS)"
         ],
         "p_created": [],
         "p_pos": {

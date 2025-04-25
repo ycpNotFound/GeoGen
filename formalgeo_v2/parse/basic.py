@@ -214,7 +214,7 @@ def parse_expr(problem, expr):
     # 使用正则表达式的lookahead和lookbehind来找到数字与字母之间的位置
     # expr = re.sub(r'(?<=\d)(?=[a-zA-Z])|(?<=[a-zA-Z])(?=\d)', '*', expr)
     expr = re.sub(r'(?<=\d)(?=[a-zA-Z(])|(?<=[a-zA-Z)])(?=\d)', '*', expr)
-    if '\\frac' in expr or '\\sqrt' in expr:
+    if '\\' in expr or '{' in expr:
         expr = str(latex2sympy(expr))
     expr = sympy.parsing.parse_expr(expr)
 
