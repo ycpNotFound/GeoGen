@@ -249,7 +249,6 @@ def clause_to_nature_language(clauses,
                     circle, points = items
                     condition_i = random.choice([
                         f"{', '.join(points)} lie on the circle {circle}",
-                        f"{', '.join(points)} lie on circle centered at {circle}",
                         f"{', '.join(points)} are on circle {circle}"
                     ])
             elif pred in PREDICATES_ENT:
@@ -553,3 +552,181 @@ def convert_upper_to_lower(name):
     return converted_name
 
 
+
+def replace_length_diameter(s):
+    # 定义正则表达式模式，用于匹配“LengthOfLine($任意一个大写字母$) = DiameterOfCircle($任意一个大写字母$)”
+    pattern_0 = r"LengthOfLine\(([A-Z]+)\) = DiameterOfCircle\(([A-Z]+)\)"
+    pattern_1 = r"DiameterOfCircle\(([A-Z]+)\) = LengthOfLine\(([A-Z]+)\)"
+    replace = r"\1 is diameter of circle \2"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def replace_length_radius(s):
+    pattern_0 = r"LengthOfLine\(([A-Z]+)\) = RadiusOfCircle\(([A-Z]+)\)"
+    pattern_1 = r"RadiusOfCircle\(([A-Z]+)\) = LengthOfLine\(([A-Z]+)\)"
+    replace = r"\1 is radius of circle \2"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def measure_of_arc(s):
+    pattern_0 = r"MeasureOfArc\(([A-Z]+)\)"
+    pattern_1 = r"MAR_([A-Z]+)"
+
+    s = re.sub(pattern_0, lambda match: f"m⌒{match.group(1)[1:]}", s)
+    s = re.sub(pattern_1, lambda match: f"m⌒{match.group(1)[1:]}", s)
+
+    return s
+
+def measure_of_angle(s):
+    pattern_0 = r"MeasureOfAngle\(([A-Z]+)\)"
+    pattern_1 = r"MA_([A-Z]+)"
+    replace = r"∠ \1"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def length_of_arc(s):
+    pattern_0 = r"LengthOfArc\(([A-Z]+)\)"
+    pattern_1 = r"LA_([A-Z]+)"
+    replace = r"⌒\1"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def radius_of_circle(s):
+    pattern_0 = r"RadiusOfCircle\(([A-Z])\)"
+    pattern_1 = r"RC_([A-Z])"
+    replace = r"r_\1"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+    
+def diameter_of_circle(s):
+    pattern_0 = r"DiameterOfCircle\(([A-Z])\)"
+    pattern_1 = r"DC_([A-Z])"
+    replace = r"d_\1"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def perimeter_of_triangle(s):
+    pattern_0 = r"PerimeterOfTriangle\(([A-Z]+)\)"
+    pattern_1 = r"PT_([A-Z]+)"
+    replace = r"C_\{\1\}"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def perimeter_of_quad(s):
+    pattern_1 = r"PQ_([A-Z]+)"
+    replace = r"C_\{\1\}"
+    # s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def perimeter_of_circle(s):
+    pattern_1 = r"PC_([A-Z]+)"
+    replace = r"C_\{\1\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def area_of_triangle(s):
+    pattern_0 = r"AreaOfTriangle\(([A-Z]+)\)"
+    pattern_1 = r"AT_([A-Z]+)"
+    replace = r"S_\{\1\}"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+
+
+def area_of_quad(s):
+    pattern_1 = r"AQ_([A-Z]+)"
+    replace = r"S_\{\1\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def area_of_sector(s):
+    pattern_1 = r"AS_([A-Z]+)"
+    replace = r"S^\{sector\}_\{\1\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def area_of_circle(s):
+    pattern_1 = r"AC_([A-Z])"
+    replace = r"S_\{\1\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def ratio_similar_triangle(s):
+    pattern_1 = r"RST_([A-Z]{3})([A-Z]{3})"
+    replace = r"k_\{\1, \2\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def ratio_similar_quad(s):
+    pattern_1 = r"RSQ_([A-Z]{4})([A-Z]{4})"
+    replace = r"k_\{\1, \2\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def ratio_similar_arc(s):
+    pattern_1 = r"RSA_([A-Z]{3})([A-Z]{3})"
+    replace = r"k_\{\1, \2\}"
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def ratio_mirror_similar_triangle(s):
+    pattern_1 = r"RMT_([A-Z]{3})([A-Z]{3})"
+    matches = re.findall(pattern_1, s)
+    for match in matches:
+        p1, p2 = match
+        p2_reverse = p2[::-1]
+        s = s.replace(f'RMT_{p1}{p2}', 
+                      f"k_{{{p1},{p2_reverse}}}")
+
+    return s
+
+def height_of_triangle(s):
+    pattern_0 = r"HeightOfTriangle\(([A-Z]+)\)"
+    pattern_1 = r"HT_([A-Z]+)"
+    replace = r"h_\{\1\}"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+def height_of_quad(s):
+    pattern_0 = r"HeightOfQuadrilateral\(([A-Z]+)\)"
+    pattern_1 = r"HQ_([A-Z]+)"
+    replace = r"h_\{\1\}"
+    s = re.sub(pattern_0, replace, s)
+    s = re.sub(pattern_1, replace, s)
+    return s
+
+
+def replace_symbols(solution):
+    new_s = solution
+
+    new_s = replace_length_diameter(new_s)
+    new_s = replace_length_radius(new_s)
+    new_s = measure_of_arc(new_s)
+    new_s = measure_of_angle(new_s)
+    new_s = length_of_arc(new_s)
+    new_s = radius_of_circle(new_s)
+    new_s = diameter_of_circle(new_s)
+    new_s = perimeter_of_triangle(new_s)
+    new_s = area_of_triangle(new_s)
+    new_s = perimeter_of_quad(new_s)
+    new_s = area_of_quad(new_s)
+    new_s = area_of_sector(new_s)
+    new_s = area_of_circle(new_s)
+    new_s = ratio_similar_triangle(new_s)
+    new_s = ratio_similar_quad(new_s)
+    new_s = ratio_mirror_similar_triangle(new_s)
+    new_s = height_of_triangle(new_s)
+    new_s = height_of_quad(new_s)
+    new_s = perimeter_of_circle(new_s)
+    new_s = ratio_similar_arc(new_s)
+    return new_s

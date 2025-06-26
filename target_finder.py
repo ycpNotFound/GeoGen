@@ -941,7 +941,7 @@ class TargetFinder():
             target_cdl = f"Value(LengthOfArc({ps}))"
         elif 'mar_' in str(sym):
             conclusion = f"measure of \\arc {ps[1:]} = {target_value}"
-            target_str = f"find the measure of {ps[1:]}"
+            target_str = f"find the measure of \\arc {ps[1:]}"
             target_cdl = f"Value(MeasureOfArc({ps}))"
         elif 'rc_' in str(sym):
             conclusion = f"radius of \\odot {ps} = {target_value}"
@@ -957,7 +957,7 @@ class TargetFinder():
             target_cdl = f"Value(PerimeterOfCircle({ps}))"
         elif 'ac_' in str(sym):
             conclusion = f"area of \\arc {ps} = {target_value}"
-            target_str = f"find the area of {ps}"
+            target_str = f"find the area of \\arc {ps}"
             target_cdl = f"Value(AreaOfCircle({ps}))"
         elif 'ps_' in str(sym):
             conclusion = f"perimeter of sector {ps} = {target_value}"
