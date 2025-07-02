@@ -148,7 +148,7 @@ def build_init_data(data_path, processor, output_dir, local_rank, world_size):
     return inputs, sliced_keys
 
 
-def vlm_chat(url, prompt, stop=None):
+def vllm_chat(url, prompt, stop=None):
     headers = {"Content-Type": "application/json"}
     payload = {
         "model": "any-model-name",
