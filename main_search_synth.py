@@ -123,7 +123,7 @@ def generate_one_sample(predicate_GDL,
         return (True, None)
     
     except Exception as e:
-        print(f"===== Error Occured: {fig_idx} =====")
+        print(f"===== Error Occurred: {fig_idx} =====")
         tb = traceback.format_exc()
         # print(tb)
         task_info = {
